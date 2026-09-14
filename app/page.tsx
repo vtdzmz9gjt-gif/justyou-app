@@ -1202,7 +1202,11 @@ export default function Home() {
   const s = STRINGS[lang] || STRINGS.en;
 
   useEffect(() => {
-    const detected = detectLang();
+    // A ?lang= link (for sharing with someone specific, or testing) wins
+    // over every other signal, including a previously saved preference.
+    const urlLang = new URLSearchParams(window.location.search).get("lang");
+    const detected =
+      urlLang && SUPPORTED_LANGS.includes(urlLang) ? urlLang : detectLang();
     setLang(detected);
     localStorage.setItem(LANG_KEY, detected);
 
