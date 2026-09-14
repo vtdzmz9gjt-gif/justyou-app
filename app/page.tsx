@@ -57,6 +57,12 @@ type Strings = {
   returnLabel: string;
   depthQuestion: string;
   depthOptions: string[];
+  // Template for the synthetic opening line sent when someone picks a mood
+  // chip instead of typing — "{mood}" is replaced with the translated mood
+  // word. Needed so that line is actually in the visitor's language rather
+  // than always English, which was steering the AI's replies into English
+  // regardless of the selected UI language.
+  moodPhrase: string;
 };
 
 const STRINGS: Record<string, Strings> = {
@@ -81,6 +87,7 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "the return",
     depthQuestion: "How much do you want to get into today?",
     depthOptions: ["Just looking around", "A little", "I've got something on my mind"],
+    moodPhrase: "I'm feeling {mood} right now.",
   },
   es: {
     brand: "El Regreso",
@@ -97,6 +104,7 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "el regreso",
     depthQuestion: "¿Qué tan a fondo quieres ir hoy?",
     depthOptions: ["Solo mirando", "Un poco", "Tengo algo en mente"],
+    moodPhrase: "Me siento {mood} ahora mismo.",
   },
   fr: {
     brand: "Le Retour",
@@ -113,6 +121,7 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "le retour",
     depthQuestion: "Tu veux aller jusqu'où aujourd'hui ?",
     depthOptions: ["Je regarde juste", "Un peu", "J'ai quelque chose en tête"],
+    moodPhrase: "Je me sens {mood} en ce moment.",
   },
   de: {
     brand: "Die Rückkehr",
@@ -129,6 +138,7 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "die rückkehr",
     depthQuestion: "Wie tief willst du heute gehen?",
     depthOptions: ["Ich schaue nur", "Ein bisschen", "Ich habe etwas im Kopf"],
+    moodPhrase: "Ich fühle mich gerade {mood}.",
   },
   pt: {
     brand: "O Retorno",
@@ -145,6 +155,7 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "o retorno",
     depthQuestion: "O quanto você quer se aprofundar hoje?",
     depthOptions: ["Só olhando", "Um pouco", "Tenho algo em mente"],
+    moodPhrase: "Estou me sentindo {mood} agora.",
   },
   it: {
     brand: "Il Ritorno",
@@ -161,6 +172,7 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "il ritorno",
     depthQuestion: "Quanto vuoi approfondire oggi?",
     depthOptions: ["Sto solo guardando", "Un po'", "Ho qualcosa in mente"],
+    moodPhrase: "Mi sento {mood} in questo momento.",
   },
   he: {
     brand: "החזרה",
@@ -177,6 +189,7 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "החזרה",
     depthQuestion: "כמה עמוק אתה רוצה להיכנס היום?",
     depthOptions: ["רק מסתכל", "קצת", "יש לי משהו בראש"],
+    moodPhrase: "אני מרגיש {mood} כרגע.",
   },
   ar: {
     brand: "العودة",
@@ -193,6 +206,7 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "العودة",
     depthQuestion: "كم تريد أن تتعمق اليوم؟",
     depthOptions: ["فقط أتصفح", "قليلاً", "لدي شيء في بالي"],
+    moodPhrase: "أشعر بأنني {mood} الآن.",
   },
   hi: {
     brand: "वापसी",
@@ -209,6 +223,7 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "वापसी",
     depthQuestion: "आज तुम कितना गहराई में जाना चाहते हो?",
     depthOptions: ["बस देख रहा हूँ", "थोड़ा सा", "मेरे मन में कुछ है"],
+    moodPhrase: "मुझे अभी {mood} महसूस हो रहा है.",
   },
   zh: {
     brand: "归来",
@@ -225,6 +240,7 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "归来",
     depthQuestion: "今天你想深入到什么程度？",
     depthOptions: ["只是看看", "一点点", "我心里有件事"],
+    moodPhrase: "我现在感觉{mood}。",
   },
   ja: {
     brand: "帰還",
@@ -241,6 +257,7 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "帰還",
     depthQuestion: "今日はどのくらい深く話したいですか？",
     depthOptions: ["ただ見ているだけ", "少しだけ", "気になることがある"],
+    moodPhrase: "今は{mood}な気分です。",
   },
   ru: {
     brand: "Возвращение",
@@ -257,6 +274,7 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "возвращение",
     depthQuestion: "Насколько глубоко ты хочешь зайти сегодня?",
     depthOptions: ["Просто смотрю", "Немного", "У меня кое-что на уме"],
+    moodPhrase: "Сейчас я чувствую себя {mood}.",
   },
   sq: {
     brand: "Kthimi",
@@ -273,6 +291,7 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "kthimi",
     depthQuestion: "Sa thellë dëshiron të shkosh sot?",
     depthOptions: ["Vetëm po shikoj", "Pak", "Kam diçka në mendje"],
+    moodPhrase: "Po ndihem {mood} tani.",
   },
   el: {
     brand: "Η Επιστροφή",
@@ -289,6 +308,7 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "η επιστροφή",
     depthQuestion: "Πόσο βαθιά θέλεις να πας σήμερα;",
     depthOptions: ["Απλώς κοιτάζω", "Λίγο", "Έχω κάτι στο μυαλό μου"],
+    moodPhrase: "Αισθάνομαι {mood} αυτή τη στιγμή.",
   },
   hy: {
     brand: "Վերադարձը",
@@ -305,6 +325,7 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "վերադարձը",
     depthQuestion: "Որքա՞ն խորը ես ուզում գնալ այսօր։",
     depthOptions: ["Պարզապես նայում եմ", "Մի քիչ", "Մտքումս մի բան կա"],
+    moodPhrase: "Հիմա ես {mood} եմ։",
   },
   sr: {
     brand: "Povratak",
@@ -321,6 +342,7 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "povratak",
     depthQuestion: "Koliko duboko želiš da ideš danas?",
     depthOptions: ["Samo gledam", "Malo", "Imam nešto na umu"],
+    moodPhrase: "Trenutno se osećam {mood}.",
   },
   hr: {
     brand: "Povratak",
@@ -337,6 +359,7 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "povratak",
     depthQuestion: "Koliko duboko želiš ići danas?",
     depthOptions: ["Samo gledam", "Malo", "Imam nešto na umu"],
+    moodPhrase: "Trenutno se osjećam {mood}.",
   },
   bs: {
     brand: "Povratak",
@@ -353,6 +376,7 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "povratak",
     depthQuestion: "Koliko duboko želiš ići danas?",
     depthOptions: ["Samo gledam", "Malo", "Imam nešto na umu"],
+    moodPhrase: "Trenutno se osjećam {mood}.",
   },
   bg: {
     brand: "Завръщането",
@@ -369,6 +393,7 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "завръщането",
     depthQuestion: "Колко дълбоко искаш да отидеш днес?",
     depthOptions: ["Просто гледам", "Малко", "Имам нещо наум"],
+    moodPhrase: "В момента се чувствам {mood}.",
   },
   mk: {
     brand: "Враќањето",
@@ -385,6 +410,7 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "враќањето",
     depthQuestion: "Колку длабоко сакаш да одиш денес?",
     depthOptions: ["Само гледам", "Малку", "Имам нешто на ум"],
+    moodPhrase: "Во моментот се чувствувам {mood}.",
   },
   ro: {
     brand: "Întoarcerea",
@@ -401,6 +427,7 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "întoarcerea",
     depthQuestion: "Cât de adânc vrei să mergi azi?",
     depthOptions: ["Doar mă uit", "Puțin", "Am ceva pe suflet"],
+    moodPhrase: "Mă simt {mood} chiar acum.",
   },
   sl: {
     brand: "Vrnitev",
@@ -417,6 +444,7 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "vrnitev",
     depthQuestion: "Kako globoko želiš iti danes?",
     depthOptions: ["Samo gledam", "Malo", "Nekaj imam v mislih"],
+    moodPhrase: "Trenutno se počutim {mood}.",
   },
 };
 
@@ -1228,7 +1256,10 @@ export default function Home() {
 
   function pickDepth(depthValue: Depth, moodLabel: string) {
     setDepth(depthValue);
-    send(`I'm feeling ${moodLabel.toLowerCase()} right now.`, depthValue);
+    const moodIndex = MOOD_KEYS.indexOf(moodLabel);
+    const translatedMood = (s.moods[moodIndex] ?? moodLabel).toLowerCase();
+    const phrase = s.moodPhrase.replace("{mood}", translatedMood);
+    send(phrase, depthValue);
   }
 
   async function saveEmail(e: FormEvent) {
