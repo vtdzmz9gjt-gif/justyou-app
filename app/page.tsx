@@ -478,6 +478,44 @@ const NATIVE_NAMES: Record<string, string> = {
   sl: "Slovenščina",
 };
 
+// Fallback guess when the visitor's browser language isn't one we
+// support — based on their country, read from the cookie middleware.ts
+// sets from Vercel's edge geo header. Browser language always wins when
+// it matches something we support; this only fills the gap.
+const COUNTRY_TO_LANG: Record<string, string> = {
+  US: "en", GB: "en", CA: "en", AU: "en", IE: "en", NZ: "en",
+  ES: "es", MX: "es", AR: "es", CO: "es", CL: "es", PE: "es", VE: "es",
+  EC: "es", GT: "es", CU: "es", BO: "es", DO: "es", HN: "es", PY: "es",
+  SV: "es", NI: "es", CR: "es", PA: "es", UY: "es", PR: "es",
+  FR: "fr", BE: "fr", LU: "fr", MC: "fr",
+  DE: "de", AT: "de", CH: "de", LI: "de",
+  PT: "pt", BR: "pt",
+  IT: "it",
+  IL: "he",
+  SA: "ar", AE: "ar", EG: "ar", MA: "ar", DZ: "ar", TN: "ar", JO: "ar",
+  LB: "ar", IQ: "ar", KW: "ar", QA: "ar", BH: "ar", OM: "ar", YE: "ar",
+  SY: "ar", LY: "ar", SD: "ar", PS: "ar",
+  IN: "hi",
+  CN: "zh", TW: "zh", HK: "zh",
+  JP: "ja",
+  RU: "ru", BY: "ru", KZ: "ru", KG: "ru",
+  AL: "sq", XK: "sq",
+  GR: "el", CY: "el",
+  AM: "hy",
+  RS: "sr",
+  HR: "hr",
+  BA: "bs",
+  BG: "bg",
+  MK: "mk",
+  RO: "ro", MD: "ro",
+  SI: "sl",
+};
+
+function getVisitorCountry(): string | null {
+  const match = document.cookie.match(/(?:^|; )visitor_country=([^;]*)/);
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
 function detectLang(): string {
   const stored = localStorage.getItem(LANG_KEY);
   if (stored && SUPPORTED_LANGS.includes(stored)) return stored;
@@ -486,6 +524,8 @@ function detectLang(): string {
     const short = c.toLowerCase().split("-")[0];
     if (SUPPORTED_LANGS.includes(short)) return short;
   }
+  const country = getVisitorCountry();
+  if (country && COUNTRY_TO_LANG[country]) return COUNTRY_TO_LANG[country];
   return "en";
 }
 
