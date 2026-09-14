@@ -9,3 +9,4 @@ data/*.db-wal
 *.log
 .vercel
 *.tsbuildinfo
+.env*

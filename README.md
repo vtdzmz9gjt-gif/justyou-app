@@ -19,9 +19,12 @@ check-in.
   Claude has two tools it can call mid-conversation: `record_commitment`
   and `resolve_open_commitment`. It decides when to use them — you don't
   have to parse its replies for intent.
-- **SQLite** (`lib/db.ts`, via `better-sqlite3`) — stores messages and
-  commitments per browser (a random ID is generated into `localStorage` on
-  first visit — there's no login for this prototype).
+- **Postgres** (`lib/db.ts`, via `@neondatabase/serverless`) — stores
+  messages and commitments per browser (a random ID is generated into
+  `localStorage` on first visit — there's no login for this prototype).
+  Needs `DATABASE_URL` set; on Vercel this is populated automatically once
+  a Postgres database (Neon, from the Vercel Marketplace) is connected to
+  the project.
 - **Proactive check-ins** (`app/api/cron/check-ins`) — optional. If someone
   leaves an email (via the ⋯ menu in the app) and you wire this endpoint
   to a daily scheduler, it emails them the day before a commitment is due,
@@ -35,47 +38,32 @@ check-in.
 
 ```bash
 npm install
-cp .env.example .env.local
-# edit .env.local and set ANTHROPIC_API_KEY
+vercel env pull   # pulls DATABASE_URL and ANTHROPIC_API_KEY from Vercel
 npm run dev
 ```
 
-Open http://localhost:3000. That's the whole setup for testing it
-yourself right now.
-
-> This project was put together in a sandboxed environment without access
-> to the npm registry, so `npm install` and `npm run build` haven't been
-> run here — the code has been written and reviewed carefully, but treat
-> the first `npm install` / `npm run dev` as the real first test. If a
-> dependency's types shifted slightly (SDK versions move fast), the fix is
-> almost always a one-line type adjustment in `lib/anthropic.ts`.
+Open http://localhost:3000. If you're not using Vercel's CLI, copy
+`.env.example` to `.env.local` and fill in `ANTHROPIC_API_KEY` and
+`DATABASE_URL` (any Postgres instance) yourself instead.
 
 ## Deploying so real people can use it
 
-Two things matter for deployment: the app needs a persistent filesystem
-(SQLite is a file), and it needs `ANTHROPIC_API_KEY` set as an environment
-variable on the host.
-
-- **Vercel**: works for the chat itself, but Vercel's serverless
-  filesystem is not persistent between deploys/cold starts — commitments
-  and message history can reset. Fine for a quick demo link, not for the
-  multi-week test in the spec's step 5.
-- **Railway, Render, Fly.io, or any small VPS** (recommended): these give
-  you a persistent disk, so SQLite just works. Point the service at this
-  repo, set `ANTHROPIC_API_KEY`, run `npm run build && npm start`.
-- If you outgrow SQLite (multiple server instances, need real backups),
-  swap `lib/db.ts` for Postgres — the rest of the app doesn't need to
-  change, since everything else calls the exported functions, not SQL
-  directly.
+Deployed on Vercel, aliased to the production domain. Needs
+`ANTHROPIC_API_KEY` and `DATABASE_URL` set as environment variables —
+`DATABASE_URL` is populated automatically once a Postgres database is
+connected to the project (Storage tab → connect a Postgres/Neon
+database), so persistence isn't tied to the serverless filesystem the
+way it would be with SQLite.
 
 ## Wiring up the proactive email nudge (optional)
 
 1. Get a free API key at [resend.com](https://resend.com).
-2. Set `RESEND_API_KEY` and `FROM_EMAIL` in your environment.
-3. Point any scheduler at `GET /api/cron/check-ins` once a day — a Vercel
-   Cron Job, a GitHub Action on a schedule, or a free pinger like
-   cron-job.org all work. If you set `CRON_SECRET`, send it as
-   `Authorization: Bearer <secret>`.
+2. Set `RESEND_API_KEY` (and optionally `FROM_EMAIL`) as an environment
+   variable on Vercel.
+3. That's it — `vercel.json` already schedules a Vercel Cron Job to hit
+   `GET /api/cron/check-ins` once a day. If you set `CRON_SECRET`, Vercel
+   automatically sends it as the `Authorization: Bearer <secret>` header
+   on its own scheduled requests.
 
 Skip all of this and the app still works — see "proactive check-ins"
 above.

@@ -24,8 +24,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  ensureUser(userId);
-  const history = getMessages(userId);
+  await ensureUser(userId);
+  const history = await getMessages(userId);
 
   let result: { reply: string; stage?: string };
   try {
@@ -38,8 +38,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  addMessage(userId, "user", message.trim());
-  addMessage(userId, "assistant", result.reply);
+  await addMessage(userId, "user", message.trim());
+  await addMessage(userId, "assistant", result.reply);
 
   return NextResponse.json({ reply: result.reply, stage: result.stage });
 }
@@ -49,6 +49,6 @@ export async function GET(req: NextRequest) {
   if (!userId) {
     return NextResponse.json({ error: "Missing userId." }, { status: 400 });
   }
-  ensureUser(userId);
-  return NextResponse.json({ messages: getMessages(userId) });
+  await ensureUser(userId);
+  return NextResponse.json({ messages: await getMessages(userId) });
 }

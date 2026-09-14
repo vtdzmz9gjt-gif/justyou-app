@@ -83,8 +83,8 @@ function todayContext(): string {
   return `Today's date is ${today}.`;
 }
 
-function openCommitmentContext(userId: string): string {
-  const open = getOpenCommitment(userId);
+async function openCommitmentContext(userId: string): Promise<string> {
+  const open = await getOpenCommitment(userId);
   if (!open) return "There is no open commitment right now.";
   return `There is an open commitment, not yet resolved: "${open.action}", target date ${open.target_date}. If that date has arrived or passed, raise it yourself early in your reply, low-pressure, in your own words — don't wait to be asked.`;
 }
@@ -109,9 +109,9 @@ function uiLanguageContext(uiLang: string | null | undefined): string {
   return `The visitor's browser/UI language is set to "${uiLang}". If their first message doesn't make the language clear on its own, default to responding in that language instead of English.`;
 }
 
-function stageContext(userId: string): string {
-  const currentStage = getUserStage(userId);
-  const percentages = getStagePercentages();
+async function stageContext(userId: string): Promise<string> {
+  const currentStage = await getUserStage(userId);
+  const percentages = await getStagePercentages();
   const pctLine = Object.keys(percentages).length
     ? `Current real distribution of people across stages: ${JSON.stringify(
         percentages
@@ -140,9 +140,13 @@ export async function runChat(
   depth?: string | null,
   uiLang?: string | null
 ): Promise<ChatResult> {
-  const system = `${BASE_SYSTEM_PROMPT}\n\n---\n\nCONTEXT (not visible to the person, never repeat it back verbatim):\n${todayContext()}\n${openCommitmentContext(
-    userId
-  )}\n${depthContext(depth)}\n${uiLanguageContext(uiLang)}\n${stageContext(userId)}`;
+  const [openCommitment, stageInfo] = await Promise.all([
+    openCommitmentContext(userId),
+    stageContext(userId),
+  ]);
+  const system = `${BASE_SYSTEM_PROMPT}\n\n---\n\nCONTEXT (not visible to the person, never repeat it back verbatim):\n${todayContext()}\n${openCommitment}\n${depthContext(
+    depth
+  )}\n${uiLanguageContext(uiLang)}\n${stageInfo}`;
 
   const messages: Anthropic.MessageParam[] = [
     ...toApiMessages(history),
@@ -175,55 +179,52 @@ export async function runChat(
 
     messages.push({ role: "assistant", content: response.content });
 
-    const toolResults: Anthropic.ToolResultBlockParam[] = toolUses.map(
-      (call) => {
-        try {
-          if (call.name === "record_commitment") {
-            const input = call.input as { action: string; target_date: string };
-            recordCommitment(userId, input.action, input.target_date);
-            return {
-              type: "tool_result",
-              tool_use_id: call.id,
-              content: "Recorded.",
-            };
-          }
-          if (call.name === "resolve_open_commitment") {
-            const input = call.input as { outcome: "landed" | "not_landed" };
-            resolveCommitment(userId, input.outcome);
-            return {
-              type: "tool_result",
-              tool_use_id: call.id,
-              content: `Recorded. Total landed commitments for this person: ${countLandedCommitments(
-                userId
-              )}.`,
-            };
-          }
-          if (call.name === "signal_depth") {
-            const input = call.input as { stage: Stage };
-            setUserStage(userId, input.stage);
-            newStage = input.stage;
-            return {
-              type: "tool_result",
-              tool_use_id: call.id,
-              content: "Recorded.",
-            };
-          }
-          return {
+    const toolResults: Anthropic.ToolResultBlockParam[] = [];
+    for (const call of toolUses) {
+      try {
+        if (call.name === "record_commitment") {
+          const input = call.input as { action: string; target_date: string };
+          await recordCommitment(userId, input.action, input.target_date);
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: call.id,
+            content: "Recorded.",
+          });
+        } else if (call.name === "resolve_open_commitment") {
+          const input = call.input as { outcome: "landed" | "not_landed" };
+          await resolveCommitment(userId, input.outcome);
+          const landedCount = await countLandedCommitments(userId);
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: call.id,
+            content: `Recorded. Total landed commitments for this person: ${landedCount}.`,
+          });
+        } else if (call.name === "signal_depth") {
+          const input = call.input as { stage: Stage };
+          await setUserStage(userId, input.stage);
+          newStage = input.stage;
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: call.id,
+            content: "Recorded.",
+          });
+        } else {
+          toolResults.push({
             type: "tool_result",
             tool_use_id: call.id,
             content: "Unknown tool.",
             is_error: true,
-          };
-        } catch (err) {
-          return {
-            type: "tool_result",
-            tool_use_id: call.id,
-            content: "Failed to record.",
-            is_error: true,
-          };
+          });
         }
+      } catch (err) {
+        toolResults.push({
+          type: "tool_result",
+          tool_use_id: call.id,
+          content: "Failed to record.",
+          is_error: true,
+        });
       }
-    );
+    }
 
     messages.push({ role: "user", content: toolResults });
 

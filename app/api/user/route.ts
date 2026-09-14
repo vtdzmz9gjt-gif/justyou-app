@@ -20,6 +20,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Invalid email." }, { status: 400 });
   }
 
-  setUserEmail(userId, email.trim());
+  await setUserEmail(userId, email.trim());
   return NextResponse.json({ ok: true });
 }

@@ -18,7 +18,7 @@ export async function GET(req: NextRequest) {
 
   const resendKey = process.env.RESEND_API_KEY;
   const fromEmail = process.env.FROM_EMAIL || "The Return <onboarding@resend.dev>";
-  const due = getDueReminders();
+  const due = await getDueReminders();
 
   if (!resendKey) {
     return NextResponse.json({
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
         subject: "Still doing the thing?",
         text: `${commitment.action}\n\nThat was the plan. Open The Return when you're ready.`,
       });
-      markReminderSent(commitment.id);
+      await markReminderSent(commitment.id);
       sent++;
     } catch (err) {
       console.error("reminder email failed", commitment.id, err);
