@@ -422,6 +422,34 @@ const STRINGS: Record<string, Strings> = {
 
 const SUPPORTED_LANGS = Object.keys(STRINGS);
 
+// Native display names for the language dropdown — showing "Shqip" instead
+// of just "SQ" is the difference between someone finding their language
+// and assuming it isn't there.
+const NATIVE_NAMES: Record<string, string> = {
+  en: "English",
+  es: "Español",
+  fr: "Français",
+  de: "Deutsch",
+  pt: "Português",
+  it: "Italiano",
+  he: "עברית",
+  ar: "العربية",
+  hi: "हिन्दी",
+  zh: "中文",
+  ja: "日本語",
+  ru: "Русский",
+  sq: "Shqip",
+  el: "Ελληνικά",
+  hy: "Հայերեն",
+  sr: "Srpski",
+  hr: "Hrvatski",
+  bs: "Bosanski",
+  bg: "Български",
+  mk: "Македонски",
+  ro: "Română",
+  sl: "Slovenščina",
+};
+
 function detectLang(): string {
   const stored = localStorage.getItem(LANG_KEY);
   if (stored && SUPPORTED_LANGS.includes(stored)) return stored;
@@ -1248,7 +1276,7 @@ export default function Home() {
           >
             {SUPPORTED_LANGS.map((code) => (
               <option key={code} value={code}>
-                {code.toUpperCase()}
+                {NATIVE_NAMES[code] || code.toUpperCase()}
               </option>
             ))}
           </select>
@@ -1288,7 +1316,7 @@ export default function Home() {
           >
             {SUPPORTED_LANGS.map((code) => (
               <option key={code} value={code}>
-                {code.toUpperCase()}
+                {NATIVE_NAMES[code] || code.toUpperCase()}
               </option>
             ))}
           </select>
