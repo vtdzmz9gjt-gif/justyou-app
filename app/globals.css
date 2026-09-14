@@ -537,3 +537,11 @@ body {
   margin-top: 1rem;
   padding: 0.6rem 1.8rem;
 }
+
+.onboarding-topbar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  padding: 1.1rem 1.5rem;
+  z-index: 1;
+}

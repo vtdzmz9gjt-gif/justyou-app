@@ -433,65 +433,642 @@ function detectLang(): string {
   return "en";
 }
 
-// --- Onboarding script screens, shown once before anything else ---
-// Copy is final and approved — preserve wording and order exactly as
-// written in onboarding-script.md; only the screen-break points here are
-// an implementation choice.
-function getOnboardingScreens(): { html: JSX.Element }[] {
+// --- Onboarding script, translated. English wording is the final,
+// approved copy from onboarding-script.md, preserved exactly; every other
+// language is a faithful translation of the same content and order.
+type OnboardingCopy = {
+  p1a: string;
+  p1b: string;
+  whoWeAreHint: string;
+  p2: string;
+  p3a: string;
+  p3b: string;
+  p4a: string;
+  p4b: string;
+  stageMystery: string;
+  stageMysteryDesc: string;
+  stageSafety: string;
+  stageSafetyDesc: string;
+  stageRecognition: string;
+  stageRecognitionDesc: string;
+  stageCourage: string;
+  stageCourageDesc: string;
+  stageReturn: string;
+  stageReturnDesc: string;
+  p5: string;
+  beforeYouStartHint: string;
+  p6: string;
+  continueLabel: string;
+  beginLabel: string;
+};
+
+const ONBOARDING_STRINGS: Record<string, OnboardingCopy> = {
+  en: {
+    p1a: "Most things on your phone are built to hold your attention as long as possible. This one isn't.",
+    p1b: "The whole point is the opposite: to help you need it less. If it does its job, you leave — not because you got bored, but because you got somewhere.",
+    whoWeAreHint: "Who we are",
+    p2: "Not a company chasing your attention. Not a wellness brand with a quiz and a subscription. A small group who got tired of performing ourselves, and built the thing we wished existed.",
+    p3a: "Think of it as a mentor — built on the thinking of the most influential and successful people who ever lived, distilled down to what actually works. Not just information. Something closer to spiritual, if you let it be.",
+    p3b: "This isn't here to help you understand yourself. It's here to help you win — at the things that actually matter to you. Understanding yourself just happens to be what it takes to get there.",
+    p4a: "Not therapy. Not a chatbot. Not another app asking for five minutes of your attention.",
+    p4b: "This is a space that follows you through five honest stages — the same ones underneath almost every real change a person ever makes, whether they had a name for it or not:",
+    stageMystery: "Mystery.",
+    stageMysteryDesc: "Something's off. You can't name it yet.",
+    stageSafety: "Safety.",
+    stageSafetyDesc: "You've admitted it — but you're still protecting yourself from what you might find.",
+    stageRecognition: "Recognition.",
+    stageRecognitionDesc: "The pattern becomes visible. Not the circumstances. The role you've been playing.",
+    stageCourage: "Courage.",
+    stageCourageDesc: "You know the truth now. It's asking something of you.",
+    stageReturn: "Return.",
+    stageReturnDesc: "Not fixed. Not arrived. Just no longer performing.",
+    p5: "You won't be told which stage you're in while you're in it. That's on purpose — naming it too early turns a real process into a personality quiz. You'll find out where you landed when the conversation is ready to tell you, not before.",
+    beforeYouStartHint: "Before you start",
+    p6: "You won't get there today, and that's fine. Nobody starts anywhere but the beginning. Wherever you actually are right now, it'll meet you there.",
+    continueLabel: "Continue",
+    beginLabel: "Begin",
+  },
+  es: {
+    p1a: "La mayoría de las cosas en tu teléfono están diseñadas para captar tu atención el mayor tiempo posible. Esto no.",
+    p1b: "El objetivo es justo lo contrario: ayudarte a necesitarlo menos. Si cumple su función, te vas — no porque te aburriste, sino porque llegaste a algún lado.",
+    whoWeAreHint: "Quiénes somos",
+    p2: "No somos una empresa que persigue tu atención. No somos una marca de bienestar con un cuestionario y una suscripción. Un pequeño grupo que se cansó de fingir, y construyó lo que deseaba que existiera.",
+    p3a: "Piénsalo como un mentor — construido sobre el pensamiento de las personas más influyentes y exitosas que han existido, reducido a lo que realmente funciona. No es solo información. Algo más cercano a lo espiritual, si lo permites.",
+    p3b: "Esto no está aquí para ayudarte a entenderte a ti mismo. Está aquí para ayudarte a ganar — en las cosas que realmente te importan. Entenderte a ti mismo resulta ser lo que se necesita para llegar ahí.",
+    p4a: "No es terapia. No es un chatbot. No es otra app pidiendo cinco minutos de tu atención.",
+    p4b: "Este es un espacio que te acompaña a través de cinco etapas honestas — las mismas que hay detrás de casi todo cambio real que una persona hace, tuviera nombre o no:",
+    stageMystery: "Misterio.",
+    stageMysteryDesc: "Algo no está bien. Aún no sabes nombrarlo.",
+    stageSafety: "Seguridad.",
+    stageSafetyDesc: "Ya lo admitiste — pero todavía te proteges de lo que puedas encontrar.",
+    stageRecognition: "Reconocimiento.",
+    stageRecognitionDesc: "El patrón se hace visible. No las circunstancias. El papel que has estado interpretando.",
+    stageCourage: "Coraje.",
+    stageCourageDesc: "Ya conoces la verdad. Te está pidiendo algo.",
+    stageReturn: "Regreso.",
+    stageReturnDesc: "No arreglado. No llegado. Simplemente ya no actuando un papel.",
+    p5: "No te dirán en qué etapa estás mientras estás en ella. Es a propósito — nombrarlo demasiado pronto convierte un proceso real en un test de personalidad. Sabrás dónde llegaste cuando la conversación esté lista para decírtelo, no antes.",
+    beforeYouStartHint: "Antes de empezar",
+    p6: "Hoy no vas a llegar, y está bien. Nadie empieza en otro lugar que no sea el principio. Donde sea que estés ahora mismo, te va a encontrar ahí.",
+    continueLabel: "Continuar",
+    beginLabel: "Empezar",
+  },
+  fr: {
+    p1a: "La plupart des choses sur ton téléphone sont conçues pour capter ton attention le plus longtemps possible. Pas celle-ci.",
+    p1b: "Le but est justement l'inverse : t'aider à en avoir moins besoin. Si elle fait son travail, tu pars — pas parce que tu t'es ennuyé, mais parce que tu es arrivé quelque part.",
+    whoWeAreHint: "Qui nous sommes",
+    p2: "Pas une entreprise qui chasse ton attention. Pas une marque de bien-être avec un quiz et un abonnement. Un petit groupe fatigué de jouer un rôle, qui a construit ce qu'il aurait aimé trouver.",
+    p3a: "Vois ça comme un mentor — construit sur la pensée des personnes les plus influentes et accomplies qui ont existé, réduite à ce qui fonctionne vraiment. Pas juste de l'information. Quelque chose de plus proche du spirituel, si tu le laisses être.",
+    p3b: "Ce n'est pas là pour t'aider à te comprendre. C'est là pour t'aider à gagner — dans les choses qui comptent vraiment pour toi. Se comprendre soi-même, c'est juste ce qu'il faut pour y arriver.",
+    p4a: "Pas de la thérapie. Pas un chatbot. Pas une autre appli qui demande cinq minutes de ton attention.",
+    p4b: "C'est un espace qui t'accompagne à travers cinq étapes honnêtes — celles qui sous-tendent presque tous les vrais changements qu'une personne fait, qu'elle leur ait donné un nom ou non :",
+    stageMystery: "Mystère.",
+    stageMysteryDesc: "Quelque chose ne va pas. Tu ne sais pas encore le nommer.",
+    stageSafety: "Sécurité.",
+    stageSafetyDesc: "Tu l'as admis — mais tu te protèges encore de ce que tu pourrais trouver.",
+    stageRecognition: "Reconnaissance.",
+    stageRecognitionDesc: "Le schéma devient visible. Pas les circonstances. Le rôle que tu as joué.",
+    stageCourage: "Courage.",
+    stageCourageDesc: "Tu connais la vérité maintenant. Elle te demande quelque chose.",
+    stageReturn: "Retour.",
+    stageReturnDesc: "Pas réparé. Pas arrivé. Juste plus en train de jouer un rôle.",
+    p5: "On ne te dira pas à quelle étape tu es pendant que tu y es. C'est voulu — le nommer trop tôt transforme un vrai processus en test de personnalité. Tu sauras où tu en es quand la conversation sera prête à te le dire, pas avant.",
+    beforeYouStartHint: "Avant de commencer",
+    p6: "Tu n'y arriveras pas aujourd'hui, et c'est normal. Personne ne commence ailleurs qu'au début. Où que tu sois vraiment en ce moment, ça te retrouvera là.",
+    continueLabel: "Continuer",
+    beginLabel: "Commencer",
+  },
+  de: {
+    p1a: "Die meisten Dinge auf deinem Handy sind darauf ausgelegt, deine Aufmerksamkeit so lange wie möglich zu halten. Das hier nicht.",
+    p1b: "Der ganze Sinn ist das Gegenteil: dir zu helfen, es weniger zu brauchen. Wenn es seinen Zweck erfüllt, gehst du — nicht weil dir langweilig wurde, sondern weil du irgendwo angekommen bist.",
+    whoWeAreHint: "Wer wir sind",
+    p2: "Kein Unternehmen, das deine Aufmerksamkeit jagt. Keine Wellness-Marke mit Quiz und Abo. Eine kleine Gruppe, die es leid war, sich selbst vorzuspielen, und das gebaut hat, was sie sich gewünscht hätte.",
+    p3a: "Stell es dir wie einen Mentor vor — aufgebaut auf dem Denken der einflussreichsten und erfolgreichsten Menschen, die je gelebt haben, verdichtet auf das, was wirklich funktioniert. Nicht nur Information. Etwas, das dem Spirituellen nahekommt, wenn du es zulässt.",
+    p3b: "Das hier soll dir nicht helfen, dich selbst zu verstehen. Es soll dir helfen zu gewinnen — bei den Dingen, die dir wirklich wichtig sind. Sich selbst zu verstehen ist nur das, was es dafür braucht.",
+    p4a: "Keine Therapie. Kein Chatbot. Keine weitere App, die fünf Minuten deiner Aufmerksamkeit will.",
+    p4b: "Das ist ein Raum, der dich durch fünf ehrliche Stufen begleitet — dieselben, die fast jeder echten Veränderung zugrunde liegen, ob sie einen Namen dafür hatten oder nicht:",
+    stageMystery: "Rätsel.",
+    stageMysteryDesc: "Etwas stimmt nicht. Du kannst es noch nicht benennen.",
+    stageSafety: "Sicherheit.",
+    stageSafetyDesc: "Du hast es zugegeben — aber du schützt dich noch davor, was du finden könntest.",
+    stageRecognition: "Erkenntnis.",
+    stageRecognitionDesc: "Das Muster wird sichtbar. Nicht die Umstände. Die Rolle, die du gespielt hast.",
+    stageCourage: "Mut.",
+    stageCourageDesc: "Du kennst jetzt die Wahrheit. Sie verlangt etwas von dir.",
+    stageReturn: "Rückkehr.",
+    stageReturnDesc: "Nicht geheilt. Nicht angekommen. Einfach nicht mehr spielend.",
+    p5: "Man wird dir nicht sagen, in welcher Stufe du bist, während du darin bist. Das ist Absicht — es zu früh zu benennen macht aus einem echten Prozess ein Persönlichkeitsquiz. Du erfährst, wo du gelandet bist, wenn das Gespräch bereit ist, es dir zu sagen — nicht vorher.",
+    beforeYouStartHint: "Bevor du anfängst",
+    p6: "Du wirst heute nicht dort ankommen, und das ist okay. Niemand beginnt irgendwo anders als am Anfang. Wo auch immer du gerade wirklich bist — es wird dich dort abholen.",
+    continueLabel: "Weiter",
+    beginLabel: "Anfangen",
+  },
+  pt: {
+    p1a: "A maioria das coisas no seu telefone é feita para reter sua atenção o máximo de tempo possível. Esta não.",
+    p1b: "O objetivo é justamente o contrário: ajudar você a precisar menos disso. Se fizer o que deve, você vai embora — não porque se cansou, mas porque chegou a algum lugar.",
+    whoWeAreHint: "Quem somos",
+    p2: "Não somos uma empresa atrás da sua atenção. Não somos uma marca de bem-estar com questionário e assinatura. Um pequeno grupo que se cansou de fingir e construiu o que gostaria que existisse.",
+    p3a: "Pense nisso como um mentor — construído sobre o pensamento das pessoas mais influentes e bem-sucedidas que já existiram, reduzido ao que realmente funciona. Não é só informação. Algo mais perto do espiritual, se você deixar.",
+    p3b: "Isto não está aqui para ajudar você a se entender. Está aqui para ajudar você a vencer — nas coisas que realmente importam para você. Entender a si mesmo é só o que é preciso para chegar lá.",
+    p4a: "Não é terapia. Não é um chatbot. Não é mais um app pedindo cinco minutos da sua atenção.",
+    p4b: "Este é um espaço que acompanha você por cinco estágios honestos — os mesmos que estão por trás de quase toda mudança real que uma pessoa faz, tendo um nome para isso ou não:",
+    stageMystery: "Mistério.",
+    stageMysteryDesc: "Algo não está certo. Você ainda não sabe nomear.",
+    stageSafety: "Segurança.",
+    stageSafetyDesc: "Você já admitiu — mas ainda está se protegendo do que pode encontrar.",
+    stageRecognition: "Reconhecimento.",
+    stageRecognitionDesc: "O padrão se torna visível. Não as circunstâncias. O papel que você tem interpretado.",
+    stageCourage: "Coragem.",
+    stageCourageDesc: "Você já conhece a verdade. Ela está pedindo algo de você.",
+    stageReturn: "Retorno.",
+    stageReturnDesc: "Não resolvido. Não chegado. Só não mais representando um papel.",
+    p5: "Você não vai saber em que estágio está enquanto estiver nele. Isso é de propósito — nomear cedo demais transforma um processo real em teste de personalidade. Você vai descobrir onde chegou quando a conversa estiver pronta para dizer, não antes.",
+    beforeYouStartHint: "Antes de começar",
+    p6: "Você não vai chegar lá hoje, e está tudo bem. Ninguém começa em outro lugar além do início. Onde você estiver agora, é aí que isso vai te encontrar.",
+    continueLabel: "Continuar",
+    beginLabel: "Começar",
+  },
+  it: {
+    p1a: "La maggior parte delle cose sul tuo telefono è pensata per trattenere la tua attenzione quanto più possibile. Questa no.",
+    p1b: "Lo scopo è proprio l'opposto: aiutarti ad averne meno bisogno. Se fa il suo lavoro, te ne vai — non perché ti sei annoiato, ma perché sei arrivato da qualche parte.",
+    whoWeAreHint: "Chi siamo",
+    p2: "Non un'azienda a caccia della tua attenzione. Non un marchio di benessere con quiz e abbonamento. Un piccolo gruppo stanco di recitare una parte, che ha costruito ciò che avrebbe voluto trovare.",
+    p3a: "Pensalo come un mentore — costruito sul pensiero delle persone più influenti e di successo che siano mai esistite, distillato in ciò che funziona davvero. Non solo informazioni. Qualcosa più vicino allo spirituale, se glielo permetti.",
+    p3b: "Non è qui per aiutarti a capire te stesso. È qui per aiutarti a vincere — nelle cose che contano davvero per te. Capire te stesso è solo ciò che serve per arrivarci.",
+    p4a: "Non è terapia. Non è un chatbot. Non è un'altra app che chiede cinque minuti della tua attenzione.",
+    p4b: "Questo è uno spazio che ti accompagna attraverso cinque fasi oneste — le stesse che stanno dietro quasi ogni vero cambiamento che una persona fa, che gli avesse dato un nome o no:",
+    stageMystery: "Mistero.",
+    stageMysteryDesc: "Qualcosa non va. Non sai ancora nominarlo.",
+    stageSafety: "Sicurezza.",
+    stageSafetyDesc: "L'hai ammesso — ma ti stai ancora proteggendo da ciò che potresti trovare.",
+    stageRecognition: "Riconoscimento.",
+    stageRecognitionDesc: "Lo schema diventa visibile. Non le circostanze. Il ruolo che hai interpretato.",
+    stageCourage: "Coraggio.",
+    stageCourageDesc: "Ora conosci la verità. Ti sta chiedendo qualcosa.",
+    stageReturn: "Ritorno.",
+    stageReturnDesc: "Non risolto. Non arrivato. Solo non più recitando.",
+    p5: "Non ti sarà detto in che fase sei mentre ci sei dentro. È voluto — nominarlo troppo presto trasforma un processo vero in un test di personalità. Saprai dove sei arrivato quando la conversazione sarà pronta a dirtelo, non prima.",
+    beforeYouStartHint: "Prima di iniziare",
+    p6: "Non ci arriverai oggi, e va bene così. Nessuno comincia altrove se non dall'inizio. Ovunque tu sia davvero in questo momento, ti troverà lì.",
+    continueLabel: "Continua",
+    beginLabel: "Inizia",
+  },
+  he: {
+    p1a: "רוב הדברים בטלפון שלך נועדו לתפוס את הקשב שלך כל עוד שאפשר. זה לא כזה.",
+    p1b: "כל המטרה היא ההפך: לעזור לך להזדקק לזה פחות. אם זה עושה את העבודה, אתה עוזב — לא כי נמאס לך, אלא כי הגעת לאיזשהו מקום.",
+    whoWeAreHint: "מי אנחנו",
+    p2: "לא חברה שרודפת אחרי הקשב שלך. לא מותג וולנס עם שאלון ומנוי. קבוצה קטנה שנמאס לה להעמיד פנים, ובנתה את מה שהיינו רוצים שיהיה קיים.",
+    p3a: "תחשוב על זה כמנטור — בנוי על החשיבה של האנשים המשפיעים והמצליחים ביותר שחיו אי פעם, מזוקק למה שבאמת עובד. לא רק מידע. משהו קרוב יותר לרוחני, אם תיתן לזה להיות.",
+    p3b: "זה לא כאן כדי לעזור לך להבין את עצמך. זה כאן כדי לעזור לך לנצח — בדברים שבאמת חשובים לך. להבין את עצמך זה סתם מה שצריך כדי להגיע לשם.",
+    p4a: "לא טיפול. לא צ'אטבוט. לא עוד אפליקציה שמבקשת חמש דקות מהקשב שלך.",
+    p4b: "זה מרחב שמלווה אותך בחמישה שלבים כנים — אותם שלבים שעומדים בבסיס כל שינוי אמיתי שאדם עושה, בין אם היה לזה שם ובין אם לא:",
+    stageMystery: "תעלומה.",
+    stageMysteryDesc: "משהו לא בסדר. אתה עדיין לא יודע לקרוא לזה בשם.",
+    stageSafety: "ביטחון.",
+    stageSafetyDesc: "הודית בזה — אבל אתה עדיין מגן על עצמך ממה שאתה עשוי למצוא.",
+    stageRecognition: "הכרה.",
+    stageRecognitionDesc: "הדפוס הופך לגלוי. לא הנסיבות. התפקיד שאתה משחק.",
+    stageCourage: "אומץ.",
+    stageCourageDesc: "אתה יודע את האמת עכשיו. היא מבקשת ממך משהו.",
+    stageReturn: "חזרה.",
+    stageReturnDesc: "לא מתוקן. לא הגיע. פשוט לא מעמיד פנים יותר.",
+    p5: "לא יגידו לך באיזה שלב אתה נמצא בזמן שאתה בו. זה בכוונה — לקרוא לזה בשם מוקדם מדי הופך תהליך אמיתי למבחן אישיות. תגלה איפה נחת כשהשיחה תהיה מוכנה להגיד לך, לא לפני.",
+    beforeYouStartHint: "לפני שתתחיל",
+    p6: "לא תגיע לשם היום, וזה בסדר. אף אחד לא מתחיל במקום אחר מלבד ההתחלה. בכל מקום שאתה נמצא בו באמת עכשיו, זה יפגוש אותך שם.",
+    continueLabel: "המשך",
+    beginLabel: "התחל",
+  },
+  ar: {
+    p1a: "معظم الأشياء في هاتفك مصممة للاستحواذ على انتباهك لأطول وقت ممكن. هذا ليس كذلك.",
+    p1b: "الهدف كله هو العكس: مساعدتك على الحاجة إليه أقل. إذا قام بمهمته، ستغادر — ليس لأنك شعرت بالملل، بل لأنك وصلت إلى مكان ما.",
+    whoWeAreHint: "من نحن",
+    p2: "ليس شركة تسعى وراء انتباهك. ليس علامة عافية بها استبيان واشتراك. مجموعة صغيرة تعبت من التمثيل على نفسها، وبنت الشيء الذي كانت تتمنى وجوده.",
+    p3a: "فكر فيه كمرشد — مبني على تفكير أكثر الأشخاص تأثيرًا ونجاحًا الذين عاشوا، مُختزَل إلى ما ينجح فعلاً. ليس مجرد معلومات. شيء أقرب إلى الروحي، إذا سمحت له بذلك.",
+    p3b: "هذا ليس موجودًا لمساعدتك على فهم نفسك. إنه موجود لمساعدتك على الفوز — في الأشياء التي تهمك بالفعل. فهم نفسك هو فقط ما يتطلبه الوصول إلى هناك.",
+    p4a: "ليس علاجًا نفسيًا. ليس روبوت محادثة. ليس تطبيقًا آخر يطلب خمس دقائق من انتباهك.",
+    p4b: "هذا مساحة تسير معك عبر خمس مراحل صادقة — نفس المراحل الكامنة تحت كل تغيير حقيقي يقوم به أي شخص، سواء كان لديه اسم لها أم لا:",
+    stageMystery: "اللغز.",
+    stageMysteryDesc: "هناك شيء ليس على ما يرام. لا تستطيع تسميته بعد.",
+    stageSafety: "الأمان.",
+    stageSafetyDesc: "لقد أقررت به — لكنك ما زلت تحمي نفسك من ما قد تجده.",
+    stageRecognition: "الإدراك.",
+    stageRecognitionDesc: "النمط يصبح واضحًا. ليس الظروف. الدور الذي كنت تلعبه.",
+    stageCourage: "الشجاعة.",
+    stageCourageDesc: "أنت تعرف الحقيقة الآن. إنها تطلب منك شيئًا.",
+    stageReturn: "العودة.",
+    stageReturnDesc: "لست مُصلحًا. لم تصل. فقط لم تعد تمثّل.",
+    p5: "لن يُقال لك في أي مرحلة أنت وأنت فيها. هذا مقصود — تسميتها مبكرًا جدًا تحوّل عملية حقيقية إلى اختبار شخصية. ستعرف أين وصلت عندما تكون المحادثة جاهزة لإخبارك، لا قبل ذلك.",
+    beforeYouStartHint: "قبل أن تبدأ",
+    p6: "لن تصل إلى هناك اليوم، ولا بأس بذلك. لا أحد يبدأ من أي مكان سوى البداية. أينما كنت فعلاً الآن، سيجدك هناك.",
+    continueLabel: "استمر",
+    beginLabel: "ابدأ",
+  },
+  hi: {
+    p1a: "तुम्हारे फ़ोन पर ज़्यादातर चीज़ें तुम्हारा ध्यान जितना हो सके उतनी देर तक बनाए रखने के लिए बनी हैं। यह वैसी नहीं है।",
+    p1b: "पूरा मकसद इसका उल्टा है: तुम्हें इसकी ज़रूरत कम करना। अगर यह अपना काम करती है, तो तुम चले जाओगे — बोरियत की वजह से नहीं, बल्कि इसलिए कि तुम कहीं पहुँच गए।",
+    whoWeAreHint: "हम कौन हैं",
+    p2: "तुम्हारा ध्यान खींचने वाली कोई कंपनी नहीं। क्विज़ और सब्सक्रिप्शन वाला वेलनेस ब्रांड नहीं। एक छोटा समूह जो खुद दिखावा करते-करते थक गया, और वही चीज़ बनाई जो वह चाहता था कि मौजूद हो।",
+    p3a: "इसे एक मेंटर की तरह सोचो — जो अब तक के सबसे प्रभावशाली और सफल लोगों की सोच पर बना है, और उसे इस तक सीमित किया गया है जो असल में काम करता है। सिर्फ जानकारी नहीं। कुछ ऐसा जो आध्यात्मिक के करीब है, अगर तुम उसे होने दो।",
+    p3b: "यह तुम्हें खुद को समझने में मदद करने के लिए नहीं है। यह तुम्हें जीतने में मदद करने के लिए है — उन चीज़ों में जो तुम्हारे लिए असल में मायने रखती हैं। खुद को समझना बस वही है जो वहाँ पहुँचने के लिए ज़रूरी है।",
+    p4a: "थेरेपी नहीं। चैटबॉट नहीं। तुम्हारे ध्यान के पाँच मिनट माँगने वाली और कोई ऐप नहीं।",
+    p4b: "यह एक ऐसी जगह है जो तुम्हारे साथ पाँच ईमानदार चरणों से गुज़रती है — वही चरण जो लगभग हर असली बदलाव के पीछे होते हैं, चाहे उसे कोई नाम दिया गया हो या नहीं:",
+    stageMystery: "रहस्य।",
+    stageMysteryDesc: "कुछ ठीक नहीं है। तुम अभी उसे नाम नहीं दे पा रहे।",
+    stageSafety: "सुरक्षा।",
+    stageSafetyDesc: "तुमने इसे मान लिया है — लेकिन तुम अब भी खुद को उससे बचा रहे हो जो तुम पा सकते हो।",
+    stageRecognition: "पहचान।",
+    stageRecognitionDesc: "पैटर्न दिखने लगता है। हालात नहीं। वह भूमिका जो तुम निभा रहे थे।",
+    stageCourage: "हिम्मत।",
+    stageCourageDesc: "अब तुम सच जानते हो। यह तुमसे कुछ माँग रहा है।",
+    stageReturn: "वापसी।",
+    stageReturnDesc: "ठीक नहीं हुआ। पहुँचा नहीं। सिर्फ अब दिखावा नहीं कर रहा।",
+    p5: "जब तुम किसी चरण में हो, तो तुम्हें बताया नहीं जाएगा कि तुम किस चरण में हो। यह जानबूझकर है — बहुत जल्दी नाम देना एक असली प्रक्रिया को पर्सनैलिटी क्विज़ बना देता है। तुम्हें पता चलेगा कि तुम कहाँ पहुँचे, जब बातचीत तुम्हें बताने के लिए तैयार होगी, उससे पहले नहीं।",
+    beforeYouStartHint: "शुरू करने से पहले",
+    p6: "आज तुम वहाँ नहीं पहुँचोगे, और यह ठीक है। कोई भी शुरुआत के अलावा कहीं और से शुरू नहीं करता। तुम अभी असल में जहाँ भी हो, यह तुम्हें वहीं मिलेगा।",
+    continueLabel: "जारी रखें",
+    beginLabel: "शुरू करें",
+  },
+  zh: {
+    p1a: "你手机上的大多数东西都是为了尽可能长时间抓住你的注意力而设计的。这个不是。",
+    p1b: "它的目的恰恰相反：帮你不再那么需要它。如果它做到了，你会离开——不是因为你厌倦了，而是因为你到达了某个地方。",
+    whoWeAreHint: "我们是谁",
+    p2: "不是一家追逐你注意力的公司。不是带测验和订阅的健康品牌。一小群人厌倦了自我表演，于是做出了他们希望存在的东西。",
+    p3a: "把它想成一位导师——建立在历史上最有影响力、最成功的人的思想之上，提炼成真正有效的东西。不只是信息。如果你愿意，它更接近某种精神层面的东西。",
+    p3b: "它不是为了帮你理解自己而存在。它是为了帮你赢——在那些对你真正重要的事情上。理解自己只是到达那里所需要的东西。",
+    p4a: "不是心理治疗。不是聊天机器人。不是又一个索取你五分钟注意力的应用。",
+    p4b: "这是一个陪你走过五个诚实阶段的空间——几乎每一次真正的改变背后都有这些阶段，无论一个人是否给它们起过名字：",
+    stageMystery: "迷茫。",
+    stageMysteryDesc: "有什么不对，但你还说不出来。",
+    stageSafety: "安全。",
+    stageSafetyDesc: "你已经承认了——但你仍在保护自己，不去面对可能发现的东西。",
+    stageRecognition: "看清。",
+    stageRecognitionDesc: "模式开始显现。不是境遇本身，而是你一直在扮演的角色。",
+    stageCourage: "勇气。",
+    stageCourageDesc: "你现在知道真相了。它在向你提出要求。",
+    stageReturn: "归来。",
+    stageReturnDesc: "没有被修复，也没有到达终点。只是不再表演了。",
+    p5: "在你身处某个阶段时，不会有人告诉你你在哪个阶段。这是有意为之——过早说出来会把一个真实的过程变成性格测试。等对话准备好告诉你时，你才会知道自己走到了哪里，不会更早。",
+    beforeYouStartHint: "开始之前",
+    p6: "今天你不会到达那里，这没关系。没有人会从别的地方开始，只能从起点开始。无论你现在真正身处何处，它都会在那里与你相遇。",
+    continueLabel: "继续",
+    beginLabel: "开始",
+  },
+  ja: {
+    p1a: "スマホの中のほとんどのものは、できるだけ長くあなたの注意を引き続けるために作られている。これは違う。",
+    p1b: "目的はまったく逆——これを必要としなくなるように助けること。役割を果たせたなら、あなたは離れていく。飽きたからじゃなく、どこかに辿り着いたから。",
+    whoWeAreHint: "私たちについて",
+    p2: "あなたの注意を追いかける会社ではない。診断とサブスクのウェルネスブランドでもない。演じることに疲れた小さなグループが、自分たちが欲しかったものを作った。",
+    p3a: "メンターだと思ってほしい——歴史上もっとも影響力があり成功した人々の思考を、本当に効く部分だけに絞り込んだもの。ただの情報じゃない。あなたがそう許すなら、もっと精神的なものに近い何か。",
+    p3b: "これは自分を理解するためのものじゃない。あなたが本当に大切にしているものごとで勝つためのもの。自分を理解することは、そこに辿り着くために必要な過程にすぎない。",
+    p4a: "セラピーじゃない。チャットボットじゃない。あなたの5分の注意を求める、また別のアプリでもない。",
+    p4b: "これは五つの正直な段階を通してあなたに付き添う場所——それは、名前がついていたかどうかに関わらず、人が経験するほぼすべての本当の変化の根底にあるものだ：",
+    stageMystery: "謎。",
+    stageMysteryDesc: "何かがおかしい。まだそれに名前をつけられない。",
+    stageSafety: "安全。",
+    stageSafetyDesc: "それを認めた——でもまだ、見つけてしまうかもしれないものから自分を守っている。",
+    stageRecognition: "気づき。",
+    stageRecognitionDesc: "パターンが見えてくる。状況そのものじゃない。あなたが演じてきた役割。",
+    stageCourage: "勇気。",
+    stageCourageDesc: "もう真実を知っている。それがあなたに何かを求めている。",
+    stageReturn: "帰還。",
+    stageReturnDesc: "直ったわけじゃない。着いたわけでもない。ただ、もう演じていないだけ。",
+    p5: "その段階にいる間は、どの段階にいるかは教えられない。それは意図的なこと——早く名前をつけてしまうと、本当のプロセスが性格診断になってしまう。会話が伝える準備ができたとき、それより前ではなく、あなたはどこに辿り着いたかを知る。",
+    beforeYouStartHint: "始める前に",
+    p6: "今日そこには辿り着かない。それでいい。誰も始まり以外の場所から始めることはできない。あなたが今実際にいる場所——そこであなたを迎えてくれる。",
+    continueLabel: "続ける",
+    beginLabel: "始める",
+  },
+  ru: {
+    p1a: "Большинство вещей в твоём телефоне созданы, чтобы удерживать твоё внимание как можно дольше. Это — нет.",
+    p1b: "Смысл здесь прямо противоположный: помочь тебе нуждаться в этом меньше. Если оно делает своё дело, ты уходишь — не потому что заскучал, а потому что куда-то пришёл.",
+    whoWeAreHint: "Кто мы",
+    p2: "Не компания, гоняющаяся за твоим вниманием. Не бренд для здоровья с тестом и подпиской. Небольшая группа людей, устала притворяться, и создала то, что сама хотела бы иметь.",
+    p3a: "Думай об этом как о наставнике — построенном на мышлении самых влиятельных и успешных людей, которые когда-либо жили, сведённом к тому, что реально работает. Не просто информация. Что-то более близкое к духовному, если ты позволишь этому быть.",
+    p3b: "Это не для того, чтобы помочь тебе понять себя. Это для того, чтобы помочь тебе победить — в том, что действительно важно для тебя. Понимание себя — это просто то, что нужно, чтобы туда добраться.",
+    p4a: "Не терапия. Не чат-бот. Не ещё одно приложение, просящее пять минут твоего внимания.",
+    p4b: "Это пространство, которое сопровождает тебя через пять честных стадий — те же самые, что стоят почти за каждым настоящим изменением, которое человек когда-либо совершал, было ли у этого название или нет:",
+    stageMystery: "Загадка.",
+    stageMysteryDesc: "Что-то не так. Ты пока не можешь это назвать.",
+    stageSafety: "Безопасность.",
+    stageSafetyDesc: "Ты это признал — но всё ещё защищаешь себя от того, что можешь найти.",
+    stageRecognition: "Осознание.",
+    stageRecognitionDesc: "Паттерн становится видимым. Не обстоятельства. Роль, которую ты играл.",
+    stageCourage: "Смелость.",
+    stageCourageDesc: "Теперь ты знаешь правду. Она просит от тебя чего-то.",
+    stageReturn: "Возвращение.",
+    stageReturnDesc: "Не исправлен. Не пришёл. Просто больше не играешь роль.",
+    p5: "Тебе не скажут, на какой стадии ты находишься, пока ты на ней. Это намеренно — назвать это слишком рано превращает настоящий процесс в тест на личность. Ты узнаешь, куда пришёл, когда разговор будет готов сказать тебе, не раньше.",
+    beforeYouStartHint: "Перед началом",
+    p6: "Сегодня ты туда не доберёшься, и это нормально. Никто не начинает не с начала. Где бы ты сейчас реально ни был, оно встретит тебя там.",
+    continueLabel: "Продолжить",
+    beginLabel: "Начать",
+  },
+  sq: {
+    p1a: "Shumica e gjërave në telefonin tënd janë ndërtuar për të mbajtur vëmendjen tënde sa më gjatë të jetë e mundur. Kjo jo.",
+    p1b: "Qëllimi është krejtësisht i kundërt: të të ndihmojë të kesh më pak nevojë për të. Nëse bën punën e vet, ti largohesh — jo se u mërzite, por se arrite diku.",
+    whoWeAreHint: "Kush jemi ne",
+    p2: "Jo një kompani që ndjek vëmendjen tënde. Jo një markë wellness me kuiz dhe abonim. Një grup i vogël që u lodh duke luajtur rolin e vet, dhe ndërtoi atë që do të kishte dashur të ekzistonte.",
+    p3a: "Mendoje si një mentor — ndërtuar mbi mendimin e njerëzve më me influencë dhe më të suksesshëm që kanë jetuar ndonjëherë, i përqendruar në atë që vërtet funksionon. Jo thjesht informacion. Diçka më afër spiritualit, nëse e lë të jetë.",
+    p3b: "Kjo nuk është këtu për të të ndihmuar të kuptosh veten. Është këtu për të të ndihmuar të fitosh — në gjërat që vërtet të interesojnë. Të kuptosh veten thjesht rastis të jetë ajo çka duhet për të arritur atje.",
+    p4a: "Jo terapi. Jo chatbot. Jo një aplikacion tjetër që kërkon pesë minuta të vëmendjes tënde.",
+    p4b: "Ky është një hapësirë që të shoqëron nëpër pesë faza të sinqerta — të njëjtat që qëndrojnë pas pothuajse çdo ndryshimi të vërtetë që bën një person, pavarësisht nëse e ka pasur emër apo jo:",
+    stageMystery: "Mister.",
+    stageMysteryDesc: "Ka diçka që nuk shkon. Nuk mund ta emërtosh ende.",
+    stageSafety: "Siguri.",
+    stageSafetyDesc: "Ta ke pranuar — por ende po e mbron veten nga ajo që mund të gjesh.",
+    stageRecognition: "Njohje.",
+    stageRecognitionDesc: "Modeli bëhet i dukshëm. Jo rrethanat. Roli që ke luajtur.",
+    stageCourage: "Guxim.",
+    stageCourageDesc: "Tani e di të vërtetën. Ajo po të kërkon diçka.",
+    stageReturn: "Kthimi.",
+    stageReturnDesc: "Jo i rregulluar. Jo i arritur. Thjesht nuk po luan më rol.",
+    p5: "Nuk do të të thuhet në cilën fazë ndodhesh ndërkohë që je në të. Kjo është me qëllim — ta emërtosh shumë herët e kthen një proces të vërtetë në test personaliteti. Do të mësosh ku ke arritur kur biseda të jetë gati të ta thotë, jo më parë.",
+    beforeYouStartHint: "Para se të fillosh",
+    p6: "Nuk do të arrish atje sot, dhe kjo është në rregull. Askush nuk fillon diku tjetër përveçse nga fillimi. Kudo që të jesh vërtet tani, do të të gjejë atje.",
+    continueLabel: "Vazhdo",
+    beginLabel: "Fillo",
+  },
+  el: {
+    p1a: "Τα περισσότερα πράγματα στο κινητό σου έχουν φτιαχτεί για να κρατούν την προσοχή σου όσο πιο πολύ γίνεται. Αυτό όχι.",
+    p1b: "Ο σκοπός είναι ακριβώς το αντίθετο: να σε βοηθήσει να το χρειάζεσαι λιγότερο. Αν κάνει τη δουλειά του, φεύγεις — όχι επειδή βαρέθηκες, αλλά επειδή έφτασες κάπου.",
+    whoWeAreHint: "Ποιοι είμαστε",
+    p2: "Όχι μια εταιρεία που κυνηγά την προσοχή σου. Όχι μια μάρκα ευεξίας με κουίζ και συνδρομή. Μια μικρή ομάδα που βαρέθηκε να υποκρίνεται, και έφτιαξε αυτό που θα ήθελε να υπάρχει.",
+    p3a: "Σκέψου το σαν μέντορα — χτισμένο στη σκέψη των πιο επιδραστικών και επιτυχημένων ανθρώπων που έζησαν ποτέ, αποσταγμένο σε αυτό που όντως λειτουργεί. Όχι απλά πληροφορία. Κάτι πιο κοντά στο πνευματικό, αν το αφήσεις.",
+    p3b: "Αυτό δεν είναι εδώ για να σε βοηθήσει να καταλάβεις τον εαυτό σου. Είναι εδώ για να σε βοηθήσει να κερδίσεις — στα πράγματα που πραγματικά σε νοιάζουν. Το να καταλάβεις τον εαυτό σου είναι απλά αυτό που χρειάζεται για να φτάσεις εκεί.",
+    p4a: "Όχι θεραπεία. Όχι chatbot. Όχι άλλη μια εφαρμογή που ζητά πέντε λεπτά της προσοχής σου.",
+    p4b: "Αυτός είναι ένας χώρος που σε συνοδεύει μέσα από πέντε ειλικρινή στάδια — τα ίδια που βρίσκονται πίσω από κάθε αληθινή αλλαγή που κάνει ένας άνθρωπος, είχε όνομα γι' αυτό ή όχι:",
+    stageMystery: "Μυστήριο.",
+    stageMysteryDesc: "Κάτι δεν πάει καλά. Δεν μπορείς ακόμα να το ονομάσεις.",
+    stageSafety: "Ασφάλεια.",
+    stageSafetyDesc: "Το παραδέχτηκες — αλλά ακόμα προστατεύεις τον εαυτό σου από αυτό που μπορεί να βρεις.",
+    stageRecognition: "Αναγνώριση.",
+    stageRecognitionDesc: "Το μοτίβο γίνεται ορατό. Όχι οι συνθήκες. Ο ρόλος που έπαιζες.",
+    stageCourage: "Θάρρος.",
+    stageCourageDesc: "Ξέρεις τώρα την αλήθεια. Σου ζητάει κάτι.",
+    stageReturn: "Επιστροφή.",
+    stageReturnDesc: "Όχι διορθωμένος. Όχι φτασμένος. Απλά δεν υποκρίνεσαι πια.",
+    p5: "Δεν θα σου πουν σε ποιο στάδιο βρίσκεσαι όσο είσαι μέσα σε αυτό. Είναι σκόπιμο — το να το ονομάσεις πολύ πρόωρα μετατρέπει μια αληθινή διαδικασία σε τεστ προσωπικότητας. Θα μάθεις πού έφτασες όταν η συζήτηση είναι έτοιμη να σου το πει, όχι πριν.",
+    beforeYouStartHint: "Πριν ξεκινήσεις",
+    p6: "Δεν θα φτάσεις εκεί σήμερα, και δεν πειράζει. Κανείς δεν ξεκινά από πουθενά αλλού παρά από την αρχή. Όπου πραγματικά βρίσκεσαι τώρα, εκεί θα σε συναντήσει.",
+    continueLabel: "Συνέχεια",
+    beginLabel: "Ξεκίνα",
+  },
+  hy: {
+    p1a: "Քո հեռախոսի մեծ մասը կառուցված է քո ուշադրությունը հնարավորինս երկար պահելու համար։ Սա՝ ոչ։",
+    p1b: "Ամբողջ նպատակը հակառակն է․ օգնել քեզ ավելի քիչ կարիք ունենալ դրան։ Եթե այն կատարում է իր գործը, դու հեռանում ես — ոչ թե ձանձրանալու պատճառով, այլ որովհետև հասել ես ինչ-որ տեղ։",
+    whoWeAreHint: "Ով ենք մենք",
+    p2: "Ոչ ընկերություն, որ հետամուտ է քո ուշադրությանը։ Ոչ վելնես բրենդ՝ թեստով և բաժանորդագրությամբ։ Փոքր խումբ, որ հոգնեց իրեն ձևացնելուց և ստեղծեց այն, ինչ կցանկանար որ գոյություն ունենար։",
+    p3a: "Մտածիր դրա մասին որպես մենթոր — կառուցված ամենաազդեցիկ և հաջողակ մարդկանց մտածողության վրա, ամփոփված նրանով, ինչ իրականում աշխատում է։ Ոչ միայն տեղեկություն։ Ինչ-որ բան, որ ավելի մոտ է հոգևորին, եթե թույլ տաս։",
+    p3b: "Սա այստեղ չէ, որպեսզի քեզ օգնի հասկանալ քեզ։ Այն այստեղ է, որպեսզի օգնի քեզ հաղթել — այն բաներում, որ իրականում կարևոր են քեզ համար։ Ինքդ քեզ հասկանալը պարզապես այն է, ինչ պետք է, որպեսզի հասնես այնտեղ։",
+    p4a: "Ոչ թերապիա։ Ոչ չաթբոտ։ Ոչ մեկ այլ հավելված, որ խնդրում է քո ուշադրության հինգ րոպեն։",
+    p4b: "Սա տարածք է, որ ուղեկցում է քեզ հինգ անկեղծ փուլերով — նույն փուլերով, որոնք թաքնված են գրեթե ամեն իրական փոփոխության հիմքում, որ մարդ երբևէ կատարել է, անուն ունենալով դրա համար, թե ոչ։",
+    stageMystery: "Առեղծված։",
+    stageMysteryDesc: "Ինչ-որ բան այն չէ։ Դու դեռ չես կարողանում անվանել այն։",
+    stageSafety: "Անվտանգություն։",
+    stageSafetyDesc: "Ընդունել ես դա — բայց դեռ պաշտպանում ես քեզ այն ինչից, որ կարող ես գտնել։",
+    stageRecognition: "Ընկալում։",
+    stageRecognitionDesc: "Օրինաչափությունը դառնում է տեսանելի։ Ոչ հանգամանքները։ Դերը, որ խաղում էիր։",
+    stageCourage: "Խիզախություն։",
+    stageCourageDesc: "Դու գիտես ճշմարտությունը հիմա։ Այն ինչ-որ բան է խնդրում քեզից։",
+    stageReturn: "Վերադարձ։",
+    stageReturnDesc: "Ոչ ուղղված։ Ոչ հասած։ Պարզապես ոչ ձևացնող այլևս։",
+    p5: "Քեզ չեն ասի, թե որ փուլում ես, քանի դեռ դրանում ես։ Դա միտումնավոր է — շուտ անվանելը իրական գործընթացը վերածում է անհատականության թեստի։ Կիմանաս, թե ուր ես հասել, երբ խոսակցությունը պատրաստ լինի ասել քեզ, ոչ ավելի վաղ։",
+    beforeYouStartHint: "Նախքան սկսելը",
+    p6: "Այսօր դու չես հասնի այնտեղ, և դա լավ է։ Ոչ ոք չի սկսում որևէ այլ տեղից, քան սկիզբը։ Որտեղ էլ որ իրականում գտնվես հիմա, այն կհանդիպի քեզ այնտեղ։",
+    continueLabel: "Շարունակել",
+    beginLabel: "Սկսել",
+  },
+  sr: {
+    p1a: "Većina stvari na tvom telefonu je napravljena da zadrži tvoju pažnju što je duže moguće. Ovo nije.",
+    p1b: "Cela poenta je suprotna: da ti pomogne da ti to bude sve manje potrebno. Ako obavi svoj posao, ti odeš — ne zato što ti je dosadilo, nego zato što si negde stigao.",
+    whoWeAreHint: "Ko smo mi",
+    p2: "Nismo kompanija koja juri tvoju pažnju. Nismo wellness brend sa kvizom i pretplatom. Mala grupa koja se umorila od glumljenja, i napravila ono što je želela da postoji.",
+    p3a: "Zamisli to kao mentora — izgrađenog na mišljenju najutricajnijih i najuspešnijih ljudi koji su ikada živeli, sažetog na ono što stvarno funkcioniše. Ne samo informacije. Nešto bliže duhovnom, ako mu dozvoliš.",
+    p3b: "Ovo nije ovde da ti pomogne da razumeš sebe. Ovde je da ti pomogne da pobediš — u stvarima koje su ti stvarno važne. Razumevanje sebe je samo ono što je potrebno da tamo stigneš.",
+    p4a: "Nije terapija. Nije chatbot. Nije još jedna aplikacija koja traži pet minuta tvoje pažnje.",
+    p4b: "Ovo je prostor koji te prati kroz pet iskrenih faza — istih onih koje stoje iza skoro svake stvarne promene koju čovek napravi, imao ime za nju ili ne:",
+    stageMystery: "Tajna.",
+    stageMysteryDesc: "Nešto nije u redu. Još ne znaš da ga imenuješ.",
+    stageSafety: "Sigurnost.",
+    stageSafetyDesc: "Priznao si to — ali se još štitiš od onoga što bi mogao pronaći.",
+    stageRecognition: "Prepoznavanje.",
+    stageRecognitionDesc: "Obrazac postaje vidljiv. Ne okolnosti. Uloga koju si igrao.",
+    stageCourage: "Hrabrost.",
+    stageCourageDesc: "Sada znaš istinu. Ona traži nešto od tebe.",
+    stageReturn: "Povratak.",
+    stageReturnDesc: "Nije popravljeno. Nije stiglo. Samo se više ne glumi.",
+    p5: "Neće ti biti rečeno u kojoj si fazi dok si u njoj. To je namerno — imenovanje previše rano pretvara stvaran proces u test ličnosti. Saznaćeš gde si stigao kada razgovor bude spreman da ti kaže, ne pre toga.",
+    beforeYouStartHint: "Pre nego što počneš",
+    p6: "Danas nećeš stići tamo, i to je u redu. Niko ne počinje nigde osim od početka. Gde god da si zaista sada, tu će te i pronaći.",
+    continueLabel: "Nastavi",
+    beginLabel: "Počni",
+  },
+  hr: {
+    p1a: "Većina stvari na tvom telefonu izrađena je da zadrži tvoju pažnju što je dulje moguće. Ovo nije.",
+    p1b: "Cijela poanta je suprotna: pomoći ti da to sve manje trebaš. Ako obavi svoj posao, otići ćeš — ne zato što ti je dosadno, nego zato što si negdje stigao.",
+    whoWeAreHint: "Tko smo mi",
+    p2: "Nismo tvrtka koja juri tvoju pažnju. Nismo wellness brend s kvizom i pretplatom. Mala skupina koja se umorila od glume, i izgradila ono što bi željela da postoji.",
+    p3a: "Zamisli to kao mentora — izgrađenog na razmišljanju najutjecajnijih i najuspješnijih ljudi koji su ikada živjeli, sažetog na ono što stvarno funkcionira. Ne samo informacije. Nešto bliže duhovnom, ako mu to dopustiš.",
+    p3b: "Ovo nije ovdje da ti pomogne razumjeti sebe. Ovdje je da ti pomogne pobijediti — u stvarima koje su ti stvarno važne. Razumijevanje sebe samo je ono što treba da bi se tamo stiglo.",
+    p4a: "Nije terapija. Nije chatbot. Nije još jedna aplikacija koja traži pet minuta tvoje pažnje.",
+    p4b: "Ovo je prostor koji te prati kroz pet iskrenih faza — istih onih koje stoje iza skoro svake stvarne promjene koju čovjek učini, imao ime za nju ili ne:",
+    stageMystery: "Tajna.",
+    stageMysteryDesc: "Nešto nije u redu. Još ne znaš to imenovati.",
+    stageSafety: "Sigurnost.",
+    stageSafetyDesc: "Priznao si to — ali se još štitiš od onoga što bi mogao pronaći.",
+    stageRecognition: "Prepoznavanje.",
+    stageRecognitionDesc: "Obrazac postaje vidljiv. Ne okolnosti. Uloga koju si igrao.",
+    stageCourage: "Hrabrost.",
+    stageCourageDesc: "Sada znaš istinu. Ona traži nešto od tebe.",
+    stageReturn: "Povratak.",
+    stageReturnDesc: "Nije popravljeno. Nije stiglo. Samo se više ne glumi.",
+    p5: "Neće ti biti rečeno u kojoj si fazi dok si u njoj. To je namjerno — imenovanje previše rano pretvara stvaran proces u test osobnosti. Saznat ćeš gdje si stigao kada razgovor bude spreman reći ti, ne prije.",
+    beforeYouStartHint: "Prije nego počneš",
+    p6: "Danas nećeš stići tamo, i to je u redu. Nitko ne počinje nigdje osim od početka. Gdje god da si zaista sada, tu će te i pronaći.",
+    continueLabel: "Nastavi",
+    beginLabel: "Počni",
+  },
+  bs: {
+    p1a: "Većina stvari na tvom telefonu napravljena je da zadrži tvoju pažnju što je duže moguće. Ovo nije.",
+    p1b: "Cijela poenta je suprotna: pomoći ti da ti to bude sve manje potrebno. Ako obavi svoj posao, ti odeš — ne zato što ti je dosadilo, nego zato što si negdje stigao.",
+    whoWeAreHint: "Ko smo mi",
+    p2: "Nismo kompanija koja juri tvoju pažnju. Nismo wellness brend sa kvizom i pretplatom. Mala grupa koja se umorila od glumljenja, i napravila ono što je željela da postoji.",
+    p3a: "Zamisli to kao mentora — izgrađenog na mišljenju najutjecajnijih i najuspješnijih ljudi koji su ikada živjeli, sažetog na ono što stvarno funkcioniše. Ne samo informacije. Nešto bliže duhovnom, ako mu dozvoliš.",
+    p3b: "Ovo nije ovdje da ti pomogne da razumiješ sebe. Ovdje je da ti pomogne da pobijediš — u stvarima koje su ti stvarno važne. Razumijevanje sebe je samo ono što je potrebno da tamo stigneš.",
+    p4a: "Nije terapija. Nije chatbot. Nije još jedna aplikacija koja traži pet minuta tvoje pažnje.",
+    p4b: "Ovo je prostor koji te prati kroz pet iskrenih faza — istih onih koje stoje iza skoro svake stvarne promjene koju čovjek napravi, imao ime za nju ili ne:",
+    stageMystery: "Tajna.",
+    stageMysteryDesc: "Nešto nije u redu. Još ne znaš to imenovati.",
+    stageSafety: "Sigurnost.",
+    stageSafetyDesc: "Priznao si to — ali se još štitiš od onoga što bi mogao pronaći.",
+    stageRecognition: "Prepoznavanje.",
+    stageRecognitionDesc: "Obrazac postaje vidljiv. Ne okolnosti. Uloga koju si igrao.",
+    stageCourage: "Hrabrost.",
+    stageCourageDesc: "Sada znaš istinu. Ona traži nešto od tebe.",
+    stageReturn: "Povratak.",
+    stageReturnDesc: "Nije popravljeno. Nije stiglo. Samo se više ne glumi.",
+    p5: "Neće ti biti rečeno u kojoj si fazi dok si u njoj. To je namjerno — imenovanje previše rano pretvara stvaran proces u test ličnosti. Saznaćeš gdje si stigao kada razgovor bude spreman da ti kaže, ne prije.",
+    beforeYouStartHint: "Prije nego što počneš",
+    p6: "Danas nećeš stići tamo, i to je u redu. Niko ne počinje nigdje osim od početka. Gdje god da si zaista sada, tu će te i pronaći.",
+    continueLabel: "Nastavi",
+    beginLabel: "Počni",
+  },
+  bg: {
+    p1a: "Повечето неща в телефона ти са направени да задържат вниманието ти колкото се може по-дълго. Това — не.",
+    p1b: "Целта е точно обратната: да ти помогне да имаш по-малко нужда от него. Ако си свърши работата, ти си тръгваш — не защото ти е станало скучно, а защото си стигнал донякъде.",
+    whoWeAreHint: "Кои сме ние",
+    p2: "Не компания, преследваща вниманието ти. Не уелнес марка с тест и абонамент. Малка група, уморена да се преструва, която направи онова, което би искала да съществува.",
+    p3a: "Мисли за него като за наставник — изграден върху мисленето на най-влиятелните и успешните хора, живели някога, сведено до онова, което наистина работи. Не просто информация. Нещо по-близо до духовното, ако му позволиш.",
+    p3b: "Това не е тук, за да ти помогне да разбереш себе си. Тук е, за да ти помогне да победиш — в нещата, които наистина имат значение за тебе. Разбирането на себе си е просто онова, което е нужно, за да стигнеш дотам.",
+    p4a: "Не терапия. Не чатбот. Не още едно приложение, което иска пет минути от вниманието ти.",
+    p4b: "Това е пространство, което те съпровожда през пет честни етапа — същите, които стоят зад почти всяка истинска промяна, която човек прави, независимо дали е имал име за нея:",
+    stageMystery: "Загадка.",
+    stageMysteryDesc: "Нещо не е наред. Още не можеш да го назовеш.",
+    stageSafety: "Сигурност.",
+    stageSafetyDesc: "Признал си го — но все още се пазиш от онова, което можеш да откриеш.",
+    stageRecognition: "Осъзнаване.",
+    stageRecognitionDesc: "Моделът става видим. Не обстоятелствата. Ролята, която си играл.",
+    stageCourage: "Смелост.",
+    stageCourageDesc: "Вече знаеш истината. Тя иска нещо от тебе.",
+    stageReturn: "Завръщане.",
+    stageReturnDesc: "Не поправен. Не пристигнал. Просто вече не се преструваш.",
+    p5: "Няма да ти кажат в какъв етап си, докато си в него. Това е нарочно — да го назовеш прекалено рано превръща истинския процес в тест за личност. Ще разбереш докъде си стигнал, когато разговорът е готов да ти каже, не преди това.",
+    beforeYouStartHint: "Преди да започнеш",
+    p6: "Днес няма да стигнеш дотам, и това е нормално. Никой не започва отникъде другаде освен от началото. Където наистина си сега, там ще те намери.",
+    continueLabel: "Напред",
+    beginLabel: "Започни",
+  },
+  mk: {
+    p1a: "Повеќето работи на твојот телефон се направени да ти го задржат вниманието колку што е можно подолго. Ова не.",
+    p1b: "Целта е токму спротивна: да ти помогне да имаш помала потреба од тоа. Ако свои ја работата, ти си заминуваш — не затоа што ти е здодевно, туку затоа што некаде си стигнал.",
+    whoWeAreHint: "Кои сме ние",
+    p2: "Не компанија што те јури за твоето внимание. Не wellness бренд со квиз и претплата. Мала група која се измори да глуми, и направи она што сакаше да постои.",
+    p3a: "Замисли го како менторот — изграден на размислувањата на најмоќните и најуспешните луѓе што некогаш живеле, сведено на тоа што навистина работи. Не само информации. Нешто поблиско до духовното, ако му дозволиш.",
+    p3b: "Ова не е тука да ти помогне да разбереш себеси. Тука е да ти помогне да победиш — во работите што навистина ти се важни. Разбирањето на себеси е само тоа што е потребно за да стигнеш таму.",
+    p4a: "Не терапија. Не чатбот. Не уште една апликација што бара пет минути од твоето внимание.",
+    p4b: "Ова е простор што те придружува низ пет искрени фази — истите што стојат зад речиси секоја вистинска промена што човек ја прави, без разлика дали имал име за неа:",
+    stageMystery: "Тајна.",
+    stageMysteryDesc: "Нешто не е во ред. Сè уште не можеш да го именуваш.",
+    stageSafety: "Сигурност.",
+    stageSafetyDesc: "Го признал си — но сè уште се штитиш од тоа што можеш да го најдеш.",
+    stageRecognition: "Препознавање.",
+    stageRecognitionDesc: "Образецот станува видлив. Не околностите. Улогата што ја играш.",
+    stageCourage: "Храброст.",
+    stageCourageDesc: "Сега знаеш вистината. Таа бара нешто од тебе.",
+    stageReturn: "Враќање.",
+    stageReturnDesc: "Не поправен. Не пристигнат. Само повеќе не глумиш.",
+    p5: "Нема да ти се каже во која фаза си додека си во неа. Тоа е намерно — да се именува прерано, го претвора вистинскиот процес во тест на личност. Ќе дознаеш каде си стигнал кога разговорот ќе биде подготвен да ти каже, не порано.",
+    beforeYouStartHint: "Пред да започнеш",
+    p6: "Денес нема да стигнеш таму, и тоа е во ред. Никој не почнува од друго место освен од почетокот. Каде и да си навистина сега, таму ќе те најде.",
+    continueLabel: "Продолжи",
+    beginLabel: "Започни",
+  },
+  ro: {
+    p1a: "Majoritatea lucrurilor de pe telefonul tău sunt construite să-ți rețină atenția cât mai mult timp posibil. Aceasta nu.",
+    p1b: "Întregul scop este opusul: să te ajute să ai nevoie de el mai puțin. Dacă își face treaba, pleci — nu pentru că te-ai plictisit, ci pentru că ai ajuns undeva.",
+    whoWeAreHint: "Cine suntem",
+    p2: "Nu o companie care îți urmărește atenția. Nu un brand de wellness cu un chestionar și un abonament. Un mic grup obosit să se prefacă, care a construit ceea ce ar fi vrut să existe.",
+    p3a: "Gândește-te la el ca la un mentor — construit pe gândirea celor mai influenți și de succes oameni care au trăit vreodată, redusă la ceea ce funcționează cu adevărat. Nu doar informație. Ceva mai apropiat de spiritual, dacă îi permiți.",
+    p3b: "Nu e aici să te ajute să te înțelegi pe tine. E aici să te ajute să câștigi — în lucrurile care îți sunt cu adevărat importante. Înțelegerea de sine e doar ceea ce e nevoie ca să ajungi acolo.",
+    p4a: "Nu terapie. Nu chatbot. Nu o altă aplicație care îți cere cinci minute din atenție.",
+    p4b: "Acesta e un spațiu care te urmărește prin cinci etape sincere — aceleași care se află în spatele aproape oricărei schimbări reale pe care o face o persoană, fie că a avut un nume pentru ea sau nu:",
+    stageMystery: "Mister.",
+    stageMysteryDesc: "Ceva nu e în regulă. Încă nu poți să-l numești.",
+    stageSafety: "Siguranță.",
+    stageSafetyDesc: "Ai admis-o — dar te protejezi în continuare de ce ai putea găsi.",
+    stageRecognition: "Recunoaștere.",
+    stageRecognitionDesc: "Modelul devine vizibil. Nu circumstanțele. Rolul pe care l-ai jucat.",
+    stageCourage: "Curaj.",
+    stageCourageDesc: "Cunoști adevărul acum. Îți cere ceva.",
+    stageReturn: "Întoarcere.",
+    stageReturnDesc: "Nu reparat. Nu ajuns. Doar nu mai jucând un rol.",
+    p5: "Nu ți se va spune în ce etapă ești cât timp ești în ea. E intenționat — s-o numești prea devreme transformă un proces real într-un test de personalitate. Vei afla unde ai ajuns când conversația va fi pregătită să-ți spună, nu înainte.",
+    beforeYouStartHint: "Înainte să începi",
+    p6: "Nu vei ajunge acolo azi, și e în regulă. Nimeni nu începe altundeva decât la început. Oriunde ești cu adevărat acum, te va găsi acolo.",
+    continueLabel: "Continuă",
+    beginLabel: "Începe",
+  },
+  sl: {
+    p1a: "Večina stvari na tvojem telefonu je narejenih, da čim dlje ohranjajo tvojo pozornost. To ni tako.",
+    p1b: "Namen je ravno nasproten: pomagati ti, da to čim manj potrebuješ. Če opravi svoje delo, greš stran — ne zato, ker se ti je zdolgočasilo, ampak ker si nekam prišel.",
+    whoWeAreHint: "Kdo smo",
+    p2: "Ne podjetje, ki lovi tvojo pozornost. Ne wellness znamka s kvizom in naročnino. Majhna skupina, ki se je naveličala igranja vloge, in ustvarila to, kar bi si želela, da obstaja.",
+    p3a: "Zamisli si to kot mentorja — zgrajenega na razmišljanju najbolj vplivnih in uspešnih ljudi, ki so kdaj živeli, skrčenega na tisto, kar dejansko deluje. Ne le informacije. Nekaj bližje duhovnemu, če to dovoliš.",
+    p3b: "To ni tu, da bi ti pomagalo razumeti samega sebe. Tu je, da bi ti pomagalo zmagati — pri stvareh, ki so ti resnično pomembne. Razumevanje samega sebe je le to, kar je potrebno, da prideš tja.",
+    p4a: "Ni terapija. Ni klepetalni robot. Ni še ena aplikacija, ki prosi za pet minut tvoje pozornosti.",
+    p4b: "To je prostor, ki te spremlja skozi pet iskrenih faz — istih, ki stojijo za skoraj vsako resnično spremembo, ki jo naredi človek, ne glede na to, ali je zanjo imel ime:",
+    stageMystery: "Skrivnost.",
+    stageMysteryDesc: "Nekaj ni v redu. Tega še ne znaš imenovati.",
+    stageSafety: "Varnost.",
+    stageSafetyDesc: "To si priznal — a se še vedno ščitiš pred tem, kar bi lahko odkril.",
+    stageRecognition: "Spoznanje.",
+    stageRecognitionDesc: "Vzorec postane viden. Ne okoliščine. Vloga, ki jo igraš.",
+    stageCourage: "Pogum.",
+    stageCourageDesc: "Zdaj poznaš resnico. Ta od tebe nekaj zahteva.",
+    stageReturn: "Vrnitev.",
+    stageReturnDesc: "Ni popravljeno. Ni prispelo. Le ne igra več vloge.",
+    p5: "Ne bo ti povedano, v kateri fazi si, medtem ko si v njej. To je namerno — če jo poimenuješ prehitro, se resničen proces spremeni v osebnostni test. Izvedel boš, kje si pristal, ko bo pogovor pripravljen povedati, ne prej.",
+    beforeYouStartHint: "Preden začneš",
+    p6: "Danes ne boš prišel tja, in to je v redu. Nihče ne začne nikjer drugje kot na začetku. Kjerkoli dejansko zdaj si, te bo tam poiskalo.",
+    continueLabel: "Nadaljuj",
+    beginLabel: "Začni",
+  },
+};
+
+function getOnboardingScreens(lang: string): { html: JSX.Element }[] {
+  const o = ONBOARDING_STRINGS[lang] || ONBOARDING_STRINGS.en;
   return [
     {
       html: (
         <>
-          <p>Most things on your phone are built to hold your attention as long as possible. This one isn&rsquo;t.</p>
-          <p>The whole point is the opposite: to help you need it less. If it does its job, you leave — not because you got bored, but because you got somewhere.</p>
+          <p>{o.p1a}</p>
+          <p>{o.p1b}</p>
         </>
       ),
     },
     {
       html: (
         <>
-          <p className="onb-hint">Who we are</p>
-          <p>Not a company chasing your attention. Not a wellness brand with a quiz and a subscription. A small group who got tired of performing ourselves, and built the thing we wished existed.</p>
+          <p className="onb-hint">{o.whoWeAreHint}</p>
+          <p>{o.p2}</p>
         </>
       ),
     },
     {
       html: (
         <>
-          <p>Think of it as a mentor — built on the thinking of the most influential and successful people who ever lived, distilled down to what actually works. Not just information. Something closer to spiritual, if you let it be.</p>
-          <p>This isn&rsquo;t here to help you understand yourself. It&rsquo;s here to help you win — at the things that actually matter to you. Understanding yourself just happens to be what it takes to get there.</p>
+          <p>{o.p3a}</p>
+          <p>{o.p3b}</p>
         </>
       ),
     },
     {
       html: (
         <>
-          <p>Not therapy. Not a chatbot. Not another app asking for five minutes of your attention.</p>
-          <p className="onb-sub">This is a space that follows you through five honest stages — the same ones underneath almost every real change a person ever makes, whether they had a name for it or not:</p>
+          <p>{o.p4a}</p>
+          <p className="onb-sub">{o.p4b}</p>
         </>
       ),
     },
     {
       html: (
         <div className="onb-stages">
-          <p><strong>Mystery.</strong> Something&rsquo;s off. You can&rsquo;t name it yet.</p>
-          <p><strong>Safety.</strong> You&rsquo;ve admitted it — but you&rsquo;re still protecting yourself from what you might find.</p>
-          <p><strong>Recognition.</strong> The pattern becomes visible. Not the circumstances. The role you&rsquo;ve been playing.</p>
-          <p><strong>Courage.</strong> You know the truth now. It&rsquo;s asking something of you.</p>
-          <p><strong>Return.</strong> Not fixed. Not arrived. Just no longer performing.</p>
+          <p><strong>{o.stageMystery}</strong> {o.stageMysteryDesc}</p>
+          <p><strong>{o.stageSafety}</strong> {o.stageSafetyDesc}</p>
+          <p><strong>{o.stageRecognition}</strong> {o.stageRecognitionDesc}</p>
+          <p><strong>{o.stageCourage}</strong> {o.stageCourageDesc}</p>
+          <p><strong>{o.stageReturn}</strong> {o.stageReturnDesc}</p>
         </div>
       ),
     },
     {
-      html: (
-        <p>You won&rsquo;t be told which stage you&rsquo;re in while you&rsquo;re in it. That&rsquo;s on purpose — naming it too early turns a real process into a personality quiz. You&rsquo;ll find out where you landed when the conversation is ready to tell you, not before.</p>
-      ),
+      html: <p>{o.p5}</p>,
     },
     {
       html: (
         <>
-          <p className="onb-hint">Before you start</p>
-          <p>You won&rsquo;t get there today, and that&rsquo;s fine. Nobody starts anywhere but the beginning. Wherever you actually are right now, it&rsquo;ll meet you there.</p>
+          <p className="onb-hint">{o.beforeYouStartHint}</p>
+          <p>{o.p6}</p>
         </>
       ),
     },
@@ -651,7 +1228,8 @@ export default function Home() {
     : null;
 
   if (showOnboarding) {
-    const screens = getOnboardingScreens();
+    const screens = getOnboardingScreens(lang);
+    const o = ONBOARDING_STRINGS[lang] || ONBOARDING_STRINGS.en;
     const isLast = onboardingIndex === screens.length - 1;
     return (
       <div className="app onboarding">
@@ -661,13 +1239,27 @@ export default function Home() {
             background: `radial-gradient(circle at 50% 40%, ${STAGE_COLORS.mystery.glow}, transparent 65%)`,
           }}
         />
+        <div className="onboarding-topbar">
+          <select
+            className="lang-select"
+            value={lang}
+            onChange={(e) => changeLang(e.target.value)}
+            aria-label="Choose language"
+          >
+            {SUPPORTED_LANGS.map((code) => (
+              <option key={code} value={code}>
+                {code.toUpperCase()}
+              </option>
+            ))}
+          </select>
+        </div>
         <div className="onboarding-content">
           {screens[onboardingIndex].html}
           <button
             className="mood-chip onboarding-next"
             onClick={() => (isLast ? finishOnboarding() : setOnboardingIndex((i) => i + 1))}
           >
-            {isLast ? "Begin" : "Continue"}
+            {isLast ? o.beginLabel : o.continueLabel}
           </button>
         </div>
       </div>
