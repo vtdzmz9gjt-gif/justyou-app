@@ -483,8 +483,9 @@ body {
 
 .onboarding {
   align-items: center;
-  justify-content: center;
-  padding: 2rem 1.5rem;
+  justify-content: flex-start;
+  padding: 4rem 1.5rem 3rem;
+  overflow-y: auto;
 }
 
 .onboarding-content {
