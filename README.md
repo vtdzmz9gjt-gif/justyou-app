@@ -1,4 +1,4 @@
-# The Return — working prototype
+# Just You — working prototype
 
 A minimal, real chat app that turns `system-prompt.md` (built from your
 `the_return_system_prompt_spec.md`) into an actual Claude-backed

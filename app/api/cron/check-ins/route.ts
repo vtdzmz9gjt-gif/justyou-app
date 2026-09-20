@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   }
 
   const resendKey = process.env.RESEND_API_KEY;
-  const fromEmail = process.env.FROM_EMAIL || "The Return <onboarding@resend.dev>";
+  const fromEmail = process.env.FROM_EMAIL || "Just You <onboarding@resend.dev>";
   const due = await getDueReminders();
 
   if (!resendKey) {
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
         from: fromEmail,
         to: commitment.email,
         subject: "Still doing the thing?",
-        text: `${commitment.action}\n\nThat was the plan. Open The Return when you're ready.`,
+        text: `${commitment.action}\n\nThat was the plan. Open Just You when you're ready.`,
       });
       await markReminderSent(commitment.id);
       sent++;

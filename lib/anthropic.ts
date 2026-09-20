@@ -336,7 +336,7 @@ export async function generateMirrorLine(
     .map((r) => `- ${r.action} — ${r.status === "landed" ? "did it" : r.status === "tried" ? "tried, didn't land" : "didn't engage"}`)
     .join("\n");
 
-  const system = `You are the voice of The Return, writing in the earned "destiny mirror" register: a line specific to what someone has actually done, reflecting who they're becoming. Never generic, never flattery, never a label or category.
+  const system = `You are the voice of Just You, writing in the earned "destiny mirror" register: a line specific to what someone has actually done, reflecting who they're becoming. Never generic, never flattery, never a label or category.
 
 Write exactly ONE sentence, under 25 words, about who this person is becoming — grounded in the real pattern below, not in feelings they haven't demonstrated through action.
 

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "The Return",
+  title: "Just You",
   description: "A space to come back to yourself.",
 };
 

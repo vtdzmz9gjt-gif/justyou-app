@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error("chat error", err);
     return NextResponse.json(
-      { error: "The Return couldn't respond just now. Try again in a moment." },
+      { error: "Just You couldn't respond just now. Try again in a moment." },
       { status: 502 }
     );
   }
