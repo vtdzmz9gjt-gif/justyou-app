@@ -209,21 +209,171 @@ function ShapeArt({
   );
 }
 
+// Renders the shape artwork (at the given stage progress) onto a portrait
+// keepsake card as SVG markup, background + brand + caption included, so
+// there's something worth saving/sharing rather than a bare icon on
+// transparent ground. Plain string building (not a React render pass)
+// since it also has to survive going through an <img> src and canvas.
+function buildKeepsakeSvg(
+  family: ShapeFamily,
+  stage: string,
+  caption: string,
+  brand: string
+): string {
+  const fam = SHAPE_FAMILIES[family];
+  const stageIdx = Math.max(0, STAGE_ORDER.indexOf(stage as (typeof STAGE_ORDER)[number]));
+  const progress = stageIdx / 4;
+  const W = 720;
+  const H = 900;
+  const artSize = 420;
+  const artX = (W - artSize) / 2;
+  const artY = 150;
+
+  const escape = (s: string) =>
+    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  const paths = fam.paths
+    .map((p) => {
+      const tx = p.dx * (1 - progress);
+      const ty = p.dy * (1 - progress);
+      const rot = p.rot * (1 - progress);
+      return `<path d="${p.d}" stroke="${fam.color}" fill="none" stroke-width="2.4" stroke-linecap="round" opacity="${0.35 + 0.6 * progress}" transform="translate(${tx},${ty}) rotate(${rot} 150 150)" />`;
+    })
+    .join("");
+  const dots = fam.dots
+    .map(
+      (d) =>
+        `<circle cx="${d.cx}" cy="${d.cy}" r="${d.r}" fill="${fam.color}" opacity="${0.3 + 0.6 * progress}" />`
+    )
+    .join("");
+
+  // Rough character-count word wrap -- good enough for an exported image,
+  // not trying to match real text metrics.
+  const words = caption.split(" ");
+  const lines: string[] = [];
+  let cur = "";
+  for (const w of words) {
+    const next = cur ? `${cur} ${w}` : w;
+    if (next.length > 34 && cur) {
+      lines.push(cur);
+      cur = w;
+    } else {
+      cur = next;
+    }
+  }
+  if (cur) lines.push(cur);
+  const captionTspans = lines
+    .map((line, idx) => `<tspan x="${W / 2}" dy="${idx === 0 ? 0 : 34}">${escape(line)}</tspan>`)
+    .join("");
+
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+    <rect width="${W}" height="${H}" fill="#14120f" />
+    <text x="${W / 2}" y="80" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-size="30" fill="#c99a5b" letter-spacing="1">${escape(brand)}</text>
+    <svg x="${artX}" y="${artY}" width="${artSize}" height="${artSize}" viewBox="0 0 300 300">${paths}${dots}</svg>
+    <text x="${W / 2}" y="${artY + artSize + 70}" text-anchor="middle" font-family="Georgia, serif" font-size="24" fill="#ede8de">${captionTspans}</text>
+  </svg>`;
+}
+
+// Rasterizes the keepsake SVG to a PNG blob via an offscreen <img> + canvas
+// (browser-only -- no server-side image lib in play).
+async function keepsakePngBlob(svgMarkup: string): Promise<Blob> {
+  const W = 720;
+  const H = 900;
+  const svgBlob = new Blob([svgMarkup], { type: "image/svg+xml;charset=utf-8" });
+  const url = URL.createObjectURL(svgBlob);
+  try {
+    const img = new Image();
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error("Could not render artwork."));
+      img.src = url;
+    });
+    const canvas = document.createElement("canvas");
+    canvas.width = W * 2;
+    canvas.height = H * 2;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas unavailable.");
+    ctx.scale(2, 2);
+    ctx.drawImage(img, 0, 0, W, H);
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
+    if (!blob) throw new Error("Could not export artwork.");
+    return blob;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
+// Shares the keepsake image via the native share sheet when available
+// (mainly mobile), otherwise falls back to a plain file download.
+async function saveOrShareArtwork(
+  family: ShapeFamily,
+  stage: string,
+  caption: string,
+  brand: string
+) {
+  const blob = await keepsakePngBlob(buildKeepsakeSvg(family, stage, caption, brand));
+  const filename = `just-you-${family}-${stage}.png`;
+
+  const nav = navigator as Navigator & {
+    share?: (data: ShareData) => Promise<void>;
+    canShare?: (data: ShareData) => boolean;
+  };
+  if (nav.share && nav.canShare) {
+    const file = new File([blob], filename, { type: "image/png" });
+    if (nav.canShare({ files: [file] })) {
+      try {
+        await nav.share({ files: [file], title: brand });
+        return;
+      } catch {
+        // User dismissed the share sheet -- leave it at that rather than
+        // also forcing a download.
+        return;
+      }
+    }
+  }
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 // The Return-stage reveal: happens once, for real, at the true end of
 // someone's journey. Fragments assemble fully, a beat of stillness, then
 // the line. Not something to casually replay -- see REVEAL_SHOWN_KEY.
 function RevealOverlay({
   family,
   label,
+  saveLabel,
   onClose,
 }: {
   family: ShapeFamily;
   label: string;
+  saveLabel: string;
   onClose: () => void;
 }) {
   const fam = SHAPE_FAMILIES[family];
   const total = fam.paths.length + fam.dots.length;
   let i = 0;
+  const revealLine =
+    "You didn’t choose this shape. You just kept being honest, and this is what it became.";
+  const [saving, setSaving] = useState(false);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      await saveOrShareArtwork(family, "return", revealLine, label);
+    } catch {
+      // Best-effort keepsake export -- silently drop failures rather than
+      // interrupting the reveal moment with an error state.
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="reveal-overlay">
@@ -262,13 +412,15 @@ function RevealOverlay({
         </svg>
       </div>
       <div className="reveal-word">Whole.</div>
-      <div className="reveal-line">
-        You didn&rsquo;t choose this shape. You just kept being honest, and this is what it
-        became.
+      <div className="reveal-line">{revealLine}</div>
+      <div className="reveal-actions">
+        <button className="reveal-save" onClick={handleSave} disabled={saving}>
+          {saving ? "…" : saveLabel}
+        </button>
+        <button className="reveal-continue" onClick={onClose}>
+          continue
+        </button>
       </div>
-      <button className="reveal-continue" onClick={onClose}>
-        continue
-      </button>
     </div>
   );
 }
@@ -1448,6 +1600,7 @@ export default function Home() {
   const [shapeFamily, setShapeFamily] = useState<ShapeFamily | null>(null);
   const [branches, setBranches] = useState<string[]>([]);
   const [showReveal, setShowReveal] = useState(false);
+  const [savingArtwork, setSavingArtwork] = useState(false);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -1624,6 +1777,23 @@ export default function Home() {
     setShowReveal(false);
   }
 
+  async function handleSaveArtwork() {
+    if (!shapeFamily) return;
+    const currentStage = stage || "mystery";
+    const caption =
+      SHAPE_FAMILIES[shapeFamily].stageLines[
+        Math.max(0, STAGE_ORDER.indexOf(currentStage as (typeof STAGE_ORDER)[number]))
+      ];
+    setSavingArtwork(true);
+    try {
+      await saveOrShareArtwork(shapeFamily, currentStage, caption, s.returnLabel);
+    } catch {
+      /* best-effort keepsake export — no error UI for a nice-to-have */
+    } finally {
+      setSavingArtwork(false);
+    }
+  }
+
   const hasStarted = messages.length > 0;
   const awaitingDepth = selectedMood !== null && !hasStarted;
 
@@ -1634,7 +1804,14 @@ export default function Home() {
     : null;
 
   if (showReveal && shapeFamily) {
-    return <RevealOverlay family={shapeFamily} label={s.returnLabel} onClose={closeReveal} />;
+    return (
+      <RevealOverlay
+        family={shapeFamily}
+        label={s.returnLabel}
+        saveLabel={s.saveLabel}
+        onClose={closeReveal}
+      />
+    );
   }
 
   if (showOnboarding) {
@@ -1723,6 +1900,14 @@ export default function Home() {
                   Math.max(0, STAGE_ORDER.indexOf((stage || "mystery") as (typeof STAGE_ORDER)[number]))
                 ]}
               </div>
+              <button
+                type="button"
+                className="artwork-save-btn"
+                onClick={handleSaveArtwork}
+                disabled={savingArtwork}
+              >
+                {savingArtwork ? "…" : s.saveLabel}
+              </button>
             </div>
           )}
           {mirrorLine && (
