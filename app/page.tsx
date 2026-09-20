@@ -212,14 +212,22 @@ function ShapeArt({
 // The Return-stage reveal: happens once, for real, at the true end of
 // someone's journey. Fragments assemble fully, a beat of stillness, then
 // the line. Not something to casually replay -- see REVEAL_SHOWN_KEY.
-function RevealOverlay({ family, onClose }: { family: ShapeFamily; onClose: () => void }) {
+function RevealOverlay({
+  family,
+  label,
+  onClose,
+}: {
+  family: ShapeFamily;
+  label: string;
+  onClose: () => void;
+}) {
   const fam = SHAPE_FAMILIES[family];
   const total = fam.paths.length + fam.dots.length;
   let i = 0;
 
   return (
     <div className="reveal-overlay">
-      <div className="reveal-eyebrow">the return</div>
+      <div className="reveal-eyebrow">{label}</div>
       <div className="reveal-art">
         <svg viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
           {fam.paths.map((p, idx) => {
@@ -1626,7 +1634,7 @@ export default function Home() {
     : null;
 
   if (showReveal && shapeFamily) {
-    return <RevealOverlay family={shapeFamily} onClose={closeReveal} />;
+    return <RevealOverlay family={shapeFamily} label={s.returnLabel} onClose={closeReveal} />;
   }
 
   if (showOnboarding) {
@@ -1719,7 +1727,7 @@ export default function Home() {
           )}
           {mirrorLine && (
             <div className="mirror-card">
-              <div className="mirror-card-label">the return</div>
+              <div className="mirror-card-label">{s.returnLabel}</div>
               <div className="mirror-card-line">{mirrorLine}</div>
             </div>
           )}

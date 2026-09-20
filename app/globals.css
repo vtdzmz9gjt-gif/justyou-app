@@ -1,14 +1,20 @@
 :root {
-  --bg: #14110f;
+  /* Spec's exact palette (docs/just-you-spec-v2.md, section 12): bg,
+     ink, ink-dim, ink-faint, ember. accent-strong, accent-soft, surface,
+     surface-raised and border have no spec equivalent -- kept as
+     reasonable derived values so existing hover/panel/card treatments
+     still have something to use. */
+  --bg: #14120f;
   --surface: #1c1815;
   --surface-raised: #241f1b;
   --border: #2c2621;
-  --text: #fbf5ea;
-  --text-muted: #b3a596;
-  --text-faint: #7c7063;
-  --accent: #e08a3c;
-  --accent-soft: rgba(224, 138, 60, 0.22);
-  --accent-strong: #ffb066;
+  --text: #ede8de;
+  --text-muted: #a39b8c;
+  --text-faint: #6e685d;
+  --accent: #c99a5b;
+  --accent-dim: #7a6446;
+  --accent-soft: rgba(201, 154, 91, 0.22);
+  --accent-strong: #ddb077;
 
   --font-display: "Fraunces", "Iowan Old Style", "Palatino Linotype", serif;
   --font-body: "Karla", "Segoe UI", system-ui, sans-serif;
