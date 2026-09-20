@@ -9,8 +9,11 @@ import {
   setUserStage,
   getUserStage,
   getStagePercentages,
+  getUserShape,
+  setUserShape,
   type StoredMessage,
   type Stage,
+  type ShapeFamily,
 } from "./db";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -76,6 +79,21 @@ const tools: Anthropic.Tool[] = [
       required: ["stage"],
     },
   },
+  {
+    name: "assign_shape_family",
+    description:
+      "Call this AT MOST ONCE per person, ever -- only if the context below says no shape family is assigned yet, and only once you have a real feel for how they express themselves (never on the very first message alone; wait until Mystery or Safety has given you something to go on). Quietly match them to whichever family fits the actual shape of how they're moving through this, not what they say they want to be. Never ask them directly, never mention this choice or these categories to them -- it is entirely invisible.\n\n- tree: grounding, patience, roots -- someone building slowly, staying planted through pressure.\n- flame: transformation, intensity -- someone burning through a change, urgent and consuming.\n- river: adaptability, emotional flow -- someone moving around obstacles, shaped by what they pass through.\n- constellation: meaning, direction, big-picture -- someone oriented by a distant point, connecting scattered things into a pattern.\n- mountain: stillness, endurance -- someone unmoved under real weight, holding rather than reacting.",
+    input_schema: {
+      type: "object",
+      properties: {
+        family: {
+          type: "string",
+          enum: ["tree", "flame", "river", "constellation", "mountain"],
+        },
+      },
+      required: ["family"],
+    },
+  },
 ];
 
 function todayContext(): string {
@@ -137,9 +155,17 @@ function toApiMessages(history: StoredMessage[]): Anthropic.MessageParam[] {
   return history.map((m) => ({ role: m.role, content: m.content }));
 }
 
+async function shapeContext(userId: string): Promise<string> {
+  const family = await getUserShape(userId);
+  return family
+    ? `A shape family is already assigned ("${family}") — do not call assign_shape_family again.`
+    : "No shape family assigned yet. Once you have a real feel for them (not on the first message alone), call assign_shape_family.";
+}
+
 export interface ChatResult {
   reply: string;
   stage?: Stage;
+  shapeFamily?: ShapeFamily;
 }
 
 export async function runChat(
@@ -150,13 +176,14 @@ export async function runChat(
   uiLang?: string | null,
   alivenessAnswer?: string | null
 ): Promise<ChatResult> {
-  const [openCommitment, stageInfo] = await Promise.all([
+  const [openCommitment, stageInfo, shapeInfo] = await Promise.all([
     openCommitmentContext(userId),
     stageContext(userId),
+    shapeContext(userId),
   ]);
   const system = `${BASE_SYSTEM_PROMPT}\n\n---\n\nCONTEXT (not visible to the person, never repeat it back verbatim):\n${todayContext()}\n${openCommitment}\n${depthContext(
     depth
-  )}\n${uiLanguageContext(uiLang)}\n${alivenessContext(alivenessAnswer)}\n${stageInfo}`;
+  )}\n${uiLanguageContext(uiLang)}\n${alivenessContext(alivenessAnswer)}\n${stageInfo}\n${shapeInfo}`;
 
   const messages: Anthropic.MessageParam[] = [
     ...toApiMessages(history),
@@ -164,6 +191,7 @@ export async function runChat(
   ];
 
   let newStage: Stage | undefined;
+  let newShape: ShapeFamily | undefined;
 
   // Tool-use loop: the model may call record_commitment / resolve_open_commitment /
   // signal_depth one or more times before producing its actual reply to the person.
@@ -184,7 +212,11 @@ export async function runChat(
     );
 
     if (toolUses.length === 0) {
-      return { reply: textBlocks.map((b) => b.text).join("\n").trim(), stage: newStage };
+      return {
+        reply: textBlocks.map((b) => b.text).join("\n").trim(),
+        stage: newStage,
+        shapeFamily: newShape,
+      };
     }
 
     messages.push({ role: "assistant", content: response.content });
@@ -218,6 +250,15 @@ export async function runChat(
             tool_use_id: call.id,
             content: "Recorded.",
           });
+        } else if (call.name === "assign_shape_family") {
+          const input = call.input as { family: ShapeFamily };
+          await setUserShape(userId, input.family);
+          newShape = input.family;
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: call.id,
+            content: "Recorded.",
+          });
         } else {
           toolResults.push({
             type: "tool_result",
@@ -240,11 +281,15 @@ export async function runChat(
 
     if (response.stop_reason !== "tool_use") {
       const trailing = textBlocks.map((b) => b.text).join("\n").trim();
-      if (trailing) return { reply: trailing, stage: newStage };
+      if (trailing) return { reply: trailing, stage: newStage, shapeFamily: newShape };
     }
   }
 
-  return { reply: "Something got tangled on my end — say that again?", stage: newStage };
+  return {
+    reply: "Something got tangled on my end — say that again?",
+    stage: newStage,
+    shapeFamily: newShape,
+  };
 }
 
 // --- Weekly mirror line ---

@@ -15,6 +15,7 @@ type Depth = "light" | "medium" | "deep";
 const USER_ID_KEY = "the_return_user_id";
 const ONBOARDED_KEY = "the_return_onboarded";
 const LANG_KEY = "the_return_lang";
+const REVEAL_SHOWN_KEY = "the_return_reveal_shown";
 
 // --- Stage colors, matching the arc discussed for the ambient background ---
 const STAGE_COLORS: Record<string, { glow: string; pulse: string }> = {
@@ -37,6 +38,232 @@ const MOOD_COLORS: Record<string, { glow: string; pulse: string; speed: string }
 };
 
 const MOOD_KEYS = ["Calm", "Anxious", "Angry", "Numb", "Tired", "Hopeful", "Stuck"];
+
+// --- Personalized shape family artwork: fragments -> whole across the five
+// stages. Which family someone gets is decided invisibly by the model (see
+// assign_shape_family in lib/anthropic.ts) -- never shown as a quiz, never
+// announced. Geometry ported from the approved mockup.
+const STAGE_ORDER = ["mystery", "safety", "recognition", "courage", "return"] as const;
+type ShapeFamily = "tree" | "flame" | "river" | "constellation" | "mountain";
+
+type FamilyPath = { d: string; dx: number; dy: number; rot: number };
+type FamilyDot = { cx: number; cy: number; r: number };
+
+const SHAPE_FAMILIES: Record<
+  ShapeFamily,
+  { color: string; paths: FamilyPath[]; dots: FamilyDot[]; stageLines: string[] }
+> = {
+  tree: {
+    color: "#C99A5B",
+    paths: [
+      { d: "M150,270 L150,140", dx: -40, dy: 30, rot: -25 },
+      { d: "M150,140 Q110,110 95,70", dx: 35, dy: -25, rot: 20 },
+      { d: "M150,140 Q190,110 205,68", dx: -30, dy: 25, rot: -18 },
+      { d: "M150,175 Q110,165 80,190", dx: 25, dy: 20, rot: 15 },
+      { d: "M150,175 Q190,165 220,195", dx: -25, dy: -20, rot: -15 },
+      { d: "M150,205 Q125,200 105,220", dx: 20, dy: 15, rot: 10 },
+      { d: "M150,205 Q175,200 195,222", dx: -20, dy: -15, rot: -10 },
+    ],
+    dots: [
+      { cx: 95, cy: 70, r: 2.5 },
+      { cx: 205, cy: 68, r: 2.5 },
+      { cx: 80, cy: 190, r: 2 },
+      { cx: 220, cy: 195, r: 2 },
+    ],
+    stageLines: [
+      "Something unfinished, barely a line.",
+      "The fragments start finding each other.",
+      "The pattern appears — it was always a tree.",
+      "The branches reach further than before.",
+      "Whole — every fragment, one shape.",
+    ],
+  },
+  flame: {
+    color: "#D97A4A",
+    paths: [
+      { d: "M150,260 Q130,220 150,190", dx: 30, dy: 20, rot: 20 },
+      { d: "M150,260 Q170,220 150,190", dx: -30, dy: 20, rot: -20 },
+      { d: "M150,195 Q125,150 145,110", dx: 25, dy: -25, rot: 18 },
+      { d: "M150,195 Q175,150 155,110", dx: -25, dy: -25, rot: -18 },
+      { d: "M150,115 Q135,80 150,55", dx: 18, dy: -15, rot: 12 },
+      { d: "M150,115 Q165,80 150,55", dx: -18, dy: -15, rot: -12 },
+    ],
+    dots: [{ cx: 150, cy: 55, r: 3 }],
+    stageLines: [
+      "A flicker, easy to miss.",
+      "Catching, but still unsteady.",
+      "It knows now it's meant to burn.",
+      "Rising, no longer asking permission.",
+      "A fire that doesn't need feeding to stay lit.",
+    ],
+  },
+  river: {
+    color: "#5FA3A0",
+    paths: [
+      { d: "M40,90 Q80,70 100,95", dx: -20, dy: 20, rot: 10 },
+      { d: "M100,95 Q140,120 130,150", dx: 20, dy: -15, rot: -10 },
+      { d: "M130,150 Q160,175 150,200", dx: -15, dy: 15, rot: 8 },
+      { d: "M150,200 Q190,220 185,245", dx: 15, dy: -15, rot: -8 },
+      { d: "M185,245 Q220,255 260,250", dx: -10, dy: 10, rot: 6 },
+    ],
+    dots: [],
+    stageLines: [
+      "Water with nowhere agreed to go.",
+      "Finding a direction, still shallow.",
+      "The current knows its own shape now.",
+      "Moving fast, carving its own bank.",
+      "One continuous line, all the way to the sea.",
+    ],
+  },
+  constellation: {
+    color: "#B9AEDB",
+    paths: [
+      { d: "M70,70 L120,110", dx: 30, dy: -25, rot: 0 },
+      { d: "M120,110 L110,170", dx: -25, dy: 20, rot: 0 },
+      { d: "M110,170 L160,200", dx: 20, dy: -20, rot: 0 },
+      { d: "M160,200 L215,175", dx: -20, dy: 20, rot: 0 },
+      { d: "M215,175 L230,110", dx: 20, dy: -15, rot: 0 },
+      { d: "M230,110 L180,75", dx: -20, dy: 15, rot: 0 },
+      { d: "M180,75 L120,110", dx: 15, dy: -15, rot: 0 },
+    ],
+    dots: [
+      { cx: 70, cy: 70, r: 3 },
+      { cx: 120, cy: 110, r: 2.5 },
+      { cx: 110, cy: 170, r: 2.5 },
+      { cx: 160, cy: 200, r: 3 },
+      { cx: 215, cy: 175, r: 2.5 },
+      { cx: 230, cy: 110, r: 2.5 },
+      { cx: 180, cy: 75, r: 2.5 },
+    ],
+    stageLines: [
+      "Scattered light, no shape yet.",
+      "A few points start to relate.",
+      "You can almost trace the figure.",
+      "The shape is unmistakable now.",
+      "A full constellation — it was always there.",
+    ],
+  },
+  mountain: {
+    color: "#9C978C",
+    paths: [
+      { d: "M40,230 L110,110", dx: -20, dy: 25, rot: 8 },
+      { d: "M110,110 L150,160", dx: 15, dy: -20, rot: -6 },
+      { d: "M150,160 L190,90", dx: -15, dy: 20, rot: 6 },
+      { d: "M190,90 L260,230", dx: 15, dy: -20, rot: -6 },
+      { d: "M40,230 L260,230", dx: 0, dy: 20, rot: 0 },
+    ],
+    dots: [
+      { cx: 110, cy: 110, r: 2 },
+      { cx: 190, cy: 90, r: 2.5 },
+    ],
+    stageLines: [
+      "Loose stone, no ground yet.",
+      "Something is starting to hold weight.",
+      "The base is set — it isn't moving.",
+      "Rising higher than the fog.",
+      "A mountain. Unshaken, from any side.",
+    ],
+  },
+};
+
+function ShapeArt({
+  family,
+  stage,
+  size,
+}: {
+  family: ShapeFamily;
+  stage: string;
+  size: number;
+}) {
+  const fam = SHAPE_FAMILIES[family];
+  const stageIdx = Math.max(0, STAGE_ORDER.indexOf(stage as (typeof STAGE_ORDER)[number]));
+  const progress = stageIdx / 4;
+
+  return (
+    <svg width={size} height={size} viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+      {fam.paths.map((p, i) => (
+        <path
+          key={i}
+          d={p.d}
+          stroke={fam.color}
+          fill="none"
+          strokeWidth={1.6}
+          strokeLinecap="round"
+          opacity={0.35 + 0.6 * progress}
+          transform={`translate(${p.dx * (1 - progress)},${p.dy * (1 - progress)}) rotate(${
+            p.rot * (1 - progress)
+          } 150 150)`}
+        />
+      ))}
+      {fam.dots.map((d, i) => (
+        <circle
+          key={i}
+          cx={d.cx}
+          cy={d.cy}
+          r={d.r}
+          fill={fam.color}
+          opacity={0.3 + 0.6 * progress}
+        />
+      ))}
+    </svg>
+  );
+}
+
+// The Return-stage reveal: happens once, for real, at the true end of
+// someone's journey. Fragments assemble fully, a beat of stillness, then
+// the line. Not something to casually replay -- see REVEAL_SHOWN_KEY.
+function RevealOverlay({ family, onClose }: { family: ShapeFamily; onClose: () => void }) {
+  const fam = SHAPE_FAMILIES[family];
+  const total = fam.paths.length + fam.dots.length;
+  let i = 0;
+
+  return (
+    <div className="reveal-overlay">
+      <div className="reveal-eyebrow">the return</div>
+      <div className="reveal-art">
+        <svg viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+          {fam.paths.map((p, idx) => {
+            const delay = 0.5 + (i++ / total) * 1.6;
+            return (
+              <path
+                key={`p${idx}`}
+                d={p.d}
+                stroke={fam.color}
+                fill="none"
+                strokeWidth={1.7}
+                strokeLinecap="round"
+                className="reveal-fragment"
+                style={{ animationDelay: `${delay}s` }}
+              />
+            );
+          })}
+          {fam.dots.map((d, idx) => {
+            const delay = 0.5 + (i++ / total) * 1.6;
+            return (
+              <circle
+                key={`d${idx}`}
+                cx={d.cx}
+                cy={d.cy}
+                r={d.r}
+                fill={fam.color}
+                className="reveal-fragment"
+                style={{ animationDelay: `${delay}s` }}
+              />
+            );
+          })}
+        </svg>
+      </div>
+      <div className="reveal-word">Whole.</div>
+      <div className="reveal-line">
+        You didn&rsquo;t choose this shape. You just kept being honest, and this is what it
+        became.
+      </div>
+      <button className="reveal-continue" onClick={onClose}>
+        continue
+      </button>
+    </div>
+  );
+}
 
 // --- Translations for the static UI text (mood labels, hints, placeholders) ---
 // English carries the full 5 rotating opening questions; every other language
@@ -1210,6 +1437,8 @@ export default function Home() {
   const [stage, setStage] = useState<string | null>(null);
   const [alivenessInput, setAlivenessInput] = useState("");
   const [mirrorLine, setMirrorLine] = useState<string | null>(null);
+  const [shapeFamily, setShapeFamily] = useState<ShapeFamily | null>(null);
+  const [showReveal, setShowReveal] = useState(false);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -1256,6 +1485,24 @@ export default function Home() {
       })
       .catch(() => {
         /* quiet failure — the mirror line is a nice-to-have, not core */
+      });
+
+    // Restores the persistent artwork + ambient stage color on a fresh
+    // load, since assign_shape_family / signal_depth only fire once each
+    // and won't repeat themselves on a later visit to re-tell the client.
+    fetch(`/api/shape?userId=${encodeURIComponent(id)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.family) setShapeFamily(data.family);
+        if (data.stage) {
+          setStage(data.stage);
+          if (data.stage === "return" && !localStorage.getItem(REVEAL_SHOWN_KEY)) {
+            setShowReveal(true);
+          }
+        }
+      })
+      .catch(() => {
+        /* quiet failure — the ambient state just starts fresh this visit */
       });
   }, []);
 
@@ -1304,6 +1551,14 @@ export default function Home() {
       if (!res.ok) throw new Error(data.error || "Something went wrong.");
       setMessages((m) => [...m, { role: "assistant", content: data.reply }]);
       if (data.stage) setStage(data.stage);
+      if (data.shapeFamily) setShapeFamily(data.shapeFamily);
+      if (
+        data.stage === "return" &&
+        typeof window !== "undefined" &&
+        !localStorage.getItem(REVEAL_SHOWN_KEY)
+      ) {
+        setShowReveal(true);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -1349,6 +1604,15 @@ export default function Home() {
     }
   }
 
+  function closeReveal() {
+    try {
+      localStorage.setItem(REVEAL_SHOWN_KEY, "1");
+    } catch {
+      /* private browsing or storage disabled — still closes for this visit */
+    }
+    setShowReveal(false);
+  }
+
   const hasStarted = messages.length > 0;
   const awaitingDepth = selectedMood !== null && !hasStarted;
 
@@ -1357,6 +1621,10 @@ export default function Home() {
     : selectedMood
     ? MOOD_COLORS[selectedMood]
     : null;
+
+  if (showReveal && shapeFamily) {
+    return <RevealOverlay family={shapeFamily} onClose={closeReveal} />;
+  }
 
   if (showOnboarding) {
     const screens = getOnboardingScreens(lang);
@@ -1436,6 +1704,16 @@ export default function Home() {
 
       {showSettings && (
         <div className="settings-panel">
+          {shapeFamily && (
+            <div className="artwork-card">
+              <ShapeArt family={shapeFamily} stage={stage || "mystery"} size={96} />
+              <div className="artwork-caption">
+                {SHAPE_FAMILIES[shapeFamily].stageLines[
+                  Math.max(0, STAGE_ORDER.indexOf((stage || "mystery") as (typeof STAGE_ORDER)[number]))
+                ]}
+              </div>
+            </div>
+          )}
           {mirrorLine && (
             <div className="mirror-card">
               <div className="mirror-card-label">the return</div>

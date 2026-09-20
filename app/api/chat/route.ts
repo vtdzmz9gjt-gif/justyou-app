@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
   await ensureUser(userId);
   const history = await getMessages(userId);
 
-  let result: { reply: string; stage?: string };
+  let result: { reply: string; stage?: string; shapeFamily?: string };
   try {
     result = await runChat(userId, history, message.trim(), depth, lang, alivenessAnswer);
   } catch (err) {
@@ -47,7 +47,11 @@ export async function POST(req: NextRequest) {
   await addMessage(userId, "user", message.trim());
   await addMessage(userId, "assistant", result.reply);
 
-  return NextResponse.json({ reply: result.reply, stage: result.stage });
+  return NextResponse.json({
+    reply: result.reply,
+    stage: result.stage,
+    shapeFamily: result.shapeFamily,
+  });
 }
 
 export async function GET(req: NextRequest) {

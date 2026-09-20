@@ -48,6 +48,13 @@ function ensureSchema(): Promise<void> {
         )
       `;
       await sql`
+        CREATE TABLE IF NOT EXISTS user_shape (
+          user_id TEXT PRIMARY KEY,
+          family TEXT NOT NULL CHECK (family IN ('tree','flame','river','constellation','mountain')),
+          assigned_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `;
+      await sql`
         CREATE TABLE IF NOT EXISTS mirror_lines (
           user_id TEXT PRIMARY KEY,
           line TEXT NOT NULL,
@@ -205,6 +212,27 @@ export async function getUserStage(userId: string): Promise<Stage | undefined> {
   await ensureSchema();
   const rows = await sql`SELECT stage FROM user_stage WHERE user_id = ${userId}`;
   return (rows[0] as { stage: Stage } | undefined)?.stage;
+}
+
+// --- Personalized shape family (Tree / Flame / River / Constellation / Mountain) ---
+// Quietly matched once, early on, from the feel of how someone expresses
+// themselves -- never a quiz, never announced. See lib/anthropic.ts's
+// assign_shape_family tool.
+
+export type ShapeFamily = "tree" | "flame" | "river" | "constellation" | "mountain";
+
+export async function getUserShape(userId: string): Promise<ShapeFamily | undefined> {
+  await ensureSchema();
+  const rows = await sql`SELECT family FROM user_shape WHERE user_id = ${userId}`;
+  return (rows[0] as { family: ShapeFamily } | undefined)?.family;
+}
+
+export async function setUserShape(userId: string, family: ShapeFamily) {
+  await ensureUser(userId);
+  await sql`
+    INSERT INTO user_shape (user_id, family) VALUES (${userId}, ${family})
+    ON CONFLICT (user_id) DO NOTHING
+  `;
 }
 
 // Real, current percentage of all users sitting at each stage right now —
