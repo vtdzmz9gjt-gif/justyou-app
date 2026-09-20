@@ -627,6 +627,35 @@ a {
   margin-top: 4px;
 }
 
+/* ---------- mirror card ---------- */
+
+.mirror-card {
+  width: 100%;
+  max-width: 420px;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  padding: 36px 28px;
+  text-align: center;
+  margin-bottom: 44px;
+  background: var(--bg-deep);
+}
+
+.mirror-card-label {
+  font-family: var(--font-inter), sans-serif;
+  font-size: 10.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-faint);
+  margin-bottom: 16px;
+}
+
+.mirror-card-line {
+  font-style: italic;
+  font-size: 19px;
+  line-height: 1.6;
+  color: var(--ember);
+}
+
 .trail-empty {
   font-family: var(--font-inter), sans-serif;
   font-size: 14px;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { track } from "@vercel/analytics";
 import { STAGES, type StageKey } from "@/lib/stages";
 import type { AssistantTurn, Turn } from "@/lib/types";
 import { playChime } from "@/lib/sound";
@@ -76,6 +77,7 @@ export default function SessionView({ onExit }: { onExit: () => void }) {
 
     if (isFirst && checkInEntry && resolveOutcome) {
       resolveTrailEntry(checkInEntry.id, resolveOutcome);
+      track("action_outcome", { outcome: resolveOutcome });
     }
 
     const history = turns.map((t) =>

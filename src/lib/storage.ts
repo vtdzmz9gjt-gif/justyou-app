@@ -18,6 +18,8 @@ export interface StoredState {
   lastStage: StageKey;
   lastPhrase?: string;
   trail: TrailEntry[];
+  mirrorLine?: string;
+  mirrorGeneratedAt?: string;
 }
 
 const KEY = "justyou.state.v1";
@@ -96,4 +98,16 @@ export function resolveTrailEntry(id: string, outcome: Exclude<TrailOutcome, "pe
 export function updateLastStageAndPhrase(stage: StageKey, phrase?: string) {
   const state = loadState();
   saveState({ ...state, lastStage: stage, ...(phrase ? { lastPhrase: phrase } : {}) });
+}
+
+export function shouldGenerateMirrorLine(state: StoredState): boolean {
+  if (state.sessionCount < 3 || state.trail.length === 0) return false;
+  if (!state.mirrorGeneratedAt) return true;
+  const days = (Date.now() - new Date(state.mirrorGeneratedAt).getTime()) / 86400000;
+  return days >= 7;
+}
+
+export function saveMirrorLine(line: string) {
+  const state = loadState();
+  saveState({ ...state, mirrorLine: line, mirrorGeneratedAt: new Date().toISOString() });
 }

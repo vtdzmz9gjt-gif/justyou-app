@@ -165,3 +165,42 @@ export const RESPOND_TOOL = {
     required: ["truth", "question", "branches", "stage", "weighted", "processingStyle"],
   },
 };
+
+export interface MirrorActionSummary {
+  actionText: string;
+  stage: StageKey;
+  outcome: "pending" | "did" | "tried" | "missed";
+}
+
+export function buildMirrorPrompt(stage: StageKey, actions: MirrorActionSummary[]): string {
+  const stageInfo = STAGES.find((s) => s.key === stage)!;
+  const list = actions
+    .map((a) => `- ${a.actionText} (${a.stage}) — ${a.outcome}`)
+    .join("\n");
+
+  return `You are the voice inside "Just You," writing in the earned "destiny mirror" register: a line specific to what someone has actually done, reflecting who they're becoming. Never generic, never flattery, never a label or category ("you're a fire person").
+
+Write exactly ONE sentence, under 25 words, about who this person is becoming — grounded in the real pattern below, not in feelings they haven't demonstrated through action.
+
+This line will be shown on a small shareable card someone might screenshot. Do NOT include names, employers, companies, or any other identifying detail, even if implied by the actions below — stay in the register of character and pattern, not specific events.
+
+Their committed actions so far, most recent first:
+${list}
+
+They currently seem to be in: ${stageInfo.name} — ${stageInfo.line}`;
+}
+
+export const MIRROR_TOOL = {
+  name: "mirror_line",
+  description: "Produce the weekly destiny-mirror line.",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      line: {
+        type: "string" as const,
+        description: "One sentence, under 25 words, no identifying details.",
+      },
+    },
+    required: ["line"],
+  },
+};

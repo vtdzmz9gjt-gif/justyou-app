@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import dynamic from "next/dynamic";
+import { track } from "@vercel/analytics";
 import Home from "./Home";
 import SessionView from "./SessionView";
 import Trail from "./Trail";
@@ -18,7 +19,8 @@ export default function App() {
     return (
       <Threshold
         onClear={() => {
-          recordSessionStart();
+          const state = recordSessionStart();
+          if (state.sessionCount > 1) track("return_visit");
           setPastThreshold(true);
         }}
       />
