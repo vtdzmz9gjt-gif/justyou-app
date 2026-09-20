@@ -94,6 +94,24 @@ const tools: Anthropic.Tool[] = [
       required: ["family"],
     },
   },
+  {
+    name: "offer_branches",
+    description:
+      "Call this AT MOST ONCE per reply, and only when it genuinely fits -- not on ordinary exchanges. Use it when the conversation has arrived at a real fork: 2-3 concrete, different directions it could go from here, grounded in exactly what was just said. These are never the only option -- free text is always still there underneath -- just something concrete to tap when someone doesn't know what to say next. Use their own words and specifics, never generic labels like 'tell me more.' Skip this on most turns.",
+    input_schema: {
+      type: "object",
+      properties: {
+        options: {
+          type: "array",
+          items: { type: "string" },
+          minItems: 2,
+          maxItems: 3,
+          description: "2-3 short phrases, each a real next-step direction, in the person's own register.",
+        },
+      },
+      required: ["options"],
+    },
+  },
 ];
 
 function todayContext(): string {
@@ -166,6 +184,7 @@ export interface ChatResult {
   reply: string;
   stage?: Stage;
   shapeFamily?: ShapeFamily;
+  branches?: string[];
 }
 
 export async function runChat(
@@ -192,6 +211,7 @@ export async function runChat(
 
   let newStage: Stage | undefined;
   let newShape: ShapeFamily | undefined;
+  let newBranches: string[] | undefined;
 
   // Tool-use loop: the model may call record_commitment / resolve_open_commitment /
   // signal_depth one or more times before producing its actual reply to the person.
@@ -216,6 +236,7 @@ export async function runChat(
         reply: textBlocks.map((b) => b.text).join("\n").trim(),
         stage: newStage,
         shapeFamily: newShape,
+        branches: newBranches,
       };
     }
 
@@ -259,6 +280,14 @@ export async function runChat(
             tool_use_id: call.id,
             content: "Recorded.",
           });
+        } else if (call.name === "offer_branches") {
+          const input = call.input as { options: string[] };
+          newBranches = input.options.filter((o) => typeof o === "string" && o.trim()).slice(0, 3);
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: call.id,
+            content: "Shown to the person.",
+          });
         } else {
           toolResults.push({
             type: "tool_result",
@@ -281,7 +310,8 @@ export async function runChat(
 
     if (response.stop_reason !== "tool_use") {
       const trailing = textBlocks.map((b) => b.text).join("\n").trim();
-      if (trailing) return { reply: trailing, stage: newStage, shapeFamily: newShape };
+      if (trailing)
+        return { reply: trailing, stage: newStage, shapeFamily: newShape, branches: newBranches };
     }
   }
 
@@ -289,6 +319,7 @@ export async function runChat(
     reply: "Something got tangled on my end — say that again?",
     stage: newStage,
     shapeFamily: newShape,
+    branches: newBranches,
   };
 }
 

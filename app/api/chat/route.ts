@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
   await ensureUser(userId);
   const history = await getMessages(userId);
 
-  let result: { reply: string; stage?: string; shapeFamily?: string };
+  let result: { reply: string; stage?: string; shapeFamily?: string; branches?: string[] };
   try {
     result = await runChat(userId, history, message.trim(), depth, lang, alivenessAnswer);
   } catch (err) {
@@ -51,6 +51,7 @@ export async function POST(req: NextRequest) {
     reply: result.reply,
     stage: result.stage,
     shapeFamily: result.shapeFamily,
+    branches: result.branches,
   });
 }
 

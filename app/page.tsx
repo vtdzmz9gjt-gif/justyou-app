@@ -1438,6 +1438,7 @@ export default function Home() {
   const [alivenessInput, setAlivenessInput] = useState("");
   const [mirrorLine, setMirrorLine] = useState<string | null>(null);
   const [shapeFamily, setShapeFamily] = useState<ShapeFamily | null>(null);
+  const [branches, setBranches] = useState<string[]>([]);
   const [showReveal, setShowReveal] = useState(false);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -1532,6 +1533,7 @@ export default function Home() {
     setDraft("");
     setAlivenessInput("");
     setError(null);
+    setBranches([]);
     setMessages((m) => [...m, { role: "user", content: text }]);
     setSending(true);
 
@@ -1552,6 +1554,7 @@ export default function Home() {
       setMessages((m) => [...m, { role: "assistant", content: data.reply }]);
       if (data.stage) setStage(data.stage);
       if (data.shapeFamily) setShapeFamily(data.shapeFamily);
+      if (Array.isArray(data.branches) && data.branches.length > 0) setBranches(data.branches);
       if (
         data.stage === "return" &&
         typeof window !== "undefined" &&
@@ -1807,6 +1810,15 @@ export default function Home() {
                     <span />
                   </span>
                 </p>
+              </div>
+            )}
+            {!sending && branches.length > 0 && (
+              <div className="branches">
+                {branches.map((b, i) => (
+                  <button key={i} className="branch" onClick={() => send(b)} disabled={sending}>
+                    {b}
+                  </button>
+                ))}
               </div>
             )}
           </div>
