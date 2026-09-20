@@ -3,14 +3,20 @@ import { addMessage, ensureUser, getMessages } from "@/lib/db";
 import { runChat } from "@/lib/anthropic";
 
 export async function POST(req: NextRequest) {
-  let body: { userId?: string; message?: string; depth?: string; lang?: string };
+  let body: {
+    userId?: string;
+    message?: string;
+    depth?: string;
+    lang?: string;
+    alivenessAnswer?: string;
+  };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
   }
 
-  const { userId, message, depth, lang } = body;
+  const { userId, message, depth, lang, alivenessAnswer } = body;
   if (!userId || typeof userId !== "string") {
     return NextResponse.json({ error: "Missing userId." }, { status: 400 });
   }
@@ -29,7 +35,7 @@ export async function POST(req: NextRequest) {
 
   let result: { reply: string; stage?: string };
   try {
-    result = await runChat(userId, history, message.trim(), depth, lang);
+    result = await runChat(userId, history, message.trim(), depth, lang, alivenessAnswer);
   } catch (err) {
     console.error("chat error", err);
     return NextResponse.json(

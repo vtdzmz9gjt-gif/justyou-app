@@ -63,6 +63,16 @@ type Strings = {
   // than always English, which was steering the AI's replies into English
   // regardless of the selected UI language.
   moodPhrase: string;
+  // Optional secondary question on the opening screen. Not yet translated
+  // for every language (like the extra rotating `questions`) -- falls back
+  // to English, see ALIVENESS_FALLBACK below.
+  alivenessQuestion?: string;
+  alivenessOptional?: string;
+};
+
+const ALIVENESS_FALLBACK = {
+  alivenessQuestion: "Where did you feel most alive this week?",
+  alivenessOptional: "optional",
 };
 
 const STRINGS: Record<string, Strings> = {
@@ -88,6 +98,8 @@ const STRINGS: Record<string, Strings> = {
     depthQuestion: "How much do you want to get into today?",
     depthOptions: ["Just looking around", "A little", "I've got something on my mind"],
     moodPhrase: "I'm feeling {mood} right now.",
+    alivenessQuestion: "Where did you feel most alive this week?",
+    alivenessOptional: "optional",
   },
   es: {
     brand: "El Regreso",
@@ -1196,6 +1208,8 @@ export default function Home() {
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
   const [depth, setDepth] = useState<Depth | null>(null);
   const [stage, setStage] = useState<string | null>(null);
+  const [alivenessInput, setAlivenessInput] = useState("");
+  const [mirrorLine, setMirrorLine] = useState<string | null>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -1234,6 +1248,15 @@ export default function Home() {
       .catch(() => {
         /* fine — they'll just start fresh */
       });
+
+    fetch(`/api/mirror?userId=${encodeURIComponent(id)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.line) setMirrorLine(data.line);
+      })
+      .catch(() => {
+        /* quiet failure — the mirror line is a nice-to-have, not core */
+      });
   }, []);
 
   useEffect(() => {
@@ -1256,7 +1279,11 @@ export default function Home() {
     const text = (overrideText ?? draft).trim();
     if (!text || !userId || sending) return;
 
+    const isFirstMessage = messages.length === 0;
+    const alivenessAnswer = isFirstMessage ? alivenessInput.trim() || undefined : undefined;
+
     setDraft("");
+    setAlivenessInput("");
     setError(null);
     setMessages((m) => [...m, { role: "user", content: text }]);
     setSending(true);
@@ -1270,6 +1297,7 @@ export default function Home() {
           message: text,
           depth: depthValue ?? depth,
           lang,
+          alivenessAnswer,
         }),
       });
       const data = await res.json();
@@ -1408,6 +1436,12 @@ export default function Home() {
 
       {showSettings && (
         <div className="settings-panel">
+          {mirrorLine && (
+            <div className="mirror-card">
+              <div className="mirror-card-label">the return</div>
+              <div className="mirror-card-line">{mirrorLine}</div>
+            </div>
+          )}
           <p>{s.settingsText}</p>
           {emailSaved ? (
             <span className="settings-status">{s.savedLabel}</span>
@@ -1441,6 +1475,21 @@ export default function Home() {
                 {mood}
               </button>
             ))}
+          </div>
+          <div className="aliveness-field">
+            <label htmlFor="aliveness">
+              {s.alivenessQuestion || ALIVENESS_FALLBACK.alivenessQuestion}{" "}
+              <span className="aliveness-optional">
+                ({s.alivenessOptional || ALIVENESS_FALLBACK.alivenessOptional})
+              </span>
+            </label>
+            <input
+              id="aliveness"
+              type="text"
+              value={alivenessInput}
+              onChange={(e) => setAlivenessInput(e.target.value)}
+              disabled={sending}
+            />
           </div>
         </div>
       ) : awaitingDepth ? (

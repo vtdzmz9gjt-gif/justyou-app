@@ -29,17 +29,29 @@ function ensureSchema(): Promise<void> {
           user_id TEXT NOT NULL,
           action TEXT NOT NULL,
           target_date TEXT NOT NULL,
-          status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','landed','not_landed')),
+          status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','landed','tried','not_landed')),
           reminder_sent INTEGER NOT NULL DEFAULT 0,
           created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
           resolved_at TIMESTAMPTZ
         )
       `;
+      // Widen the status check constraint for databases created before
+      // 'tried' existed as a distinct outcome from 'not_landed'. Safe to
+      // run on every cold start: drop-if-exists then recreate.
+      await sql`ALTER TABLE commitments DROP CONSTRAINT IF EXISTS commitments_status_check`;
+      await sql`ALTER TABLE commitments ADD CONSTRAINT commitments_status_check CHECK (status IN ('pending','landed','tried','not_landed'))`;
       await sql`
         CREATE TABLE IF NOT EXISTS user_stage (
           user_id TEXT PRIMARY KEY,
           stage TEXT NOT NULL,
           updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `;
+      await sql`
+        CREATE TABLE IF NOT EXISTS mirror_lines (
+          user_id TEXT PRIMARY KEY,
+          line TEXT NOT NULL,
+          generated_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
       `;
       await sql`CREATE INDEX IF NOT EXISTS idx_messages_user ON messages(user_id, id)`;
@@ -64,7 +76,7 @@ export interface Commitment {
   user_id: string;
   action: string;
   target_date: string;
-  status: "pending" | "landed" | "not_landed";
+  status: "pending" | "landed" | "tried" | "not_landed";
   reminder_sent: number;
   created_at: string;
   resolved_at: string | null;
@@ -133,7 +145,7 @@ export async function recordCommitment(
 
 export async function resolveCommitment(
   userId: string,
-  outcome: "landed" | "not_landed"
+  outcome: "landed" | "tried" | "not_landed"
 ): Promise<Commitment | undefined> {
   await ensureSchema();
   const open = await getOpenCommitment(userId);
@@ -214,4 +226,84 @@ export async function getStagePercentages(): Promise<Record<string, number>> {
     result[r.stage] = Math.round((r.count / total) * 100);
   }
   return result;
+}
+
+// --- Weekly mirror line ---
+
+export interface CommitmentSummary {
+  action: string;
+  status: "landed" | "tried" | "not_landed";
+}
+
+export async function getDistinctActiveDays(userId: string): Promise<number> {
+  await ensureSchema();
+  const rows = await sql`
+    SELECT COUNT(DISTINCT created_at::date) as count FROM messages WHERE user_id = ${userId}
+  `;
+  return Number((rows[0] as { count: string | number }).count);
+}
+
+export async function getResolvedCommitments(
+  userId: string,
+  limit = 10
+): Promise<CommitmentSummary[]> {
+  await ensureSchema();
+  const rows = await sql`
+    SELECT action, status FROM commitments
+    WHERE user_id = ${userId} AND status IN ('landed','tried','not_landed')
+    ORDER BY resolved_at DESC LIMIT ${limit}
+  `;
+  return rows as unknown as CommitmentSummary[];
+}
+
+export async function getMirrorLine(
+  userId: string
+): Promise<{ line: string; generated_at: string } | undefined> {
+  await ensureSchema();
+  const rows = await sql`SELECT line, generated_at FROM mirror_lines WHERE user_id = ${userId}`;
+  return rows[0] as { line: string; generated_at: string } | undefined;
+}
+
+export async function saveMirrorLine(userId: string, line: string) {
+  await ensureUser(userId);
+  await sql`
+    INSERT INTO mirror_lines (user_id, line, generated_at) VALUES (${userId}, ${line}, now())
+    ON CONFLICT (user_id) DO UPDATE SET line = excluded.line, generated_at = excluded.generated_at
+  `;
+}
+
+// --- Minimal signals: do people come back, and what happens to committed actions ---
+
+export interface Signals {
+  totalUsers: number;
+  returningUsers: number;
+  commitmentOutcomes: { landed: number; tried: number; not_landed: number; pending: number };
+}
+
+export async function getSignals(): Promise<Signals> {
+  await ensureSchema();
+  const totalRows = (await sql`SELECT COUNT(*) as count FROM users`) as unknown as {
+    count: string | number;
+  }[];
+  const returningRows = (await sql`
+    SELECT COUNT(*) as count FROM (
+      SELECT user_id FROM messages GROUP BY user_id HAVING COUNT(DISTINCT created_at::date) > 1
+    ) t
+  `) as unknown as { count: string | number }[];
+  const outcomeRows = (await sql`
+    SELECT status, COUNT(*) as count FROM commitments GROUP BY status
+  `) as unknown as { status: string; count: string | number }[];
+
+  const commitmentOutcomes = { landed: 0, tried: 0, not_landed: 0, pending: 0 };
+  for (const r of outcomeRows) {
+    if (r.status in commitmentOutcomes) {
+      (commitmentOutcomes as Record<string, number>)[r.status] = Number(r.count);
+    }
+  }
+
+  return {
+    totalUsers: Number(totalRows[0].count),
+    returningUsers: Number(returningRows[0].count),
+    commitmentOutcomes,
+  };
 }

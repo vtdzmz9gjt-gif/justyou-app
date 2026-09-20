@@ -52,9 +52,9 @@ const tools: Anthropic.Tool[] = [
       properties: {
         outcome: {
           type: "string",
-          enum: ["landed", "not_landed"],
+          enum: ["landed", "tried", "not_landed"],
           description:
-            "\"landed\" if they followed through, \"not_landed\" for either a real attempt that didn't land or no attempt at all — describe the distinction to the person yourself in your reply.",
+            "\"landed\" if they followed through. \"tried\" if they made a real attempt but it didn't land. \"not_landed\" if they didn't engage with it at all.",
         },
       },
       required: ["outcome"],
@@ -109,6 +109,15 @@ function uiLanguageContext(uiLang: string | null | undefined): string {
   return `The visitor's browser/UI language is set to "${uiLang}". If their first message doesn't make the language clear on its own, default to responding in that language instead of English.`;
 }
 
+// Optional answer to "Where did you feel most alive this week?", asked
+// alongside the mood picker on a fresh visit. Private context only — never
+// a topic to raise on its own, just a signal for telling apart someone
+// pursuing a goal with real fire from someone losing themselves in it.
+function alivenessContext(alivenessAnswer: string | null | undefined): string {
+  if (!alivenessAnswer || !alivenessAnswer.trim()) return "";
+  return `At the start of this visit they were also optionally asked "Where did you feel most alive this week?" and answered: "${alivenessAnswer.trim()}". Use this only to privately judge whether they're moving through life with real fire or losing themselves in the pursuit of something — don't bring it up directly unless it's genuinely relevant to what they say.`;
+}
+
 async function stageContext(userId: string): Promise<string> {
   const currentStage = await getUserStage(userId);
   const percentages = await getStagePercentages();
@@ -138,7 +147,8 @@ export async function runChat(
   history: StoredMessage[],
   userMessage: string,
   depth?: string | null,
-  uiLang?: string | null
+  uiLang?: string | null,
+  alivenessAnswer?: string | null
 ): Promise<ChatResult> {
   const [openCommitment, stageInfo] = await Promise.all([
     openCommitmentContext(userId),
@@ -146,7 +156,7 @@ export async function runChat(
   ]);
   const system = `${BASE_SYSTEM_PROMPT}\n\n---\n\nCONTEXT (not visible to the person, never repeat it back verbatim):\n${todayContext()}\n${openCommitment}\n${depthContext(
     depth
-  )}\n${uiLanguageContext(uiLang)}\n${stageInfo}`;
+  )}\n${uiLanguageContext(uiLang)}\n${alivenessContext(alivenessAnswer)}\n${stageInfo}`;
 
   const messages: Anthropic.MessageParam[] = [
     ...toApiMessages(history),
@@ -191,7 +201,7 @@ export async function runChat(
             content: "Recorded.",
           });
         } else if (call.name === "resolve_open_commitment") {
-          const input = call.input as { outcome: "landed" | "not_landed" };
+          const input = call.input as { outcome: "landed" | "tried" | "not_landed" };
           await resolveCommitment(userId, input.outcome);
           const landedCount = await countLandedCommitments(userId);
           toolResults.push({
@@ -235,4 +245,44 @@ export async function runChat(
   }
 
   return { reply: "Something got tangled on my end — say that again?", stage: newStage };
+}
+
+// --- Weekly mirror line ---
+// One earned sentence, in the destiny-mirror register, about who this
+// person is becoming — grounded only in their resolved commitments and
+// current stage, never in raw conversation content, so it stays safe to
+// put on a small shareable card.
+export async function generateMirrorLine(
+  stage: Stage | undefined,
+  resolved: { action: string; status: "landed" | "tried" | "not_landed" }[]
+): Promise<string> {
+  const list = resolved
+    .map((r) => `- ${r.action} — ${r.status === "landed" ? "did it" : r.status === "tried" ? "tried, didn't land" : "didn't engage"}`)
+    .join("\n");
+
+  const system = `You are the voice of The Return, writing in the earned "destiny mirror" register: a line specific to what someone has actually done, reflecting who they're becoming. Never generic, never flattery, never a label or category.
+
+Write exactly ONE sentence, under 25 words, about who this person is becoming — grounded in the real pattern below, not in feelings they haven't demonstrated through action.
+
+This line will be shown on a small shareable card someone might screenshot. Do NOT include names, employers, or any other identifying detail, even if implied below — stay in the register of character and pattern.
+
+Their resolved commitments, most recent first:
+${list}
+
+Current stage: ${stage || "mystery"}`;
+
+  const response = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 200,
+    system,
+    messages: [{ role: "user", content: "Write the line." }],
+  });
+
+  const text = response.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join(" ")
+    .trim();
+
+  return text;
 }
