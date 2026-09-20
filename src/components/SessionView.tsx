@@ -4,10 +4,24 @@ import { useEffect, useRef, useState } from "react";
 import { STAGES, type StageKey } from "@/lib/stages";
 import type { AssistantTurn, Turn } from "@/lib/types";
 import { playChime } from "@/lib/sound";
+import {
+  addTrailEntry,
+  dueTrailEntries,
+  loadState,
+  resolveTrailEntry,
+  updateLastStageAndPhrase,
+  type TrailEntry,
+} from "@/lib/storage";
 
 const OPENING_LINE =
   "You know exactly who you're not. You've just never asked who's left. This is where you meet the rest of it.";
 const OPENING_QUESTION = "What's going on with you right now?";
+
+const CHECK_IN_OPTIONS: { label: string; outcome: "did" | "tried" | "missed" }[] = [
+  { label: "did it", outcome: "did" },
+  { label: "tried, but it didn't stick", outcome: "tried" },
+  { label: "didn't get to it", outcome: "missed" },
+];
 
 function flatten(turn: AssistantTurn): string {
   const parts = [turn.truth];
@@ -18,14 +32,27 @@ function flatten(turn: AssistantTurn): string {
 }
 
 export default function SessionView({ onExit }: { onExit: () => void }) {
+  const [initial] = useState(() => {
+    const stored = loadState();
+    const due = dueTrailEntries(stored);
+    return { stored, checkInEntry: due[0] as TrailEntry | undefined };
+  });
+
   const [turns, setTurns] = useState<Turn[]>([]);
-  const [stage, setStage] = useState<StageKey>("mystery");
+  const [stage, setStage] = useState<StageKey>(initial.stored.lastStage);
   const [input, setInput] = useState("");
   const [alivenessInput, setAlivenessInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [failedMessage, setFailedMessage] = useState<string | null>(null);
   const [errorText, setErrorText] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const checkInEntry = initial.checkInEntry;
+  // sessionCount is incremented at Threshold-clear, just before this mounts —
+  // so a value of 1 means "this is their first ever visit."
+  const isReturning = initial.stored.sessionCount > 1;
+  const lastActionText = initial.stored.trail[0]?.actionText;
+  const lastPhrase = initial.stored.lastPhrase;
 
   useEffect(() => {
     playChime();
@@ -35,7 +62,7 @@ export default function SessionView({ onExit }: { onExit: () => void }) {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [turns, loading]);
 
-  async function send(text: string) {
+  async function send(text: string, resolveOutcome?: "did" | "tried" | "missed") {
     const trimmed = text.trim();
     if (!trimmed || loading) return;
 
@@ -47,17 +74,22 @@ export default function SessionView({ onExit }: { onExit: () => void }) {
     setErrorText(null);
     setFailedMessage(null);
 
+    if (isFirst && checkInEntry && resolveOutcome) {
+      resolveTrailEntry(checkInEntry.id, resolveOutcome);
+    }
+
     const history = turns.map((t) =>
       t.role === "user" ? { role: "user" as const, content: t.text } : { role: "assistant" as const, content: flatten(t) },
     );
     const turnCount = turns.filter((t) => t.role === "assistant").length + 1;
-    const alivenessAnswer = isFirst && alivenessInput.trim() ? alivenessInput.trim() : undefined;
+    const alivenessAnswer = isFirst && !checkInEntry && alivenessInput.trim() ? alivenessInput.trim() : undefined;
+    const checkInAction = isFirst && checkInEntry ? checkInEntry.actionText : undefined;
 
     try {
       const res = await fetch("/api/session", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ stage, turnCount, history, message: trimmed, alivenessAnswer }),
+        body: JSON.stringify({ stage, turnCount, history, message: trimmed, alivenessAnswer, checkInAction }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -66,6 +98,10 @@ export default function SessionView({ onExit }: { onExit: () => void }) {
       const data: AssistantTurn = await res.json();
       setTurns([...nextTurns, data]);
       setStage(data.stage);
+      updateLastStageAndPhrase(data.stage, trimmed);
+      if (data.committedAction) {
+        addTrailEntry(data.committedAction, data.stage, data.checkInDays);
+      }
     } catch (err) {
       setTurns(turns); // roll back to before the user's message
       setFailedMessage(trimmed);
@@ -78,6 +114,16 @@ export default function SessionView({ onExit }: { onExit: () => void }) {
   const currentIdx = STAGES.findIndex((s) => s.key === stage);
   const lastAssistant = [...turns].reverse().find((t): t is AssistantTurn => t.role === "assistant");
   const branches = lastAssistant?.branches ?? [];
+
+  const openingLine = checkInEntry
+    ? `Last time, you said you'd ${checkInEntry.actionText}.`
+    : isReturning && lastActionText
+      ? `Last time, you said you'd ${lastActionText}.`
+      : isReturning && lastPhrase
+        ? `Last time you said: "${lastPhrase}"`
+        : OPENING_LINE;
+
+  const openingQuestion = checkInEntry ? "Did you get to it?" : OPENING_QUESTION;
 
   return (
     <div className="screen">
@@ -105,20 +151,35 @@ export default function SessionView({ onExit }: { onExit: () => void }) {
       <div className="session" style={{ marginTop: turns.length > 0 ? 56 : 0, flex: 1 }}>
         {turns.length === 0 && (
           <div className="opening">
-            <p className="opening-line">{OPENING_LINE}</p>
-            <p className="opening-question">{OPENING_QUESTION}</p>
-            <div className="aliveness">
-              <label htmlFor="aliveness" className="aliveness-label">
-                where did you feel most alive this week? <span>(optional)</span>
-              </label>
-              <input
-                id="aliveness"
-                className="aliveness-input"
-                value={alivenessInput}
-                onChange={(e) => setAlivenessInput(e.target.value)}
-                disabled={loading}
-              />
-            </div>
+            <p className="opening-line">{openingLine}</p>
+            <p className="opening-question">{openingQuestion}</p>
+            {checkInEntry ? (
+              <div className="branches" style={{ justifyContent: "center", marginTop: 8 }}>
+                {CHECK_IN_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.outcome}
+                    className="branch"
+                    onClick={() => send(opt.label, opt.outcome)}
+                    disabled={loading}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div className="aliveness">
+                <label htmlFor="aliveness" className="aliveness-label">
+                  where did you feel most alive this week? <span>(optional)</span>
+                </label>
+                <input
+                  id="aliveness"
+                  className="aliveness-input"
+                  value={alivenessInput}
+                  onChange={(e) => setAlivenessInput(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
+            )}
           </div>
         )}
 

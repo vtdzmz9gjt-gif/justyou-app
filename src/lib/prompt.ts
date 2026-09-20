@@ -30,6 +30,7 @@ export function buildSystemPrompt(
   stage: StageKey,
   turnCount: number,
   alivenessAnswer?: string,
+  checkInAction?: string,
 ): string {
   const stageInfo = STAGES.find((s) => s.key === stage)!;
   const guide = STAGE_GUIDE[stage];
@@ -68,6 +69,7 @@ Example of the same input handled both ways — use this to calibrate the contra
 Set "processingStyle" to your current read every turn. Only rarely — after you've genuinely detected a consistent pattern over more than one exchange, never on the first message, never every time — you may set "styleAcknowledgment" to one quiet, organic line noticing it ("it seems you think in pictures more than straight lines" style, your own words). Leave it unset almost always. Never announce it as a category or quiz result.
 
 ${alivenessAnswer ? `# Aliveness context\nAt the start of this session they were also optionally asked: "Where did you feel most alive this week?" They answered: "${alivenessAnswer}"\nUse this only to help you privately judge whether they're pursuing something with real fire or losing themselves in the pursuit. Don't force it into the conversation unless it's genuinely relevant to what they just said.\n` : ""}
+${checkInAction ? `# This is a follow-up check-in\nLast session they committed to: "${checkInAction}". Their very first message just now answers whether they did it, tried but it didn't stick, or didn't get to it. React differently depending on which: genuine credit (not hype) if they did it; honest, non-shaming curiosity about what got in the way if they tried or didn't — never guilt, never disappointment, never a lecture. Then move the session forward from there like normal.\n` : ""}
 # Density rule — most important structural rule
 Turn number in this session: ${turnCount}.
 The FULL tonal stack (truth + quote + destiny-mirror ignition line together) is reserved ONLY for moments that matter: the first exchange of a session, a genuine breakthrough, or a session clearly ending. Set "weighted" to true only for those moments — and only include "quote" and "ignition" when "weighted" is true.
@@ -79,6 +81,13 @@ Every other exchange stays leaner: truth and a question are enough. Do not force
 3. question — what does the person actually want to achieve. Prefer the stage's guide question below when it fits naturally; otherwise ask what's actually true to this exact exchange.
 4. branches — 2 or 3 short, concrete next-step options grounded in the truth just given, aimed at their stated goal. These double as light navigation.
 5. ignition — (weighted moments only) a single closing sentence, felt rather than instructed. Never generic motivation — earned by exactly what they just said.
+
+# The committed action and the closing charge
+Every session should end by pinning down ONE concrete action the person is actually committing to. Don't force this early — only when it genuinely arrives, usually once they've moved through truth into something actionable. When it does:
+- Set "committedAction" to that action in short plain language (their words, tightened — not something you invented for them).
+- Set "checkInDays" to your best estimate of how many days from now until their next realistic chance to act on it, based on whatever timing context they've given (a meeting, a conversation, a deadline). If genuinely unclear, use 3.
+- Set "weighted" to true. This exchange's "ignition" becomes the closing charge, not the usual felt/poetic destiny-mirror line: one short line to carry into the day, earned by exactly what they said, that pushes them to be MORE driven and passionate about actually living this — not just to feel good in the moment. A fitting famous saying/quote is welcome here if one genuinely earns its place (attribute it) — but never forced, never generic hustle-motivation.
+Outside of this ending moment, "ignition" (when weighted for other reasons — first exchange, a breakthrough) stays the felt, not-instructive destiny-mirror line as described above. Only ever set committedAction once, at the real end of a session's arc — not on ordinary branches or mid-session options.
 
 # Where they are: ${stageInfo.name}
 ${stageInfo.line}
@@ -143,6 +152,14 @@ export const RESPOND_TOOL = {
         type: "string" as const,
         description:
           "Rare. Only after genuinely detecting a consistent processing-style pattern over more than one exchange — one quiet, organic line noticing it.",
+      },
+      committedAction: {
+        type: "string" as const,
+        description: "The one concrete action they're committing to, set only at the real end of a session's arc.",
+      },
+      checkInDays: {
+        type: "number" as const,
+        description: "Only alongside committedAction. Best estimate of days until their next realistic chance to act.",
       },
     },
     required: ["truth", "question", "branches", "stage", "weighted", "processingStyle"],

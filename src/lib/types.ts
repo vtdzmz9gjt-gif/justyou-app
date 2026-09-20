@@ -15,6 +15,8 @@ export interface AssistantTurn {
   processingStyle: ProcessingStyle;
   emotionalState?: string;
   styleAcknowledgment?: string;
+  committedAction?: string;
+  checkInDays?: number;
 }
 
 export interface UserTurn {
@@ -30,4 +32,5 @@ export interface SessionRequestBody {
   history: { role: "user" | "assistant"; content: string }[];
   message: string;
   alivenessAnswer?: string;
+  checkInAction?: string;
 }

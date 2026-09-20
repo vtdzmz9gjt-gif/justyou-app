@@ -6,6 +6,7 @@ import Home from "./Home";
 import SessionView from "./SessionView";
 import Trail from "./Trail";
 import Wayfind, { type View } from "./Wayfind";
+import { recordSessionStart } from "@/lib/storage";
 
 const Threshold = dynamic(() => import("./Threshold"), { ssr: false });
 
@@ -14,7 +15,14 @@ export default function App() {
   const [view, setView] = useState<View>("home");
 
   if (!pastThreshold) {
-    return <Threshold onClear={() => setPastThreshold(true)} />;
+    return (
+      <Threshold
+        onClear={() => {
+          recordSessionStart();
+          setPastThreshold(true);
+        }}
+      />
+    );
   }
 
   return (

@@ -22,7 +22,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { stage, turnCount, history, message, alivenessAnswer } = body;
+  const { stage, turnCount, history, message, alivenessAnswer, checkInAction } = body;
   if (!STAGE_KEYS.includes(stage) || typeof message !== "string" || !message.trim()) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
@@ -47,7 +47,7 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         model: "claude-sonnet-5",
         max_tokens: 1024,
-        system: buildSystemPrompt(stage, turnCount, alivenessAnswer),
+        system: buildSystemPrompt(stage, turnCount, alivenessAnswer, checkInAction),
         messages,
         tools: [RESPOND_TOOL],
         tool_choice: { type: "tool", name: "respond" },
@@ -105,6 +105,12 @@ export async function POST(request: Request) {
     ...(typeof input.emotionalState === "string" ? { emotionalState: input.emotionalState } : {}),
     ...(typeof input.styleAcknowledgment === "string"
       ? { styleAcknowledgment: input.styleAcknowledgment }
+      : {}),
+    ...(input.weighted && typeof input.committedAction === "string" && input.committedAction.trim()
+      ? {
+          committedAction: input.committedAction.trim(),
+          ...(typeof input.checkInDays === "number" ? { checkInDays: input.checkInDays } : {}),
+        }
       : {}),
   };
 
