@@ -1,5 +1,7 @@
 import type { StageKey } from "./stages";
 
+export type ProcessingStyle = "direct" | "metaphor";
+
 export interface AssistantTurn {
   role: "assistant";
   truth: string;
@@ -10,6 +12,9 @@ export interface AssistantTurn {
   ignition?: string;
   stage: StageKey;
   weighted: boolean;
+  processingStyle: ProcessingStyle;
+  emotionalState?: string;
+  styleAcknowledgment?: string;
 }
 
 export interface UserTurn {
@@ -24,4 +29,5 @@ export interface SessionRequestBody {
   turnCount: number;
   history: { role: "user" | "assistant"; content: string }[];
   message: string;
+  alivenessAnswer?: string;
 }

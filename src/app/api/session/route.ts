@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
 import { buildSystemPrompt, RESPOND_TOOL } from "@/lib/prompt";
-import type { AssistantTurn, SessionRequestBody } from "@/lib/types";
+import type { AssistantTurn, ProcessingStyle, SessionRequestBody } from "@/lib/types";
 import type { StageKey } from "@/lib/stages";
 
 const STAGE_KEYS: StageKey[] = ["mystery", "safety", "recognition", "courage", "return"];
+const PROCESSING_STYLES: ProcessingStyle[] = ["direct", "metaphor"];
 
 export async function POST(request: Request) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
@@ -21,7 +22,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { stage, turnCount, history, message } = body;
+  const { stage, turnCount, history, message, alivenessAnswer } = body;
   if (!STAGE_KEYS.includes(stage) || typeof message !== "string" || !message.trim()) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
@@ -46,7 +47,7 @@ export async function POST(request: Request) {
       body: JSON.stringify({
         model: "claude-sonnet-5",
         max_tokens: 1024,
-        system: buildSystemPrompt(stage, turnCount),
+        system: buildSystemPrompt(stage, turnCount, alivenessAnswer),
         messages,
         tools: [RESPOND_TOOL],
         tool_choice: { type: "tool", name: "respond" },
@@ -84,6 +85,10 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Model response was malformed." }, { status: 502 });
   }
 
+  const processingStyle = PROCESSING_STYLES.includes(input.processingStyle as ProcessingStyle)
+    ? (input.processingStyle as ProcessingStyle)
+    : "direct";
+
   const turn: AssistantTurn = {
     role: "assistant",
     truth: input.truth,
@@ -91,11 +96,16 @@ export async function POST(request: Request) {
     branches: input.branches.filter((b): b is string => typeof b === "string").slice(0, 3),
     stage: input.stage as StageKey,
     weighted: Boolean(input.weighted),
+    processingStyle,
     ...(input.weighted && typeof input.quote === "string" ? { quote: input.quote } : {}),
-    ...(input.weighted && typeof input.quoteSource === "string"
+    ...(input.weighted && processingStyle === "direct" && typeof input.quoteSource === "string"
       ? { quoteSource: input.quoteSource }
       : {}),
     ...(input.weighted && typeof input.ignition === "string" ? { ignition: input.ignition } : {}),
+    ...(typeof input.emotionalState === "string" ? { emotionalState: input.emotionalState } : {}),
+    ...(typeof input.styleAcknowledgment === "string"
+      ? { styleAcknowledgment: input.styleAcknowledgment }
+      : {}),
   };
 
   return NextResponse.json(turn);

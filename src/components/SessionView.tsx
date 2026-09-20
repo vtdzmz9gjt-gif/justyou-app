@@ -21,6 +21,7 @@ export default function SessionView({ onExit }: { onExit: () => void }) {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [stage, setStage] = useState<StageKey>("mystery");
   const [input, setInput] = useState("");
+  const [alivenessInput, setAlivenessInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [failedMessage, setFailedMessage] = useState<string | null>(null);
   const [errorText, setErrorText] = useState<string | null>(null);
@@ -38,6 +39,7 @@ export default function SessionView({ onExit }: { onExit: () => void }) {
     const trimmed = text.trim();
     if (!trimmed || loading) return;
 
+    const isFirst = turns.length === 0;
     const nextTurns: Turn[] = [...turns, { role: "user", text: trimmed }];
     setTurns(nextTurns);
     setInput("");
@@ -49,12 +51,13 @@ export default function SessionView({ onExit }: { onExit: () => void }) {
       t.role === "user" ? { role: "user" as const, content: t.text } : { role: "assistant" as const, content: flatten(t) },
     );
     const turnCount = turns.filter((t) => t.role === "assistant").length + 1;
+    const alivenessAnswer = isFirst && alivenessInput.trim() ? alivenessInput.trim() : undefined;
 
     try {
       const res = await fetch("/api/session", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ stage, turnCount, history, message: trimmed }),
+        body: JSON.stringify({ stage, turnCount, history, message: trimmed, alivenessAnswer }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -104,6 +107,18 @@ export default function SessionView({ onExit }: { onExit: () => void }) {
           <div className="opening">
             <p className="opening-line">{OPENING_LINE}</p>
             <p className="opening-question">{OPENING_QUESTION}</p>
+            <div className="aliveness">
+              <label htmlFor="aliveness" className="aliveness-label">
+                where did you feel most alive this week? <span>(optional)</span>
+              </label>
+              <input
+                id="aliveness"
+                className="aliveness-input"
+                value={alivenessInput}
+                onChange={(e) => setAlivenessInput(e.target.value)}
+                disabled={loading}
+              />
+            </div>
           </div>
         )}
 
@@ -115,6 +130,9 @@ export default function SessionView({ onExit }: { onExit: () => void }) {
           ) : (
             <div key={i} style={{ display: "flex", flexDirection: "column", gap: 34 }}>
               <div className="truth beat b1">{turn.truth}</div>
+              {turn.styleAcknowledgment && (
+                <div className="style-note beat b1">{turn.styleAcknowledgment}</div>
+              )}
               {turn.quote && (
                 <div className="quote beat b2">
                   {turn.quote}
