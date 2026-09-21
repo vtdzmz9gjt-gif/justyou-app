@@ -342,6 +342,44 @@ async function saveOrShareArtwork(
   URL.revokeObjectURL(url);
 }
 
+// The threshold moment: a few seconds of near-black stillness with one
+// quiet line, on every app open (not just first-time) -- the very first
+// thing anyone reads, before onboarding or the opening question. Auto-
+// advances after a beat, or on tap/click/keypress for anyone who doesn't
+// want to wait it out.
+function ThresholdOverlay({ line, onDone }: { line: string; onDone: () => void }) {
+  const [closing, setClosing] = useState(false);
+  const proceededRef = useRef(false);
+
+  function proceed() {
+    if (proceededRef.current) return;
+    proceededRef.current = true;
+    setClosing(true);
+    setTimeout(onDone, 500);
+  }
+
+  useEffect(() => {
+    const t = setTimeout(proceed, 3800);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <div
+      className={`threshold-overlay${closing ? " threshold-closing" : ""}`}
+      onClick={proceed}
+      role="button"
+      tabIndex={0}
+      aria-label="Continue"
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") proceed();
+      }}
+    >
+      <p className="threshold-line">{line}</p>
+    </div>
+  );
+}
+
 // The Return-stage reveal: happens once, for real, at the true end of
 // someone's journey. Fragments assemble fully, a beat of stillness, then
 // the line. Not something to casually replay -- see REVEAL_SHOWN_KEY.
@@ -455,11 +493,22 @@ type Strings = {
   // to English, see ALIVENESS_FALLBACK below.
   alivenessQuestion?: string;
   alivenessOptional?: string;
+  // The fixed line shown once during the threshold moment (a few seconds
+  // of near-black stillness on every app open, before anything else --
+  // spec section 12/13). Only composed fresh for the launch languages
+  // (never machine-translated -- see spec section 13); every other
+  // language falls back to English, see THRESHOLD_FALLBACK below.
+  thresholdLine?: string;
 };
 
 const ALIVENESS_FALLBACK = {
   alivenessQuestion: "Where did you feel most alive this week?",
   alivenessOptional: "optional",
+};
+
+const THRESHOLD_FALLBACK = {
+  thresholdLine:
+    "You know exactly who you're not. You've just never asked who's left. This is where you meet the rest of it.",
 };
 
 const STRINGS: Record<string, Strings> = {
@@ -487,6 +536,8 @@ const STRINGS: Record<string, Strings> = {
     moodPhrase: "I'm feeling {mood} right now.",
     alivenessQuestion: "Where did you feel most alive this week?",
     alivenessOptional: "optional",
+    thresholdLine:
+      "You know exactly who you're not. You've just never asked who's left. This is where you meet the rest of it.",
   },
   es: {
     brand: "Just You",
@@ -538,6 +589,8 @@ const STRINGS: Record<string, Strings> = {
     depthQuestion: "Wie tief willst du heute gehen?",
     depthOptions: ["Ich schaue nur", "Ein bisschen", "Ich habe etwas im Kopf"],
     moodPhrase: "Ich fühle mich gerade {mood}.",
+    thresholdLine:
+      "Du weißt genau, wer du nicht bist. Wer noch übrig ist, hast du nie gefragt. Hier triffst du ihn.",
   },
   pt: {
     brand: "Just You",
@@ -572,6 +625,8 @@ const STRINGS: Record<string, Strings> = {
     depthQuestion: "Quanto vuoi approfondire oggi?",
     depthOptions: ["Sto solo guardando", "Un po'", "Ho qualcosa in mente"],
     moodPhrase: "Mi sento {mood} in questo momento.",
+    thresholdLine:
+      "Sai benissimo chi non sei. Ma chi sei davvero, non l'hai mai incontrato. Qui lo incontri.",
   },
   he: {
     brand: "Just You",
@@ -691,6 +746,7 @@ const STRINGS: Record<string, Strings> = {
     depthQuestion: "Sa thellë dëshiron të shkosh sot?",
     depthOptions: ["Vetëm po shikoj", "Pak", "Kam diçka në mendje"],
     moodPhrase: "Po ndihem {mood} tani.",
+    thresholdLine: "E njeh mirë atë që s'je. Po atë që je — s'e ke takuar kurrë. Këtu e takon.",
   },
   el: {
     brand: "Just You",
@@ -708,6 +764,8 @@ const STRINGS: Record<string, Strings> = {
     depthQuestion: "Πόσο βαθιά θέλεις να πας σήμερα;",
     depthOptions: ["Απλώς κοιτάζω", "Λίγο", "Έχω κάτι στο μυαλό μου"],
     moodPhrase: "Αισθάνομαι {mood} αυτή τη στιγμή.",
+    thresholdLine:
+      "Ξέρεις καλά ποιος δεν είσαι. Ποιος έμεινε, όμως, δεν τον έχεις ρωτήσει ποτέ. Εδώ τον γνωρίζεις.",
   },
   hy: {
     brand: "Just You",
@@ -1581,6 +1639,7 @@ function getUserId(): string {
 
 export default function Home() {
   const [lang, setLang] = useState("en");
+  const [showThreshold, setShowThreshold] = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingIndex, setOnboardingIndex] = useState(0);
   const [userId, setUserId] = useState<string | null>(null);
@@ -1802,6 +1861,15 @@ export default function Home() {
     : selectedMood
     ? MOOD_COLORS[selectedMood]
     : null;
+
+  if (showThreshold) {
+    return (
+      <ThresholdOverlay
+        line={s.thresholdLine || THRESHOLD_FALLBACK.thresholdLine}
+        onDone={() => setShowThreshold(false)}
+      />
+    );
+  }
 
   if (showReveal && shapeFamily) {
     return (
