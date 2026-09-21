@@ -153,6 +153,10 @@ body {
 
 /* ---------- artwork card ---------- */
 
+.shape-fragment {
+  transition: transform 1.6s ease, opacity 1.6s ease;
+}
+
 .artwork-card {
   width: 100%;
   flex: 1 1 100%;
@@ -741,7 +745,24 @@ body {
   pointer-events: none;
 }
 
-.app > *:not(.ambient-glow) {
+.ambient-art {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.13;
+  pointer-events: none;
+  transition: opacity 1.8s ease;
+}
+
+.ambient-art svg {
+  width: min(82vw, 420px);
+  height: min(82vw, 420px);
+}
+
+.app > *:not(.ambient-glow):not(.ambient-art) {
   position: relative;
   z-index: 1;
 }

@@ -170,17 +170,25 @@ function ShapeArt({
   family,
   stage,
   size,
+  className,
 }: {
   family: ShapeFamily;
   stage: string;
   size: number;
+  className?: string;
 }) {
   const fam = SHAPE_FAMILIES[family];
   const stageIdx = Math.max(0, STAGE_ORDER.indexOf(stage as (typeof STAGE_ORDER)[number]));
   const progress = stageIdx / 4;
 
   return (
-    <svg width={size} height={size} viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 300 300"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+    >
       {fam.paths.map((p, i) => (
         <path
           key={i}
@@ -189,6 +197,7 @@ function ShapeArt({
           fill="none"
           strokeWidth={1.6}
           strokeLinecap="round"
+          className="shape-fragment"
           opacity={0.35 + 0.6 * progress}
           transform={`translate(${p.dx * (1 - progress)},${p.dy * (1 - progress)}) rotate(${
             p.rot * (1 - progress)
@@ -202,6 +211,7 @@ function ShapeArt({
           cy={d.cy}
           r={d.r}
           fill={fam.color}
+          className="shape-fragment"
           opacity={0.3 + 0.6 * progress}
         />
       ))}
@@ -1931,6 +1941,12 @@ export default function Home() {
             : "none",
         }}
       />
+
+      {shapeFamily && (
+        <div className="ambient-art" aria-hidden="true">
+          <ShapeArt family={shapeFamily} stage={stage || "mystery"} size={420} />
+        </div>
+      )}
 
       <div className="topbar">
         <span className="wordmark">{s.brand}</span>
