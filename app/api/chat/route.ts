@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { addMessage, ensureUser, getMessages } from "@/lib/db";
 import { runChat } from "@/lib/anthropic";
 
+// runChat's tool-use loop can make up to 4 sequential calls to Claude in a
+// single turn (recording a commitment, signaling a stage, assigning a shape
+// family, then the actual reply) -- comfortably past Vercel's default
+// function timeout on a slow round. Needs a paid plan; Hobby's 10s cap
+// can't be raised past this.
+export const maxDuration = 60;
+
 export async function POST(req: NextRequest) {
   let body: {
     userId?: string;
