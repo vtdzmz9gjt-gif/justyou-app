@@ -575,7 +575,7 @@ const STRINGS: Record<string, Strings> = {
   },
   de: {
     brand: "Just You",
-    questions: ["Du weißt genau, wer du nicht bist. Wer noch übrig ist, hast du nie gefragt. Hier triffst du ihn."],
+    questions: ["Was bist du bereit, nicht mehr vorzuspielen?"],
     moodCaption: "Findest du keine Worte dafür? Fang hier an",
     moods: ["Ruhig", "Ängstlich", "Wütend", "Taub", "Müde", "Hoffnungsvoll", "Feststeckend"],
     placeholderStart: "Antworte, oder sag irgendetwas.",
@@ -611,7 +611,7 @@ const STRINGS: Record<string, Strings> = {
   },
   it: {
     brand: "Just You",
-    questions: ["Sai benissimo chi non sei. Ma chi sei davvero, non l'hai mai incontrato. Qui lo incontri."],
+    questions: ["Cosa sei pronto a smettere di recitare?"],
     moodCaption: "Non sai come dirlo a parole? Inizia qui",
     moods: ["Calmo", "Ansioso", "Arrabbiato", "Intorpidito", "Stanco", "Speranzoso", "Bloccato"],
     placeholderStart: "Rispondi, o di' qualsiasi cosa.",
@@ -750,7 +750,7 @@ const STRINGS: Record<string, Strings> = {
   },
   el: {
     brand: "Just You",
-    questions: ["Ξέρεις καλά ποιος δεν είσαι. Ποιος έμεινε, όμως, δεν τον έχεις ρωτήσει ποτέ. Εδώ τον γνωρίζεις."],
+    questions: ["Τι είσαι έτοιμος να σταματήσεις να προσποιείσαι;"],
     moodCaption: "Δεν ξέρεις πώς να το εκφράσεις; Ξεκίνα εδώ",
     moods: ["Ήρεμος", "Ανήσυχος", "Θυμωμένος", "Μουδιασμένος", "Κουρασμένος", "Με ελπίδα", "Κολλημένος"],
     placeholderStart: "Απάντησε, ή πες οτιδήποτε.",
