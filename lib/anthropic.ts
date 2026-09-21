@@ -362,3 +362,53 @@ Current stage: ${stage || "mystery"}`;
 
   return text;
 }
+
+// --- Pattern review ---
+// An on-demand, private end-of-conversation read -- not a recap of what was
+// said, a read on the pattern someone was actually operating from in it.
+// Unlike the mirror line, this may draw on real conversation content since
+// it's never meant to be shared or screenshotted -- just for them, in the
+// moment they ask for it.
+export async function generatePatternReview(
+  stage: Stage | undefined,
+  recentMessages: StoredMessage[],
+  uiLang?: string | null
+): Promise<string> {
+  const transcript = recentMessages
+    .map((m) => `${m.role === "user" ? "Them" : "You"}: ${m.content}`)
+    .join("\n");
+
+  const langLine =
+    uiLang && uiLang !== "en"
+      ? `Reply in the language this conversation is mostly in (UI language: "${uiLang}").`
+      : "Reply in English unless the conversation below is clearly in another language.";
+
+  const system = `You are the voice of Just You, offering a private read on the conversation that just happened -- not a summary of what was said, a read on the pattern the person was actually operating from.
+
+Write 3-4 short sentences, as flowing prose -- no headers, no bullet points, no "In this conversation..." framing:
+1. Name the real pattern they were operating from -- specific to what they actually said, not a generic label ("anxious," "avoidant") and not a diagnosis.
+2. One clear, plain reminder that this pattern is not the whole of who they are -- it's where they're operating from right now, not a permanent identity.
+3. Close forward-looking: they're leaving this pattern for one that actually gets them where they want to go -- earned by what specifically happened here, never generic motivation.
+
+Match the voice already established for this app: direct, warm, a close friend who sees clearly -- never therapy language, never clinical, never a list.
+
+${langLine}
+
+Stage reached in this conversation: ${stage || "mystery"}
+
+The conversation:
+${transcript}`;
+
+  const response = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 300,
+    system,
+    messages: [{ role: "user", content: "Give the read." }],
+  });
+
+  return response.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join(" ")
+    .trim();
+}

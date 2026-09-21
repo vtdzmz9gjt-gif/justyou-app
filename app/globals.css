@@ -662,6 +662,100 @@ body {
   background: linear-gradient(to top, var(--bg) 60%, transparent);
 }
 
+.pattern-review-trigger {
+  display: block;
+  margin: 0 auto 0.6rem;
+  background: transparent;
+  color: var(--text-faint);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0.4rem 1rem;
+  font-family: var(--font-body);
+  font-size: 0.76rem;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.pattern-review-trigger:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.pattern-review-trigger:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* ---------- pattern review overlay ---------- */
+
+.pattern-review-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 350;
+  background: rgba(20, 18, 15, 0.88);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.pattern-review-card {
+  max-width: 420px;
+  width: 100%;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 1.75rem 1.5rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.pattern-review-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.pattern-review-text {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 17px;
+  color: var(--text);
+  line-height: 1.7;
+}
+
+.pattern-review-error {
+  font-family: var(--font-body);
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.pattern-review-loading {
+  padding: 0.5rem 0;
+}
+
+.pattern-review-close {
+  font-family: var(--font-body);
+  font-size: 12px;
+  color: var(--text-faint);
+  border: 1px solid var(--border);
+  padding: 0.5rem 1.25rem;
+  border-radius: 999px;
+  cursor: pointer;
+  background: transparent;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.pattern-review-close:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
 .composer-inner {
   max-width: 640px;
   margin: 0 auto;
@@ -762,7 +856,7 @@ body {
   height: min(82vw, 420px);
 }
 
-.app > *:not(.ambient-glow):not(.ambient-art) {
+.app > *:not(.ambient-glow):not(.ambient-art):not(.pattern-review-overlay) {
   position: relative;
   z-index: 1;
 }

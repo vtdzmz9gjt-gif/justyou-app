@@ -509,6 +509,10 @@ type Strings = {
   // (never machine-translated -- see spec section 13); every other
   // language falls back to English, see THRESHOLD_FALLBACK below.
   thresholdLine?: string;
+  // Button label for the on-demand pattern review. Not yet translated for
+  // every language -- falls back to English, see PATTERN_REVIEW_FALLBACK
+  // below.
+  patternReviewLabel?: string;
 };
 
 const ALIVENESS_FALLBACK = {
@@ -519,6 +523,10 @@ const ALIVENESS_FALLBACK = {
 const THRESHOLD_FALLBACK = {
   thresholdLine:
     "You know exactly who you're not. You've just never asked who's left. This is where you meet the rest of it.",
+};
+
+const PATTERN_REVIEW_FALLBACK = {
+  patternReviewLabel: "See the pattern",
 };
 
 const STRINGS: Record<string, Strings> = {
@@ -548,6 +556,7 @@ const STRINGS: Record<string, Strings> = {
     alivenessOptional: "optional",
     thresholdLine:
       "You know exactly who you're not. You've just never asked who's left. This is where you meet the rest of it.",
+    patternReviewLabel: "See the pattern",
   },
   es: {
     brand: "Just You",
@@ -1670,6 +1679,10 @@ export default function Home() {
   const [branches, setBranches] = useState<string[]>([]);
   const [showReveal, setShowReveal] = useState(false);
   const [savingArtwork, setSavingArtwork] = useState(false);
+  const [showPatternReview, setShowPatternReview] = useState(false);
+  const [patternReview, setPatternReview] = useState<string | null>(null);
+  const [loadingPatternReview, setLoadingPatternReview] = useState(false);
+  const [patternReviewError, setPatternReviewError] = useState<string | null>(null);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -1861,6 +1874,35 @@ export default function Home() {
     } finally {
       setSavingArtwork(false);
     }
+  }
+
+  async function handlePatternReview() {
+    if (!userId) return;
+    setShowPatternReview(true);
+    setLoadingPatternReview(true);
+    setPatternReviewError(null);
+    try {
+      const res = await fetch(
+        `/api/pattern-review?userId=${encodeURIComponent(userId)}&lang=${encodeURIComponent(lang)}`
+      );
+      const data = await res.json();
+      if (!res.ok || !data.review) {
+        throw new Error(data.error || "Couldn't put that together.");
+      }
+      setPatternReview(data.review);
+    } catch (err) {
+      setPatternReviewError(
+        err instanceof Error ? err.message : "Couldn't put that together just now."
+      );
+    } finally {
+      setLoadingPatternReview(false);
+    }
+  }
+
+  function closePatternReview() {
+    setShowPatternReview(false);
+    setPatternReview(null);
+    setPatternReviewError(null);
   }
 
   const hasStarted = messages.length > 0;
@@ -2104,6 +2146,16 @@ export default function Home() {
 
       {!awaitingDepth && (
         <div className="composer">
+          {hasStarted && messages.length > 1 && (
+            <button
+              type="button"
+              className="pattern-review-trigger"
+              onClick={handlePatternReview}
+              disabled={loadingPatternReview}
+            >
+              {s.patternReviewLabel || PATTERN_REVIEW_FALLBACK.patternReviewLabel}
+            </button>
+          )}
           {error && <p className="error-line">{error}</p>}
           <div className="composer-inner">
             <textarea
@@ -2122,6 +2174,30 @@ export default function Home() {
               aria-label="Send"
             >
               ↑
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showPatternReview && (
+        <div className="pattern-review-overlay" onClick={closePatternReview}>
+          <div className="pattern-review-card" onClick={(e) => e.stopPropagation()}>
+            <div className="pattern-review-eyebrow">{s.returnLabel}</div>
+            {loadingPatternReview ? (
+              <p className="pattern-review-loading">
+                <span className="typing-dots">
+                  <span />
+                  <span />
+                  <span />
+                </span>
+              </p>
+            ) : patternReviewError ? (
+              <p className="pattern-review-error">{patternReviewError}</p>
+            ) : (
+              <p className="pattern-review-text">{patternReview}</p>
+            )}
+            <button type="button" className="pattern-review-close" onClick={closePatternReview}>
+              close
             </button>
           </div>
         </div>
