@@ -651,6 +651,13 @@ body {
   }
 }
 
+.still-here {
+  font-style: italic;
+  font-size: 0.85em;
+  opacity: 0;
+  animation: revealFadeIn 0.8s ease forwards;
+}
+
 /* ---------- composer ---------- */
 
 .composer {

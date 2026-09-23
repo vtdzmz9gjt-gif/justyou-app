@@ -513,6 +513,11 @@ type Strings = {
   // every language -- falls back to English, see PATTERN_REVIEW_FALLBACK
   // below.
   patternReviewLabel?: string;
+  // Reassurance shown in place of the plain typing dots once a reply has
+  // been pending unusually long (the tool-use loop can make several silent
+  // calls before actually replying). Not yet translated for every
+  // language -- falls back to English, see STILL_HERE_FALLBACK below.
+  stillHereLabel?: string;
 };
 
 const ALIVENESS_FALLBACK = {
@@ -527,6 +532,10 @@ const THRESHOLD_FALLBACK = {
 
 const PATTERN_REVIEW_FALLBACK = {
   patternReviewLabel: "See the pattern",
+};
+
+const STILL_HERE_FALLBACK = {
+  stillHereLabel: "Still here — this one's taking a little longer.",
 };
 
 const STRINGS: Record<string, Strings> = {
@@ -557,6 +566,7 @@ const STRINGS: Record<string, Strings> = {
     thresholdLine:
       "You know exactly who you're not. You've just never asked who's left. This is where you meet the rest of it.",
     patternReviewLabel: "See the pattern",
+    stillHereLabel: "Still here — this one's taking a little longer.",
   },
   es: {
     brand: "Just You",
@@ -1665,6 +1675,7 @@ export default function Home() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [waitingLong, setWaitingLong] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [email, setEmail] = useState("");
@@ -1764,6 +1775,19 @@ export default function Home() {
   useEffect(() => {
     transcriptRef.current?.scrollTo({ top: transcriptRef.current.scrollHeight });
   }, [messages, sending]);
+
+  // The tool-use loop can make several silent calls before the actual
+  // reply, so an ordinary wait and a genuinely slow one look identical
+  // with just the typing dots -- swap in a reassurance once it's been
+  // pending long enough that someone might otherwise think it's stuck.
+  useEffect(() => {
+    if (!sending) {
+      setWaitingLong(false);
+      return;
+    }
+    const t = setTimeout(() => setWaitingLong(true), 9000);
+    return () => clearTimeout(t);
+  }, [sending]);
 
   function changeLang(newLang: string) {
     setLang(newLang);
@@ -2133,13 +2157,19 @@ export default function Home() {
             {sending && (
               <div className="msg assistant pending">
                 <span className="msg-label">{s.returnLabel}</span>
-                <p className="msg-bubble">
-                  <span className="typing-dots">
-                    <span />
-                    <span />
-                    <span />
-                  </span>
-                </p>
+                {waitingLong ? (
+                  <p className="msg-bubble still-here">
+                    {s.stillHereLabel || STILL_HERE_FALLBACK.stillHereLabel}
+                  </p>
+                ) : (
+                  <p className="msg-bubble">
+                    <span className="typing-dots">
+                      <span />
+                      <span />
+                      <span />
+                    </span>
+                  </p>
+                )}
               </div>
             )}
             {!sending && branches.length > 0 && (
