@@ -8,22 +8,45 @@ import {
   type JSX,
   type KeyboardEvent,
 } from "react";
+import dynamic from "next/dynamic";
 
-type ChatMessage = { role: "user" | "assistant"; content: string };
+// three.js needs a real canvas/WebGL context -- both client-only, no SSR.
+const ElementOrb = dynamic(() => import("./ElementOrb"), { ssr: false });
+const AvatarReveal = dynamic(() => import("./AvatarReveal"), { ssr: false });
+
+// `id` is only present for messages fetched from the server -- a message
+// appended optimistically on send (before the round-trip completes) has
+// none yet, which the visible-boundary filter below treats as "always
+// visible" (undefined is never <= a real boundary id).
+type ChatMessage = { id?: number; role: "user" | "assistant"; content: string };
 type Depth = "light" | "medium" | "deep";
+
+// The elemental orb -- a per-session mechanic, deliberately separate from
+// the five long-arc shape families. Resets every session (see
+// VISIBLE_FROM_KEY below), never persists, never connects to stage/shape.
+type Element = "fire" | "earth" | "air" | "water";
+type ElementTally = Record<Element, number>;
+const EMPTY_TALLY: ElementTally = { fire: 0, earth: 0, air: 0, water: 0 };
 
 const USER_ID_KEY = "the_return_user_id";
 const ONBOARDED_KEY = "the_return_onboarded";
 const LANG_KEY = "the_return_lang";
 const REVEAL_SHOWN_KEY = "the_return_reveal_shown";
+// Shown once, ever, the first time the orb appears for this person.
+const ORB_INTRO_SEEN_KEY = "the_return_orb_intro_seen";
 // sessionStorage, not localStorage -- shown once per fresh app open, not
 // once ever and not on every re-render while scrolling the same visit.
 const LAST_COMMITMENT_SEEN_KEY = "the_return_last_commitment_seen";
-// How many raw messages (server-side, forever-growing) to hide from the
-// visible transcript -- set by "start fresh." The AI still gets the full
-// history on every turn regardless; this only changes what's shown. Also
-// the anchor item 5 (the per-session orb) will reset against.
-const VISIBLE_FROM_KEY = "the_return_visible_from";
+// The server message id to hide the visible transcript up to and including
+// -- set by "start fresh." The AI still gets the full history on every
+// turn regardless; this only changes what's shown. Also the real boundary
+// the per-session elemental orb resets against (sent to the server as
+// sinceMessageId so its tally query can scope to "this session").
+// Named _id (not the older, count-based `the_return_visible_from`) since
+// a real DB id is what the server-side tally query needs -- a stale
+// count-based value from before this just gets ignored as "show
+// everything," which is a safe default, not a broken one.
+const VISIBLE_FROM_KEY = "the_return_visible_from_id";
 
 // --- Stage colors, matching the arc discussed for the ambient background ---
 const STAGE_COLORS: Record<string, { glow: string; pulse: string }> = {
@@ -537,6 +560,10 @@ type Strings = {
   // full history/memory regardless. Not yet translated for every
   // language -- falls back to English, see START_FRESH_FALLBACK below.
   startFreshLabel?: string;
+  // One-time-ever line shown the first time the elemental orb appears.
+  // Not yet translated for every language -- falls back to English, see
+  // ORB_INTRO_FALLBACK below.
+  orbIntroLine?: string;
 };
 
 const ALIVENESS_FALLBACK = {
@@ -564,6 +591,10 @@ const LAST_COMMITMENT_FALLBACK = {
 
 const START_FRESH_FALLBACK = {
   startFreshLabel: "start fresh",
+};
+
+const ORB_INTRO_FALLBACK = {
+  orbIntroLine: "Every true thing you say shapes this. By the end, you'll see the shape.",
 };
 
 const STRINGS: Record<string, Strings> = {
@@ -1709,7 +1740,16 @@ export default function Home() {
   const [email, setEmail] = useState("");
   const [emailSaved, setEmailSaved] = useState(false);
   const [openingQuestion, setOpeningQuestion] = useState("");
-  const [visibleFromCount, setVisibleFromCount] = useState(0);
+  const [visibleFromId, setVisibleFromId] = useState(0);
+  const [elementTally, setElementTally] = useState<ElementTally>(EMPTY_TALLY);
+  const [showOrbIntro, setShowOrbIntro] = useState(false);
+  const [avatarReveal, setAvatarReveal] = useState<{
+    dominant: Element;
+    dominantPct: number;
+    weakest: Element;
+    weakestPct: number;
+    reflection: string;
+  } | null>(null);
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
   const [depth, setDepth] = useState<Depth | null>(null);
   const [stage, setStage] = useState<string | null>(null);
@@ -1735,7 +1775,10 @@ export default function Home() {
   // "Start fresh" only ever hides messages from view -- the AI still gets
   // the full `messages` history on every turn, unchanged. See
   // VISIBLE_FROM_KEY above.
-  const visibleMessages = messages.slice(visibleFromCount);
+  // Undefined id (an optimistically-appended, not-yet-server-confirmed
+  // message) always counts as visible -- it's always newer than any real
+  // boundary id.
+  const visibleMessages = messages.filter((m) => (m.id ?? Infinity) > visibleFromId);
 
   useEffect(() => {
     // Registers the no-op service worker so browsers offer "Add to Home
@@ -1765,25 +1808,41 @@ export default function Home() {
     }
 
     try {
+      if (!localStorage.getItem(ORB_INTRO_SEEN_KEY)) {
+        setShowOrbIntro(true);
+        localStorage.setItem(ORB_INTRO_SEEN_KEY, "1");
+      }
+    } catch {
+      /* private browsing or storage disabled -- the intro just won't show */
+    }
+
+    // Captured in a local var, not just read back from state right after
+    // setting it -- the setter's effect isn't visible within this same
+    // synchronous block, but the fetch URL below needs the real value now.
+    let boundary = 0;
+    try {
       const stored = localStorage.getItem(VISIBLE_FROM_KEY);
-      if (stored) setVisibleFromCount(parseInt(stored, 10) || 0);
+      boundary = stored ? parseInt(stored, 10) || 0 : 0;
+      setVisibleFromId(boundary);
     } catch {
       /* private browsing or storage disabled -- just shows full history */
     }
 
     const id = getUserId();
     setUserId(id);
-    fetch(`/api/chat?userId=${encodeURIComponent(id)}`)
+    fetch(`/api/chat?userId=${encodeURIComponent(id)}&sinceMessageId=${boundary}`)
       .then((r) => r.json())
       .then((data) => {
         if (Array.isArray(data.messages)) {
           setMessages(
-            data.messages.map((m: { role: "user" | "assistant"; content: string }) => ({
+            data.messages.map((m: { id?: number; role: "user" | "assistant"; content: string }) => ({
+              id: m.id,
               role: m.role,
               content: m.content,
             }))
           );
         }
+        if (data.elementTally) setElementTally(data.elementTally);
         if (data.lastCommitment) {
           setLastCommitment(data.lastCommitment);
           let alreadySeenThisSession = true;
@@ -1885,6 +1944,7 @@ export default function Home() {
           depth: depthValue ?? depth,
           lang,
           alivenessAnswer,
+          sinceMessageId: visibleFromId,
         }),
       });
       const data = await res.json();
@@ -1893,6 +1953,8 @@ export default function Home() {
       if (data.stage) setStage(data.stage);
       if (data.shapeFamily) setShapeFamily(data.shapeFamily);
       if (Array.isArray(data.branches) && data.branches.length > 0) setBranches(data.branches);
+      if (data.elementTally) setElementTally(data.elementTally);
+      if (data.avatarReveal) setAvatarReveal(data.avatarReveal);
       if (
         data.stage === "return" &&
         typeof window !== "undefined" &&
@@ -1927,8 +1989,12 @@ export default function Home() {
   // as context on every future turn regardless; only what's shown resets.
   // Stage, shape-family, and commitments are untouched, by design.
   function startFresh() {
-    const cutoff = messages.length;
-    setVisibleFromCount(cutoff);
+    // The highest real (server-confirmed) message id seen so far -- an
+    // optimistically-appended message with no id yet can't be a boundary,
+    // but nothing needs one anyway since sending is disabled while a reply
+    // is pending.
+    const cutoff = messages.reduce((max, m) => Math.max(max, m.id ?? 0), 0);
+    setVisibleFromId(cutoff);
     try {
       localStorage.setItem(VISIBLE_FROM_KEY, String(cutoff));
     } catch {
@@ -1941,6 +2007,8 @@ export default function Home() {
     setDraft("");
     setAlivenessInput("");
     setShowLastCommitment(false);
+    setElementTally(EMPTY_TALLY);
+    setAvatarReveal(null);
     setShowSettings(false);
     const questions = (STRINGS[lang] || STRINGS.en).questions;
     setOpeningQuestion(questions[Math.floor(Math.random() * questions.length)]);
@@ -2103,10 +2171,37 @@ export default function Home() {
         }}
       />
 
-      {shapeFamily && (
-        <div className="ambient-art" aria-hidden="true">
-          <ShapeArt family={shapeFamily} stage={stage || "mystery"} size={420} />
+      {hasStarted ? (
+        <div className="element-orb-wrap" aria-hidden="true">
+          <ElementOrb tally={elementTally} size={320} />
         </div>
+      ) : (
+        shapeFamily && (
+          <div className="ambient-art" aria-hidden="true">
+            <ShapeArt family={shapeFamily} stage={stage || "mystery"} size={420} />
+          </div>
+        )
+      )}
+
+      {showOrbIntro && hasStarted && (
+        <button
+          type="button"
+          className="orb-intro"
+          onClick={() => setShowOrbIntro(false)}
+        >
+          {s.orbIntroLine || ORB_INTRO_FALLBACK.orbIntroLine}
+        </button>
+      )}
+
+      {avatarReveal && (
+        <AvatarReveal
+          tally={elementTally}
+          eyebrowLabel={s.returnLabel}
+          headline={`${avatarReveal.dominant.charAt(0).toUpperCase()}${avatarReveal.dominant.slice(1)} carried tonight — ${avatarReveal.dominantPct}%.`}
+          reflection={avatarReveal.reflection}
+          closeLabel="continue"
+          onClose={() => setAvatarReveal(null)}
+        />
       )}
 
       <div className="topbar">

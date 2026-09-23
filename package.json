@@ -11,10 +11,12 @@
   "dependencies": {
     "@anthropic-ai/sdk": "latest",
     "@neondatabase/serverless": "^1.1.0",
+    "@types/three": "^0.186.0",
     "next": "latest",
     "react": "latest",
     "react-dom": "latest",
-    "resend": "latest"
+    "resend": "latest",
+    "three": "^0.186.0"
   },
   "devDependencies": {
     "@types/node": "latest",

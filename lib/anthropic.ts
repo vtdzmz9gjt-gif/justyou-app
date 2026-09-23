@@ -14,6 +14,7 @@ import {
   type StoredMessage,
   type Stage,
   type ShapeFamily,
+  type Element,
 } from "./db";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
@@ -112,6 +113,21 @@ const tools: Anthropic.Tool[] = [
       required: ["options"],
     },
   },
+  {
+    name: "tag_element",
+    description:
+      "Call this AT MOST ONCE per turn -- reading only the person's own message just now, never your own reply, and never retroactively. Skip it entirely when the message is neutral, administrative, or doesn't genuinely lean one way (most short or practical messages should get no tag at all -- don't force one). This is a separate, per-session mechanic from the long-arc shape family -- it resets every session and carries no memory across sessions, so judge only what THIS message actually carries, not the whole relationship.\n\n- fire: drive, ambition, action, anger -- pushing to do something, wanting to win, frustration aimed at moving.\n- earth: stability, loyalty, groundedness -- steadiness, commitment to people or routines, staying planted.\n- air: thought, clarity, ideas, detachment -- reasoning something through, stepping back to see it clearly, intellectualizing.\n- water: emotion, intuition, relationships, flow -- feeling something directly, sensing rather than deciding, moving with what's happening rather than against it.",
+    input_schema: {
+      type: "object",
+      properties: {
+        element: {
+          type: "string",
+          enum: ["fire", "earth", "air", "water"],
+        },
+      },
+      required: ["element"],
+    },
+  },
 ];
 
 function todayContext(): string {
@@ -185,6 +201,8 @@ export interface ChatResult {
   stage?: Stage;
   shapeFamily?: ShapeFamily;
   branches?: string[];
+  element?: Element;
+  committed?: boolean;
 }
 
 export async function runChat(
@@ -212,6 +230,8 @@ export async function runChat(
   let newStage: Stage | undefined;
   let newShape: ShapeFamily | undefined;
   let newBranches: string[] | undefined;
+  let newElement: Element | undefined;
+  let committed = false;
 
   // Tool-use loop: the model may call record_commitment / resolve_open_commitment /
   // signal_depth one or more times before producing its actual reply to the person.
@@ -237,6 +257,8 @@ export async function runChat(
         stage: newStage,
         shapeFamily: newShape,
         branches: newBranches,
+        element: newElement,
+        committed,
       };
     }
 
@@ -248,6 +270,7 @@ export async function runChat(
         if (call.name === "record_commitment") {
           const input = call.input as { action: string; target_date: string };
           await recordCommitment(userId, input.action, input.target_date);
+          committed = true;
           toolResults.push({
             type: "tool_result",
             tool_use_id: call.id,
@@ -288,6 +311,14 @@ export async function runChat(
             tool_use_id: call.id,
             content: "Shown to the person.",
           });
+        } else if (call.name === "tag_element") {
+          const input = call.input as { element: Element };
+          newElement = input.element;
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: call.id,
+            content: "Recorded.",
+          });
         } else {
           toolResults.push({
             type: "tool_result",
@@ -311,7 +342,14 @@ export async function runChat(
     if (response.stop_reason !== "tool_use") {
       const trailing = textBlocks.map((b) => b.text).join("\n").trim();
       if (trailing)
-        return { reply: trailing, stage: newStage, shapeFamily: newShape, branches: newBranches };
+        return {
+          reply: trailing,
+          stage: newStage,
+          shapeFamily: newShape,
+          branches: newBranches,
+          element: newElement,
+          committed,
+        };
     }
   }
 
@@ -320,6 +358,8 @@ export async function runChat(
     stage: newStage,
     shapeFamily: newShape,
     branches: newBranches,
+    element: newElement,
+    committed,
   };
 }
 
@@ -404,6 +444,60 @@ ${transcript}`;
     max_tokens: 300,
     system,
     messages: [{ role: "user", content: "Give the read." }],
+  });
+
+  return response.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join(" ")
+    .trim();
+}
+
+// --- Elemental orb reflection ---
+// Shown once, alongside the avatar reveal, at the genuine close of a
+// session (record_commitment fired, with enough tagged exchanges behind
+// it to mean something -- see the 4-tag floor in the chat route). Unlike
+// the shape-family reveal (long-arc, invisible, no numbers), this one is
+// explicitly quantified -- that's the whole point of the orb.
+export async function generateElementReflection(
+  dominant: Element,
+  dominantPct: number,
+  weakest: Element,
+  weakestPct: number,
+  recentMessages: StoredMessage[],
+  uiLang?: string | null
+): Promise<string> {
+  const transcript = recentMessages
+    .map((m) => `${m.role === "user" ? "Them" : "You"}: ${m.content}`)
+    .join("\n");
+
+  const langLine =
+    uiLang && uiLang !== "en"
+      ? `Reply in the language this conversation is mostly in (UI language: "${uiLang}").`
+      : "Reply in English unless the conversation below is clearly in another language.";
+
+  const system = `You are the voice of Just You, giving a short reflection on the elemental mix of tonight's session -- Fire (drive, ambition, action, anger), Earth (stability, loyalty, groundedness), Air (thought, clarity, ideas, detachment), Water (emotion, intuition, relationships, flow).
+
+Write 3-4 short sentences, flowing prose -- no headers, no bullet points:
+1. Name the dominant element and its share plainly (e.g. "Fire carried tonight -- ${dominantPct}% of it").
+2. Name the weakest element and its share -- not as a flaw, just what was quiet.
+3. Give ONE or two concrete next steps aimed specifically at that gap -- grounded in what they actually said tonight, not generic advice. A fitting line from the same wisdom traditions already grounding this app (Stoic thought, Kabbalah, Greene, Machiavelli, Sun Tzu) is welcome here if it genuinely earns its place.
+
+Match the voice already established: direct, warm, a close friend who sees clearly -- never therapy language, never clinical.
+
+${langLine}
+
+Dominant element: ${dominant} (${dominantPct}%)
+Weakest element: ${weakest} (${weakestPct}%)
+
+Tonight's conversation:
+${transcript}`;
+
+  const response = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 300,
+    system,
+    messages: [{ role: "user", content: "Give the reflection." }],
   });
 
   return response.content

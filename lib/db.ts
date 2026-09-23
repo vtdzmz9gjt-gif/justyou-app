@@ -61,6 +61,13 @@ function ensureSchema(): Promise<void> {
           generated_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
       `;
+      // Elemental orb (Fire/Earth/Air/Water) -- per-session, tagged on the
+      // person's own messages only, never the AI's reply. Nullable: most
+      // messages (administrative, ambiguous, or the assistant's own turns)
+      // never get tagged at all.
+      await sql`ALTER TABLE messages ADD COLUMN IF NOT EXISTS element TEXT`;
+      await sql`ALTER TABLE messages DROP CONSTRAINT IF EXISTS messages_element_check`;
+      await sql`ALTER TABLE messages ADD CONSTRAINT messages_element_check CHECK (element IS NULL OR element IN ('fire','earth','air','water'))`;
       await sql`CREATE INDEX IF NOT EXISTS idx_messages_user ON messages(user_id, id)`;
       await sql`CREATE INDEX IF NOT EXISTS idx_commitments_user ON commitments(user_id, status)`;
     })();
@@ -70,11 +77,14 @@ function ensureSchema(): Promise<void> {
 
 export type Role = "user" | "assistant";
 
+export type Element = "fire" | "earth" | "air" | "water";
+
 export interface StoredMessage {
   id: number;
   user_id: string;
   role: Role;
   content: string;
+  element: Element | null;
   created_at: string;
 }
 
@@ -113,11 +123,37 @@ export async function getMessages(userId: string): Promise<StoredMessage[]> {
   return rows as unknown as StoredMessage[];
 }
 
-export async function addMessage(userId: string, role: Role, content: string) {
+export async function addMessage(
+  userId: string,
+  role: Role,
+  content: string,
+  element?: Element | null
+) {
   await ensureSchema();
   await sql`
-    INSERT INTO messages (user_id, role, content) VALUES (${userId}, ${role}, ${content})
+    INSERT INTO messages (user_id, role, content, element)
+    VALUES (${userId}, ${role}, ${content}, ${element ?? null})
   `;
+}
+
+// Tally of tagged elements since a boundary message id -- the same
+// boundary "start fresh" already tracks, so a session's tally naturally
+// empties out the moment someone starts fresh, with no separate cleanup.
+export async function getElementTally(
+  userId: string,
+  sinceMessageId: number
+): Promise<Record<Element, number>> {
+  await ensureSchema();
+  const rows = await sql`
+    SELECT element, COUNT(*)::int AS count FROM messages
+    WHERE user_id = ${userId} AND id > ${sinceMessageId} AND element IS NOT NULL
+    GROUP BY element
+  `;
+  const tally: Record<Element, number> = { fire: 0, earth: 0, air: 0, water: 0 };
+  for (const row of rows as unknown as { element: Element; count: number }[]) {
+    tally[row.element] = row.count;
+  }
+  return tally;
 }
 
 export async function getOpenCommitment(userId: string): Promise<Commitment | undefined> {
