@@ -92,6 +92,23 @@ body {
   color: var(--accent-strong);
 }
 
+.start-fresh-toggle {
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  font-style: italic;
+  padding: 0;
+  transition: color 0.15s ease;
+}
+
+.start-fresh-toggle:hover,
+.start-fresh-toggle:focus-visible {
+  color: var(--accent-strong);
+}
+
 .settings-panel {
   margin: 0 1.5rem 1rem;
   padding: 0.9rem 1rem;
