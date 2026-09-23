@@ -1689,6 +1689,17 @@ export default function Home() {
   const s = STRINGS[lang] || STRINGS.en;
 
   useEffect(() => {
+    // Registers the no-op service worker so browsers offer "Add to Home
+    // Screen" / "Install app" -- see public/sw.js for why it does no
+    // caching.
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/sw.js").catch(() => {
+        /* not fatal -- the app works fine without it, just no install prompt */
+      });
+    }
+  }, []);
+
+  useEffect(() => {
     // A ?lang= link (for sharing with someone specific, or testing) wins
     // over every other signal, including a previously saved preference.
     const urlLang = new URLSearchParams(window.location.search).get("lang");
