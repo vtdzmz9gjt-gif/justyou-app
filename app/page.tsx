@@ -19,6 +19,11 @@ const REVEAL_SHOWN_KEY = "the_return_reveal_shown";
 // sessionStorage, not localStorage -- shown once per fresh app open, not
 // once ever and not on every re-render while scrolling the same visit.
 const LAST_COMMITMENT_SEEN_KEY = "the_return_last_commitment_seen";
+// How many raw messages (server-side, forever-growing) to hide from the
+// visible transcript -- set by "start fresh." The AI still gets the full
+// history on every turn regardless; this only changes what's shown. Also
+// the anchor item 5 (the per-session orb) will reset against.
+const VISIBLE_FROM_KEY = "the_return_visible_from";
 
 // --- Stage colors, matching the arc discussed for the ambient background ---
 const STAGE_COLORS: Record<string, { glow: string; pulse: string }> = {
@@ -527,6 +532,11 @@ type Strings = {
   // LAST_COMMITMENT_FALLBACK below.
   lastCommitmentLabel?: string;
   lastCommitmentLandedLabel?: string;
+  // Quiet, always-available topbar control that clears the visible
+  // transcript and restores the opening experience -- the AI still keeps
+  // full history/memory regardless. Not yet translated for every
+  // language -- falls back to English, see START_FRESH_FALLBACK below.
+  startFreshLabel?: string;
 };
 
 const ALIVENESS_FALLBACK = {
@@ -550,6 +560,10 @@ const STILL_HERE_FALLBACK = {
 const LAST_COMMITMENT_FALLBACK = {
   lastCommitmentLabel: "Last time: {action}.",
   lastCommitmentLandedLabel: "Last time: {action} — and you did it.",
+};
+
+const START_FRESH_FALLBACK = {
+  startFreshLabel: "start fresh",
 };
 
 const STRINGS: Record<string, Strings> = {
@@ -1695,6 +1709,7 @@ export default function Home() {
   const [email, setEmail] = useState("");
   const [emailSaved, setEmailSaved] = useState(false);
   const [openingQuestion, setOpeningQuestion] = useState("");
+  const [visibleFromCount, setVisibleFromCount] = useState(0);
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
   const [depth, setDepth] = useState<Depth | null>(null);
   const [stage, setStage] = useState<string | null>(null);
@@ -1717,6 +1732,10 @@ export default function Home() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const s = STRINGS[lang] || STRINGS.en;
+  // "Start fresh" only ever hides messages from view -- the AI still gets
+  // the full `messages` history on every turn, unchanged. See
+  // VISIBLE_FROM_KEY above.
+  const visibleMessages = messages.slice(visibleFromCount);
 
   useEffect(() => {
     // Registers the no-op service worker so browsers offer "Add to Home
@@ -1743,6 +1762,13 @@ export default function Home() {
 
     if (!localStorage.getItem(ONBOARDED_KEY)) {
       setShowOnboarding(true);
+    }
+
+    try {
+      const stored = localStorage.getItem(VISIBLE_FROM_KEY);
+      if (stored) setVisibleFromCount(parseInt(stored, 10) || 0);
+    } catch {
+      /* private browsing or storage disabled -- just shows full history */
     }
 
     const id = getUserId();
@@ -1838,7 +1864,7 @@ export default function Home() {
     const text = (overrideText ?? draft).trim();
     if (!text || !userId || sending) return;
 
-    const isFirstMessage = messages.length === 0;
+    const isFirstMessage = visibleMessages.length === 0;
     const alivenessAnswer = isFirstMessage ? alivenessInput.trim() || undefined : undefined;
 
     setDraft("");
@@ -1894,6 +1920,30 @@ export default function Home() {
   // instead skips both and goes straight through `send()`, same as before.
   function pickMood(moodIndex: number) {
     setSelectedMood(MOOD_KEYS[moodIndex]);
+  }
+
+  // Hides the visible transcript and restores the full opening experience
+  // (mood picker, aliveness question) -- the AI keeps the entire history
+  // as context on every future turn regardless; only what's shown resets.
+  // Stage, shape-family, and commitments are untouched, by design.
+  function startFresh() {
+    const cutoff = messages.length;
+    setVisibleFromCount(cutoff);
+    try {
+      localStorage.setItem(VISIBLE_FROM_KEY, String(cutoff));
+    } catch {
+      /* private browsing or storage disabled -- resets for this visit only */
+    }
+    setSelectedMood(null);
+    setDepth(null);
+    setBranches([]);
+    setError(null);
+    setDraft("");
+    setAlivenessInput("");
+    setShowLastCommitment(false);
+    setShowSettings(false);
+    const questions = (STRINGS[lang] || STRINGS.en).questions;
+    setOpeningQuestion(questions[Math.floor(Math.random() * questions.length)]);
   }
 
   function pickDepth(depthValue: Depth, moodLabel: string) {
@@ -1974,7 +2024,7 @@ export default function Home() {
     setPatternReviewError(null);
   }
 
-  const hasStarted = messages.length > 0;
+  const hasStarted = visibleMessages.length > 0;
   const awaitingDepth = selectedMood !== null && !hasStarted;
 
   const activeColors = stage
@@ -2074,6 +2124,15 @@ export default function Home() {
               </option>
             ))}
           </select>
+          {hasStarted && (
+            <button
+              type="button"
+              className="start-fresh-toggle"
+              onClick={startFresh}
+            >
+              {s.startFreshLabel || START_FRESH_FALLBACK.startFreshLabel}
+            </button>
+          )}
           <button
             className="settings-toggle"
             onClick={() => setShowSettings((sVal) => !sVal)}
@@ -2193,7 +2252,7 @@ export default function Home() {
       ) : (
         <div className="transcript" ref={transcriptRef}>
           <div className="transcript-inner">
-            {messages.map((m, i) => (
+            {visibleMessages.map((m, i) => (
               <div className={`msg ${m.role}`} key={i}>
                 <span className="msg-label">
                   {m.role === "user" ? s.youLabel : s.returnLabel}
@@ -2234,7 +2293,7 @@ export default function Home() {
 
       {!awaitingDepth && (
         <div className="composer">
-          {hasStarted && messages.length > 1 && (
+          {hasStarted && visibleMessages.length > 1 && (
             <button
               type="button"
               className="pattern-review-trigger"
