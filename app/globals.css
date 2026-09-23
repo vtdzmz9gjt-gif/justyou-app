@@ -104,6 +104,28 @@ body {
   gap: 0.6rem;
 }
 
+.last-commitment {
+  display: block;
+  width: calc(100% - 3rem);
+  margin: 0 1.5rem 1rem;
+  padding: 0.7rem 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text-muted);
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  font-style: italic;
+  text-align: left;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.last-commitment:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
 .settings-panel p {
   margin: 0;
   color: var(--text-muted);

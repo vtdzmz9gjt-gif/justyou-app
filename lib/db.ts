@@ -128,6 +128,17 @@ export async function getOpenCommitment(userId: string): Promise<Commitment | un
   return rows[0] as unknown as Commitment | undefined;
 }
 
+// Unlike getOpenCommitment, not filtered to pending -- used for the quiet
+// returning-visitor callback, which should reference the last commitment
+// regardless of whether it's since been resolved.
+export async function getMostRecentCommitment(userId: string): Promise<Commitment | undefined> {
+  await ensureSchema();
+  const rows = await sql`
+    SELECT * FROM commitments WHERE user_id = ${userId} ORDER BY id DESC LIMIT 1
+  `;
+  return rows[0] as unknown as Commitment | undefined;
+}
+
 export async function recordCommitment(
   userId: string,
   action: string,

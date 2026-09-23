@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { addMessage, ensureUser, getMessages } from "@/lib/db";
+import { addMessage, ensureUser, getMessages, getMostRecentCommitment } from "@/lib/db";
 import { runChat } from "@/lib/anthropic";
 
 // runChat's tool-use loop can make up to 4 sequential calls to Claude in a
@@ -68,5 +68,14 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Missing userId." }, { status: 400 });
   }
   await ensureUser(userId);
-  return NextResponse.json({ messages: await getMessages(userId) });
+  const [messages, lastCommitment] = await Promise.all([
+    getMessages(userId),
+    getMostRecentCommitment(userId),
+  ]);
+  return NextResponse.json({
+    messages,
+    lastCommitment: lastCommitment
+      ? { action: lastCommitment.action, status: lastCommitment.status }
+      : null,
+  });
 }

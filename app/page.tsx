@@ -16,6 +16,9 @@ const USER_ID_KEY = "the_return_user_id";
 const ONBOARDED_KEY = "the_return_onboarded";
 const LANG_KEY = "the_return_lang";
 const REVEAL_SHOWN_KEY = "the_return_reveal_shown";
+// sessionStorage, not localStorage -- shown once per fresh app open, not
+// once ever and not on every re-render while scrolling the same visit.
+const LAST_COMMITMENT_SEEN_KEY = "the_return_last_commitment_seen";
 
 // --- Stage colors, matching the arc discussed for the ambient background ---
 const STAGE_COLORS: Record<string, { glow: string; pulse: string }> = {
@@ -518,6 +521,12 @@ type Strings = {
   // calls before actually replying). Not yet translated for every
   // language -- falls back to English, see STILL_HERE_FALLBACK below.
   stillHereLabel?: string;
+  // Quiet returning-visitor callback to the last commitment, shown once per
+  // fresh app open -- "{action}" is replaced with what they committed to.
+  // Not yet translated for every language -- falls back to English, see
+  // LAST_COMMITMENT_FALLBACK below.
+  lastCommitmentLabel?: string;
+  lastCommitmentLandedLabel?: string;
 };
 
 const ALIVENESS_FALLBACK = {
@@ -536,6 +545,11 @@ const PATTERN_REVIEW_FALLBACK = {
 
 const STILL_HERE_FALLBACK = {
   stillHereLabel: "Still here — this one's taking a little longer.",
+};
+
+const LAST_COMMITMENT_FALLBACK = {
+  lastCommitmentLabel: "Last time: {action}.",
+  lastCommitmentLandedLabel: "Last time: {action} — and you did it.",
 };
 
 const STRINGS: Record<string, Strings> = {
@@ -1694,6 +1708,11 @@ export default function Home() {
   const [patternReview, setPatternReview] = useState<string | null>(null);
   const [loadingPatternReview, setLoadingPatternReview] = useState(false);
   const [patternReviewError, setPatternReviewError] = useState<string | null>(null);
+  const [lastCommitment, setLastCommitment] = useState<{
+    action: string;
+    status: "pending" | "landed" | "tried" | "not_landed";
+  } | null>(null);
+  const [showLastCommitment, setShowLastCommitment] = useState(false);
   const transcriptRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -1738,6 +1757,20 @@ export default function Home() {
               content: m.content,
             }))
           );
+        }
+        if (data.lastCommitment) {
+          setLastCommitment(data.lastCommitment);
+          let alreadySeenThisSession = true;
+          try {
+            alreadySeenThisSession = !!sessionStorage.getItem(LAST_COMMITMENT_SEEN_KEY);
+            if (!alreadySeenThisSession) {
+              sessionStorage.setItem(LAST_COMMITMENT_SEEN_KEY, "1");
+            }
+          } catch {
+            /* private browsing or storage disabled -- default to not showing
+               rather than risk showing it every single load */
+          }
+          if (!alreadySeenThisSession) setShowLastCommitment(true);
         }
       })
       .catch(() => {
@@ -1812,6 +1845,7 @@ export default function Home() {
     setAlivenessInput("");
     setError(null);
     setBranches([]);
+    setShowLastCommitment(false);
     setMessages((m) => [...m, { role: "user", content: text }]);
     setSending(true);
 
@@ -2093,6 +2127,19 @@ export default function Home() {
             </form>
           )}
         </div>
+      )}
+
+      {showLastCommitment && lastCommitment && (
+        <button
+          type="button"
+          className="last-commitment"
+          onClick={() => setShowLastCommitment(false)}
+        >
+          {(lastCommitment.status === "landed"
+            ? s.lastCommitmentLandedLabel || LAST_COMMITMENT_FALLBACK.lastCommitmentLandedLabel
+            : s.lastCommitmentLabel || LAST_COMMITMENT_FALLBACK.lastCommitmentLabel
+          ).replace("{action}", lastCommitment.action)}
+        </button>
       )}
 
       {!hasStarted && !awaitingDepth ? (
