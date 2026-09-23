@@ -76,3 +76,4 @@ your spec's own concerns: whether the tone actually reads as a friend and
 not a therapist, whether the crisis-detection judgment call holds up
 under real "heavy" messages, and whether the follow-up loop's check-in
 feels like genuine care rather than a notification.
+
