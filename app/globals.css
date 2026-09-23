@@ -851,20 +851,30 @@ body {
   inset: 0;
   z-index: 0;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
-  opacity: 0.34;
+  padding-bottom: 150px;
+  opacity: 0.42;
   pointer-events: none;
   transition: opacity 1.8s ease;
 }
 
 .ambient-art svg {
-  width: min(90vw, 480px);
-  height: min(90vw, 480px);
+  width: min(92vw, 500px);
+  height: min(92vw, 500px);
 }
 
 .ambient-art svg path {
-  stroke-width: 2.4;
+  stroke-width: 2.6;
+  /* Always the brand accent here, regardless of the person's actual shape
+     family color -- this is the ambient/atmospheric version, not the
+     moment for showing the specific family identity (that's the Settings
+     card and the Return-stage reveal, which keep the true family color). */
+  stroke: var(--accent);
+}
+
+.ambient-art svg circle {
+  fill: var(--accent);
 }
 
 .app > *:not(.ambient-glow):not(.ambient-art):not(.pattern-review-overlay) {
