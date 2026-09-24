@@ -113,22 +113,66 @@ const tools: Anthropic.Tool[] = [
       required: ["options"],
     },
   },
-  {
-    name: "tag_element",
-    description:
-      "Call this once per turn, reading only the person's own message just now -- never your own reply, and never retroactively. Use this liberally: most real, substantive messages in this conversation genuinely lean toward one of the four elements below, so if the message carries any real emotional or thematic weight, tag it. Skip it only for messages that are truly empty of that -- pure logistics, a bare 'ok'/'yes'/'thanks', or scheduling with nothing else in it. When in doubt between two elements, pick the one that dominates. This is a separate, per-session mechanic from the long-arc shape family -- it resets every session and carries no memory across sessions, so judge only what THIS message actually carries, not the whole relationship.\n\n- fire: drive, ambition, action, anger -- pushing to do something, wanting to win, frustration aimed at moving.\n- earth: stability, loyalty, groundedness -- steadiness, commitment to people or routines, staying planted.\n- air: thought, clarity, ideas, detachment -- reasoning something through, stepping back to see it clearly, intellectualizing.\n- water: emotion, intuition, relationships, flow -- feeling something directly, sensing rather than deciding, moving with what's happening rather than against it.",
-    input_schema: {
-      type: "object",
-      properties: {
-        element: {
-          type: "string",
-          enum: ["fire", "earth", "air", "water"],
-        },
-      },
-      required: ["element"],
-    },
-  },
 ];
+
+// tag_element used to live in the shared `tools` array above, competing for
+// the model's attention against five other tools on every single turn --
+// in production it essentially never got called (confirmed via logging: a
+// whole real conversation, substantial enough to land a commitment, tagged
+// zero messages). Pulled out into its own forced, single-purpose call
+// instead: no competing priorities, no "should I bother" judgment call.
+const ELEMENT_TAG_TOOL: Anthropic.Tool = {
+  name: "tag_element",
+  description: "Classify which element (or none) this message leans toward.",
+  input_schema: {
+    type: "object",
+    properties: {
+      element: {
+        type: "string",
+        enum: ["fire", "earth", "air", "water", "none"],
+      },
+    },
+    required: ["element"],
+  },
+};
+
+const ELEMENT_TAG_SYSTEM = `You're classifying a single message from someone in a reflective conversation app, by which of four elements it most carries -- fire, earth, air, water, or none.
+
+Most genuine, substantive messages lean toward one of the four; use "none" only for messages that are truly empty of that -- pure logistics, a bare "ok"/"yes"/"thanks", or scheduling with nothing else in it.
+
+- fire: drive, ambition, action, anger -- pushing to do something, wanting to win, frustration aimed at moving.
+- earth: stability, loyalty, groundedness -- steadiness, commitment to people or routines, staying planted.
+- air: thought, clarity, ideas, detachment -- reasoning something through, stepping back to see it clearly, intellectualizing.
+- water: emotion, intuition, relationships, flow -- feeling something directly, sensing rather than deciding, moving with what's happening rather than against it.
+
+Call tag_element with your single best answer.`;
+
+// Runs in parallel with the main reply, not blocking it -- a small, cheap,
+// forced call (tool_choice leaves the model no way to skip it) dedicated
+// entirely to this one judgment.
+async function tagElement(userMessage: string): Promise<Element | undefined> {
+  try {
+    const response = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 50,
+      system: ELEMENT_TAG_SYSTEM,
+      tools: [ELEMENT_TAG_TOOL],
+      tool_choice: { type: "tool", name: "tag_element" },
+      messages: [{ role: "user", content: `Classify this message:\n\n"${userMessage}"` }],
+    });
+    const call = response.content.find(
+      (b): b is Anthropic.ToolUseBlock => b.type === "tool_use" && b.name === "tag_element"
+    );
+    const element = (call?.input as { element?: string } | undefined)?.element;
+    if (element === "fire" || element === "earth" || element === "air" || element === "water") {
+      return element;
+    }
+    return undefined;
+  } catch (err) {
+    console.error("tagElement error", err);
+    return undefined;
+  }
+}
 
 function todayContext(): string {
   const today = new Date().toISOString().slice(0, 10);
@@ -213,6 +257,10 @@ export async function runChat(
   uiLang?: string | null,
   alivenessAnswer?: string | null
 ): Promise<ChatResult> {
+  // Fired now, awaited later -- runs alongside the whole conversational
+  // loop below rather than adding its own sequential round-trip.
+  const elementPromise = tagElement(userMessage);
+
   const [openCommitment, stageInfo, shapeInfo] = await Promise.all([
     openCommitmentContext(userId),
     stageContext(userId),
@@ -230,7 +278,6 @@ export async function runChat(
   let newStage: Stage | undefined;
   let newShape: ShapeFamily | undefined;
   let newBranches: string[] | undefined;
-  let newElement: Element | undefined;
   let committed = false;
 
   // Tool-use loop: the model may call record_commitment / resolve_open_commitment /
@@ -257,7 +304,7 @@ export async function runChat(
         stage: newStage,
         shapeFamily: newShape,
         branches: newBranches,
-        element: newElement,
+        element: await elementPromise,
         committed,
       };
     }
@@ -311,14 +358,6 @@ export async function runChat(
             tool_use_id: call.id,
             content: "Shown to the person.",
           });
-        } else if (call.name === "tag_element") {
-          const input = call.input as { element: Element };
-          newElement = input.element;
-          toolResults.push({
-            type: "tool_result",
-            tool_use_id: call.id,
-            content: "Recorded.",
-          });
         } else {
           toolResults.push({
             type: "tool_result",
@@ -347,7 +386,7 @@ export async function runChat(
           stage: newStage,
           shapeFamily: newShape,
           branches: newBranches,
-          element: newElement,
+          element: await elementPromise,
           committed,
         };
     }
@@ -358,7 +397,7 @@ export async function runChat(
     stage: newStage,
     shapeFamily: newShape,
     branches: newBranches,
-    element: newElement,
+    element: await elementPromise,
     committed,
   };
 }
