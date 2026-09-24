@@ -195,6 +195,11 @@ export default function AvatarReveal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const legendTotal = ELEMENT_KEYS.reduce((sum, k) => sum + tally[k], 0) || 1;
+  const legend = [...ELEMENT_KEYS]
+    .sort((a, b) => tally[b] - tally[a])
+    .map((key) => ({ key, pct: Math.round((tally[key] / legendTotal) * 100) }));
+
   return (
     <div className="avatar-reveal-overlay">
       <div className="avatar-reveal-eyebrow">{eyebrowLabel}</div>
@@ -202,6 +207,18 @@ export default function AvatarReveal({
       {showCard && (
         <div className="avatar-reveal-card">
           <h2 className="avatar-reveal-headline">{headline}</h2>
+          <ul className="avatar-reveal-legend">
+            {legend.map((item) => (
+              <li key={item.key} className="avatar-reveal-legend-item">
+                <span
+                  className="avatar-reveal-legend-dot"
+                  style={{ background: `#${ELEMENT_COLORS[item.key].toString(16).padStart(6, "0")}` }}
+                />
+                <span className="avatar-reveal-legend-label">{item.key}</span>
+                <span className="avatar-reveal-legend-pct">{item.pct}%</span>
+              </li>
+            ))}
+          </ul>
           <p className="avatar-reveal-reflection">{reflection}</p>
           <button type="button" className="avatar-reveal-close" onClick={onClose}>
             {closeLabel}
