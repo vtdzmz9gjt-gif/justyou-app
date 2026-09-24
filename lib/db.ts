@@ -4,6 +4,19 @@ const sql = neon(process.env.DATABASE_URL!);
 
 let schemaReady: Promise<void> | null = null;
 
+// A migration step that's safe to skip if it fails -- widening/refreshing a
+// constraint that (almost certainly) already matches production data. One
+// bad row or a transient DDL conflict here should never take down every
+// query on this connection; log it and move on rather than rejecting the
+// whole schemaReady promise over it.
+async function nonFatal(label: string, fn: () => Promise<unknown>): Promise<void> {
+  try {
+    await fn();
+  } catch (err) {
+    console.error(`[schema] non-fatal migration step failed: ${label}`, err);
+  }
+}
+
 function ensureSchema(): Promise<void> {
   if (!schemaReady) {
     schemaReady = (async () => {
@@ -36,10 +49,17 @@ function ensureSchema(): Promise<void> {
         )
       `;
       // Widen the status check constraint for databases created before
-      // 'tried' existed as a distinct outcome from 'not_landed'. Safe to
-      // run on every cold start: drop-if-exists then recreate.
-      await sql`ALTER TABLE commitments DROP CONSTRAINT IF EXISTS commitments_status_check`;
-      await sql`ALTER TABLE commitments ADD CONSTRAINT commitments_status_check CHECK (status IN ('pending','landed','tried','not_landed'))`;
+      // 'tried' existed as a distinct outcome from 'not_landed'. Meant to
+      // be a one-time no-op once it's already run successfully -- made
+      // non-fatal because a stale row or concurrent cold start hitting
+      // this at the same time as another instance must never break every
+      // other query on this connection.
+      await nonFatal("drop commitments_status_check", () =>
+        sql`ALTER TABLE commitments DROP CONSTRAINT IF EXISTS commitments_status_check`
+      );
+      await nonFatal("add commitments_status_check", () =>
+        sql`ALTER TABLE commitments ADD CONSTRAINT commitments_status_check CHECK (status IN ('pending','landed','tried','not_landed'))`
+      );
       await sql`
         CREATE TABLE IF NOT EXISTS user_stage (
           user_id TEXT PRIMARY KEY,
@@ -66,11 +86,22 @@ function ensureSchema(): Promise<void> {
       // messages (administrative, ambiguous, or the assistant's own turns)
       // never get tagged at all.
       await sql`ALTER TABLE messages ADD COLUMN IF NOT EXISTS element TEXT`;
-      await sql`ALTER TABLE messages DROP CONSTRAINT IF EXISTS messages_element_check`;
-      await sql`ALTER TABLE messages ADD CONSTRAINT messages_element_check CHECK (element IS NULL OR element IN ('fire','earth','air','water'))`;
+      await nonFatal("drop messages_element_check", () =>
+        sql`ALTER TABLE messages DROP CONSTRAINT IF EXISTS messages_element_check`
+      );
+      await nonFatal("add messages_element_check", () =>
+        sql`ALTER TABLE messages ADD CONSTRAINT messages_element_check CHECK (element IS NULL OR element IN ('fire','earth','air','water'))`
+      );
       await sql`CREATE INDEX IF NOT EXISTS idx_messages_user ON messages(user_id, id)`;
       await sql`CREATE INDEX IF NOT EXISTS idx_commitments_user ON commitments(user_id, status)`;
     })();
+    // If schema setup itself fails (not one of the non-fatal steps above,
+    // but a real CREATE TABLE/INDEX failure), don't leave every future call
+    // on this container permanently stuck replaying the same rejection --
+    // clear it so the next request gets a fresh attempt.
+    schemaReady.catch(() => {
+      schemaReady = null;
+    });
   }
   return schemaReady;
 }
