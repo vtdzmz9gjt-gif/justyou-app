@@ -44,6 +44,9 @@ export async function GET(req: NextRequest) {
 
     const tally = await getElementTally(userId, sinceMessageId);
     const total = ELEMENTS.reduce((sum, el) => sum + tally[el], 0);
+    console.log(
+      `[avatar-reveal] sinceMessageId=${sinceMessageId} tally=${JSON.stringify(tally)} total=${total} floor=${ELEMENT_REVEAL_FLOOR}`
+    );
     let avatarReveal = null;
     if (total >= ELEMENT_REVEAL_FLOOR) {
       const sorted = [...ELEMENTS].sort((a, b) => tally[b] - tally[a]);

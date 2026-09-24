@@ -66,6 +66,8 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  console.log(`[chat] userId=${userId} element=${result.element ?? "none"}`);
+
   const userMessageId = await addMessage(userId, "user", message.trim(), result.element);
   const assistantMessageId = await addMessage(userId, "assistant", result.reply);
 
