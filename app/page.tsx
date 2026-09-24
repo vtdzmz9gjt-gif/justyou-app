@@ -1949,7 +1949,20 @@ export default function Home() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong.");
-      setMessages((m) => [...m, { role: "assistant", content: data.reply }]);
+      setMessages((m) => {
+        // The user message was appended optimistically above with no real
+        // id yet -- back-fill it now that the server has one, so the
+        // "start fresh" / element-tally boundary (both id-based) work
+        // correctly without needing a page reload first.
+        const next = [...m];
+        for (let i = next.length - 1; i >= 0; i--) {
+          if (next[i].role === "user" && next[i].id === undefined) {
+            next[i] = { ...next[i], id: data.userMessageId };
+            break;
+          }
+        }
+        return [...next, { id: data.assistantMessageId, role: "assistant", content: data.reply }];
+      });
       if (data.stage) setStage(data.stage);
       if (data.shapeFamily) setShapeFamily(data.shapeFamily);
       if (Array.isArray(data.branches) && data.branches.length > 0) setBranches(data.branches);

@@ -159,12 +159,14 @@ export async function addMessage(
   role: Role,
   content: string,
   element?: Element | null
-) {
+): Promise<number> {
   await ensureSchema();
-  await sql`
+  const rows = await sql`
     INSERT INTO messages (user_id, role, content, element)
     VALUES (${userId}, ${role}, ${content}, ${element ?? null})
+    RETURNING id
   `;
+  return (rows as unknown as { id: number }[])[0].id;
 }
 
 // Tally of tagged elements since a boundary message id -- the same

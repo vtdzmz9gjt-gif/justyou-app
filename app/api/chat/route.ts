@@ -112,8 +112,8 @@ export async function POST(req: NextRequest) {
     `[chat] userId=${userId} element=${result.element ?? "none"} committed=${!!result.committed} stage=${result.stage ?? "n/a"}`
   );
 
-  await addMessage(userId, "user", message.trim(), result.element);
-  await addMessage(userId, "assistant", result.reply);
+  const userMessageId = await addMessage(userId, "user", message.trim(), result.element);
+  const assistantMessageId = await addMessage(userId, "assistant", result.reply);
 
   const boundary = typeof sinceMessageId === "number" ? sinceMessageId : 0;
   let elementTally: Record<Element, number> = { fire: 0, earth: 0, air: 0, water: 0 };
@@ -138,6 +138,8 @@ export async function POST(req: NextRequest) {
     branches: result.branches,
     elementTally,
     avatarReveal,
+    userMessageId,
+    assistantMessageId,
   });
 }
 
