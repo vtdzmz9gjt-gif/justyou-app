@@ -24,17 +24,17 @@ const ELEMENT_POLES: Record<Element, [number, number, number]> = {
 };
 
 const ELEMENT_KEYS: Element[] = ["fire", "earth", "air", "water"];
-// Lighter than the reference demo's 2200-2400 -- this runs continuously
-// in the background of an active conversation, not a dedicated full-
-// screen moment, so it needs to stay cheap.
-const COUNT = 1200;
+// Full-screen and vivid now, not a small corner accent -- same order of
+// magnitude as the reference demo's 2200-2400.
+const COUNT = 2200;
 
 // A live, ambient particle cloud that pulls toward whichever element(s)
 // are actually being tagged this session -- same mechanics as the
 // reference demo (weighted pull toward per-element "poles"), restyled to
-// this app's own palette. Purely driven by the `tally` prop; nothing in
-// here decides what gets tagged.
-export default function ElementOrb({ tally, size = 320 }: { tally: ElementTally; size?: number }) {
+// this app's own palette and stretched to fill the viewport behind the
+// conversation. Purely driven by the `tally` prop; nothing in here decides
+// what gets tagged.
+export default function ElementOrb({ tally }: { tally: ElementTally }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const tallyRef = useRef(tally);
   tallyRef.current = tally;
@@ -44,13 +44,25 @@ export default function ElementOrb({ tally, size = 320 }: { tally: ElementTally;
     if (!container) return;
 
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 100);
-    camera.position.set(0, 0, 6.2);
+    const camera = new THREE.PerspectiveCamera(
+      55,
+      window.innerWidth / window.innerHeight,
+      0.1,
+      100
+    );
+    camera.position.set(0, 0, 5.4);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setSize(size, size);
+    renderer.setSize(window.innerWidth, window.innerHeight);
     container.appendChild(renderer.domElement);
+
+    function handleResize() {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+    window.addEventListener("resize", handleResize);
 
     const basePositions = new Float32Array(COUNT * 3);
     const positions = new Float32Array(COUNT * 3);
@@ -61,7 +73,7 @@ export default function ElementOrb({ tally, size = 320 }: { tally: ElementTally;
     for (let i = 0; i < COUNT; i++) {
       const v = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5)
         .normalize()
-        .multiplyScalar(2.0 + Math.random() * 0.15);
+        .multiplyScalar(2.7 + Math.random() * 0.25);
       basePositions[i * 3] = v.x;
       basePositions[i * 3 + 1] = v.y;
       basePositions[i * 3 + 2] = v.z;
@@ -92,10 +104,10 @@ export default function ElementOrb({ tally, size = 320 }: { tally: ElementTally;
     geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 
     const material = new THREE.PointsMaterial({
-      size: 0.05,
+      size: 0.065,
       vertexColors: true,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.95,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
     });
@@ -150,6 +162,7 @@ export default function ElementOrb({ tally, size = 320 }: { tally: ElementTally;
     animate();
 
     return () => {
+      window.removeEventListener("resize", handleResize);
       cancelAnimationFrame(raf);
       geometry.dispose();
       material.dispose();
@@ -158,7 +171,7 @@ export default function ElementOrb({ tally, size = 320 }: { tally: ElementTally;
         container.removeChild(renderer.domElement);
       }
     };
-  }, [size]);
+  }, []);
 
-  return <div ref={containerRef} style={{ width: size, height: size }} aria-hidden="true" />;
+  return <div ref={containerRef} className="element-orb-canvas" aria-hidden="true" />;
 }

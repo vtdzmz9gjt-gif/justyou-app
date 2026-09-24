@@ -2173,7 +2173,7 @@ export default function Home() {
 
       {hasStarted ? (
         <div className="element-orb-wrap" aria-hidden="true">
-          <ElementOrb tally={elementTally} size={320} />
+          <ElementOrb tally={elementTally} />
         </div>
       ) : (
         shapeFamily && (

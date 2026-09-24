@@ -59,6 +59,7 @@ body {
   justify-content: space-between;
   padding: 1.1rem 1.5rem;
   border-bottom: 1px solid transparent;
+  background: linear-gradient(to bottom, var(--bg) 55%, transparent);
 }
 
 .wordmark {
@@ -667,6 +668,7 @@ body {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-faint);
+  text-shadow: 0 0 10px var(--bg), 0 0 18px var(--bg);
 }
 
 .msg.assistant .msg-label {
@@ -679,6 +681,10 @@ body {
   line-height: 1.65;
   white-space: pre-wrap;
   margin: 0;
+  /* A soft halo in the page background color, not a boxed background --
+     keeps text readable over the full-screen elemental orb during active
+     chat without breaking the "no chat bubbles" look. */
+  text-shadow: 0 0 10px var(--bg), 0 0 18px var(--bg), 0 0 28px var(--bg);
 }
 
 /* No chat bubbles -- text arrives in open space, closer to reading than
@@ -1000,41 +1006,42 @@ body {
 
 .element-orb-wrap {
   position: fixed;
-  top: 76px;
-  right: -40px;
+  inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.85;
+  opacity: 1;
   transition: opacity 1.2s ease;
 }
 
-@media (max-width: 640px) {
-  .element-orb-wrap {
-    top: 56px;
-    right: -70px;
-    transform: scale(0.72);
-    transform-origin: top right;
-  }
+.element-orb-canvas {
+  width: 100%;
+  height: 100%;
+}
+
+.element-orb-canvas canvas {
+  display: block;
 }
 
 .orb-intro {
   position: fixed;
-  top: 220px;
-  right: 12px;
+  top: 84px;
+  left: 50%;
+  transform: translateX(-50%);
   z-index: 5;
-  max-width: 22ch;
-  background: var(--surface-raised);
+  max-width: 26ch;
+  background: rgba(28, 24, 21, 0.85);
+  backdrop-filter: blur(6px);
   border: 1px solid var(--border);
   border-radius: 10px;
-  padding: 0.75rem 0.9rem;
+  padding: 0.85rem 1.1rem;
   font-family: var(--font-display);
   font-style: italic;
-  font-size: 13px;
-  line-height: 1.55;
+  font-size: 14px;
+  line-height: 1.6;
   color: var(--text-muted);
-  text-align: left;
+  text-align: center;
   cursor: pointer;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
   animation: revealFadeIn 1s ease forwards;
   transition: color 0.15s ease, border-color 0.15s ease;
 }
@@ -1047,10 +1054,9 @@ body {
 
 @media (max-width: 640px) {
   .orb-intro {
-    top: 132px;
-    right: 10px;
-    max-width: 18ch;
-    font-size: 12px;
+    top: 64px;
+    max-width: 22ch;
+    font-size: 13px;
   }
 }
 
