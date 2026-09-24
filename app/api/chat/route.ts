@@ -32,6 +32,9 @@ async function buildAvatarReveal(
 ) {
   const tally = await getElementTally(userId, sinceMessageId);
   const total = ELEMENTS.reduce((sum, el) => sum + tally[el], 0);
+  console.log(
+    `[avatar-reveal] sinceMessageId=${sinceMessageId} tally=${JSON.stringify(tally)} total=${total} floor=${ELEMENT_REVEAL_FLOOR}`
+  );
   if (total < ELEMENT_REVEAL_FLOOR) return { tally, reveal: null };
 
   const sorted = [...ELEMENTS].sort((a, b) => tally[b] - tally[a]);
@@ -104,6 +107,10 @@ export async function POST(req: NextRequest) {
       { status: 502 }
     );
   }
+
+  console.log(
+    `[chat] userId=${userId} element=${result.element ?? "none"} committed=${!!result.committed} stage=${result.stage ?? "n/a"}`
+  );
 
   await addMessage(userId, "user", message.trim(), result.element);
   await addMessage(userId, "assistant", result.reply);

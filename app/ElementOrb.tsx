@@ -24,9 +24,11 @@ const ELEMENT_POLES: Record<Element, [number, number, number]> = {
 };
 
 const ELEMENT_KEYS: Element[] = ["fire", "earth", "air", "water"];
-// Full-screen and vivid now, not a small corner accent -- same order of
-// magnitude as the reference demo's 2200-2400.
-const COUNT = 2200;
+// Full-screen now, not a small corner accent, but a full-viewport canvas
+// updating this many points' positions on the CPU every frame is real
+// work -- 2200 caused visible stutter on ordinary hardware. Trading some
+// density for smoothness; still much denser than the original 1200.
+const COUNT = 1500;
 
 // A live, ambient particle cloud that pulls toward whichever element(s)
 // are actually being tagged this session -- same mechanics as the
@@ -52,8 +54,14 @@ export default function ElementOrb({ tally }: { tally: ElementTally }) {
     );
     camera.position.set(0, 0, 5.4);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    // No antialiasing -- these are small square points, not geometry with
+    // edges that benefit from it, and MSAA on a full-screen canvas is
+    // expensive for little visible gain here. Pixel ratio capped lower
+    // than the usual 2 for the same reason: a full-viewport canvas at full
+    // Retina density is a lot of fill-rate for a continuously animating
+    // scene.
+    const renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     renderer.setSize(window.innerWidth, window.innerHeight);
     container.appendChild(renderer.domElement);
 
