@@ -27,6 +27,13 @@ type Depth = "light" | "medium" | "deep";
 type Element = "fire" | "earth" | "air" | "water";
 type ElementTally = Record<Element, number>;
 const EMPTY_TALLY: ElementTally = { fire: 0, earth: 0, air: 0, water: 0 };
+type AvatarRevealData = {
+  dominant: Element;
+  dominantPct: number;
+  weakest: Element;
+  weakestPct: number;
+  reflection: string;
+};
 
 const USER_ID_KEY = "the_return_user_id";
 const ONBOARDED_KEY = "the_return_onboarded";
@@ -1946,13 +1953,12 @@ export default function Home() {
   const [visibleFromId, setVisibleFromId] = useState(0);
   const [elementTally, setElementTally] = useState<ElementTally>(EMPTY_TALLY);
   const [showOrbIntro, setShowOrbIntro] = useState(false);
-  const [avatarReveal, setAvatarReveal] = useState<{
-    dominant: Element;
-    dominantPct: number;
-    weakest: Element;
-    weakestPct: number;
-    reflection: string;
-  } | null>(null);
+  const [avatarReveal, setAvatarReveal] = useState<AvatarRevealData | null>(null);
+  // Fetched alongside the pattern review, but only promoted into `avatarReveal`
+  // (and shown) once the person closes/continues past the pattern-review
+  // card -- the avatar is a second page after "your pattern," not something
+  // that pops up on top of it.
+  const [pendingAvatarReveal, setPendingAvatarReveal] = useState<AvatarRevealData | null>(null);
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
   const [depth, setDepth] = useState<Depth | null>(null);
   const [stage, setStage] = useState<string | null>(null);
@@ -2170,7 +2176,6 @@ export default function Home() {
       if (data.shapeFamily) setShapeFamily(data.shapeFamily);
       if (Array.isArray(data.branches) && data.branches.length > 0) setBranches(data.branches);
       if (data.elementTally) setElementTally(data.elementTally);
-      if (data.avatarReveal) setAvatarReveal(data.avatarReveal);
       if (
         data.stage === "return" &&
         typeof window !== "undefined" &&
@@ -2225,6 +2230,7 @@ export default function Home() {
     setShowLastCommitment(false);
     setElementTally(EMPTY_TALLY);
     setAvatarReveal(null);
+    setPendingAvatarReveal(null);
     setShowSettings(false);
     const questions = (STRINGS[lang] || STRINGS.en).questions;
     setOpeningQuestion(questions[Math.floor(Math.random() * questions.length)]);
@@ -2286,13 +2292,14 @@ export default function Home() {
     setPatternReviewError(null);
     try {
       const res = await fetch(
-        `/api/pattern-review?userId=${encodeURIComponent(userId)}&lang=${encodeURIComponent(lang)}`
+        `/api/pattern-review?userId=${encodeURIComponent(userId)}&lang=${encodeURIComponent(lang)}&sinceMessageId=${visibleFromId}`
       );
       const data = await res.json();
       if (!res.ok || !data.review) {
         throw new Error(data.error || "Couldn't put that together.");
       }
       setPatternReview(data.review);
+      if (data.avatarReveal) setPendingAvatarReveal(data.avatarReveal);
     } catch (err) {
       setPatternReviewError(
         err instanceof Error ? err.message : "Couldn't put that together just now."
@@ -2306,6 +2313,12 @@ export default function Home() {
     setShowPatternReview(false);
     setPatternReview(null);
     setPatternReviewError(null);
+    // The avatar is the second page after the pattern review, not a popup
+    // on top of it -- only shown now that the pattern card is closing.
+    if (pendingAvatarReveal) {
+      setAvatarReveal(pendingAvatarReveal);
+      setPendingAvatarReveal(null);
+    }
   }
 
   const hasStarted = visibleMessages.length > 0;
@@ -2655,7 +2668,7 @@ export default function Home() {
               <p className="pattern-review-text">{patternReview}</p>
             )}
             <button type="button" className="pattern-review-close" onClick={closePatternReview}>
-              close
+              {!loadingPatternReview && pendingAvatarReveal ? "continue" : "close"}
             </button>
           </div>
         </div>

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ensureUser, getMessages, getUserStage } from "@/lib/db";
-import { generatePatternReview } from "@/lib/anthropic";
+import { ensureUser, getMessages, getUserStage, getElementTally, type Element } from "@/lib/db";
+import { generatePatternReview, generateElementReflection } from "@/lib/anthropic";
 
 export const maxDuration = 30;
 
@@ -10,9 +10,16 @@ export const maxDuration = 30;
 // window rather than a literal single sitting.
 const RECENT_MESSAGE_COUNT = 24;
 
+// The avatar reveal only shows alongside the pattern review once there's
+// actually enough tagged material behind it -- a reveal built on one or two
+// tagged messages wouldn't mean anything.
+const ELEMENT_REVEAL_FLOOR = 4;
+const ELEMENTS: Element[] = ["fire", "earth", "air", "water"];
+
 export async function GET(req: NextRequest) {
   const userId = req.nextUrl.searchParams.get("userId");
   const lang = req.nextUrl.searchParams.get("lang");
+  const sinceMessageId = parseInt(req.nextUrl.searchParams.get("sinceMessageId") || "0", 10) || 0;
   if (!userId) {
     return NextResponse.json({ error: "Missing userId." }, { status: 400 });
   }
@@ -34,7 +41,28 @@ export async function GET(req: NextRequest) {
 
   try {
     const review = await generatePatternReview(stage, recent, lang);
-    return NextResponse.json({ review });
+
+    const tally = await getElementTally(userId, sinceMessageId);
+    const total = ELEMENTS.reduce((sum, el) => sum + tally[el], 0);
+    let avatarReveal = null;
+    if (total >= ELEMENT_REVEAL_FLOOR) {
+      const sorted = [...ELEMENTS].sort((a, b) => tally[b] - tally[a]);
+      const dominant = sorted[0];
+      const weakest = sorted[sorted.length - 1];
+      const dominantPct = Math.round((tally[dominant] / total) * 100);
+      const weakestPct = Math.round((tally[weakest] / total) * 100);
+      const reflection = await generateElementReflection(
+        dominant,
+        dominantPct,
+        weakest,
+        weakestPct,
+        recent,
+        lang
+      );
+      avatarReveal = { dominant, dominantPct, weakest, weakestPct, reflection };
+    }
+
+    return NextResponse.json({ review, elementTally: tally, avatarReveal });
   } catch (err) {
     console.error("pattern review error", err);
     return NextResponse.json(

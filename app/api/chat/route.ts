@@ -7,7 +7,7 @@ import {
   getElementTally,
   type Element,
 } from "@/lib/db";
-import { runChat, generateElementReflection } from "@/lib/anthropic";
+import { runChat } from "@/lib/anthropic";
 
 // runChat's tool-use loop can make up to 4 sequential calls to Claude in a
 // single turn (recording a commitment, signaling a stage, assigning a shape
@@ -15,48 +15,6 @@ import { runChat, generateElementReflection } from "@/lib/anthropic";
 // function timeout on a slow round. Needs a paid plan; Hobby's 10s cap
 // can't be raised past this.
 export const maxDuration = 60;
-
-// The avatar reveal (elemental orb resolving into a standing figure) only
-// fires alongside a genuine closing moment (record_commitment) AND once
-// there's actually enough tagged material behind it -- a reveal built on
-// one or two tagged messages wouldn't mean anything.
-const ELEMENT_REVEAL_FLOOR = 4;
-
-const ELEMENTS: Element[] = ["fire", "earth", "air", "water"];
-
-async function buildAvatarReveal(
-  userId: string,
-  sinceMessageId: number,
-  lang: string | undefined,
-  history: { role: "user" | "assistant"; content: string }[]
-) {
-  const tally = await getElementTally(userId, sinceMessageId);
-  const total = ELEMENTS.reduce((sum, el) => sum + tally[el], 0);
-  console.log(
-    `[avatar-reveal] sinceMessageId=${sinceMessageId} tally=${JSON.stringify(tally)} total=${total} floor=${ELEMENT_REVEAL_FLOOR}`
-  );
-  if (total < ELEMENT_REVEAL_FLOOR) return { tally, reveal: null };
-
-  const sorted = [...ELEMENTS].sort((a, b) => tally[b] - tally[a]);
-  const dominant = sorted[0];
-  const weakest = sorted[sorted.length - 1];
-  const dominantPct = Math.round((tally[dominant] / total) * 100);
-  const weakestPct = Math.round((tally[weakest] / total) * 100);
-
-  const reflection = await generateElementReflection(
-    dominant,
-    dominantPct,
-    weakest,
-    weakestPct,
-    history.slice(-24) as never,
-    lang
-  );
-
-  return {
-    tally,
-    reveal: { dominant, dominantPct, weakest, weakestPct, reflection },
-  };
-}
 
 export async function POST(req: NextRequest) {
   let body: {
@@ -108,28 +66,11 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  console.log(
-    `[chat] userId=${userId} element=${result.element ?? "none"} committed=${!!result.committed} stage=${result.stage ?? "n/a"}`
-  );
-
   const userMessageId = await addMessage(userId, "user", message.trim(), result.element);
   const assistantMessageId = await addMessage(userId, "assistant", result.reply);
 
   const boundary = typeof sinceMessageId === "number" ? sinceMessageId : 0;
-  let elementTally: Record<Element, number> = { fire: 0, earth: 0, air: 0, water: 0 };
-  let avatarReveal = null;
-  if (result.committed) {
-    const withNewTurn = [
-      ...history.map((m) => ({ role: m.role, content: m.content })),
-      { role: "user" as const, content: message.trim() },
-      { role: "assistant" as const, content: result.reply },
-    ];
-    const built = await buildAvatarReveal(userId, boundary, lang, withNewTurn);
-    elementTally = built.tally;
-    avatarReveal = built.reveal;
-  } else {
-    elementTally = await getElementTally(userId, boundary);
-  }
+  const elementTally = await getElementTally(userId, boundary);
 
   return NextResponse.json({
     reply: result.reply,
@@ -137,7 +78,6 @@ export async function POST(req: NextRequest) {
     shapeFamily: result.shapeFamily,
     branches: result.branches,
     elementTally,
-    avatarReveal,
     userMessageId,
     assistantMessageId,
   });
