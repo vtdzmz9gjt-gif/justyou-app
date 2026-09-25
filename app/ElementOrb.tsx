@@ -111,11 +111,15 @@ export default function ElementOrb({ tally }: { tally: ElementTally }) {
     geometry.setAttribute("position", new THREE.BufferAttribute(positions, 3));
     geometry.setAttribute("color", new THREE.BufferAttribute(colors, 3));
 
+    // Dimmer than the earlier "more vivid" pass -- full brightness read as
+    // distracting while actually reading/typing during a conversation.
+    // Movement stays (see animate() below); it's the brightness that's
+    // toned down so it recedes behind the text instead of competing with it.
     const material = new THREE.PointsMaterial({
-      size: 0.065,
+      size: 0.055,
       vertexColors: true,
       transparent: true,
-      opacity: 0.95,
+      opacity: 0.5,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
     });
@@ -127,9 +131,9 @@ export default function ElementOrb({ tally }: { tally: ElementTally }) {
 
     function animate() {
       raf = requestAnimationFrame(animate);
-      t += 0.008;
-      points.rotation.y += 0.0015;
-      points.rotation.x = Math.sin(t * 0.15) * 0.05;
+      t += 0.006;
+      points.rotation.y += 0.001;
+      points.rotation.x = Math.sin(t * 0.15) * 0.04;
 
       const tallyNow = tallyRef.current;
       const allZero = ELEMENT_KEYS.every((k) => tallyNow[k] === 0);
