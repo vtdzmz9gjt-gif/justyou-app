@@ -55,6 +55,7 @@ export async function POST(req: NextRequest) {
     branches?: string[];
     element?: Element;
     committed?: boolean;
+    win?: { action: string; reflection: string };
   };
   try {
     result = await runChat(userId, history, message.trim(), depth, lang, alivenessAnswer);
@@ -80,6 +81,7 @@ export async function POST(req: NextRequest) {
     shapeFamily: result.shapeFamily,
     branches: result.branches,
     elementTally,
+    win: result.win,
     userMessageId,
     assistantMessageId,
   });
