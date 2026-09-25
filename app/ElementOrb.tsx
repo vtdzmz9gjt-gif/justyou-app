@@ -46,6 +46,9 @@ export default function ElementOrb({ tally }: { tally: ElementTally }) {
     if (!container) return;
 
     const scene = new THREE.Scene();
+    // Particles further from camera fade into the same dark as the page
+    // background -- depth instead of a flat, evenly-lit cloud.
+    scene.fog = new THREE.Fog(0x14120f, 2.4, 6.6);
     const camera = new THREE.PerspectiveCamera(
       55,
       window.innerWidth / window.innerHeight,
@@ -75,7 +78,9 @@ export default function ElementOrb({ tally }: { tally: ElementTally }) {
     const basePositions = new Float32Array(COUNT * 3);
     const positions = new Float32Array(COUNT * 3);
     const colors = new Float32Array(COUNT * 3);
+    const baseColors = new Float32Array(COUNT * 3);
     const seeds = new Float32Array(COUNT);
+    const twinkleSpeeds = new Float32Array(COUNT);
     const assignedEl: Element[] = [];
 
     for (let i = 0; i < COUNT; i++) {
@@ -101,10 +106,17 @@ export default function ElementOrb({ tally }: { tally: ElementTally }) {
       }
       assignedEl[i] = best;
       const c = new THREE.Color(ELEMENT_COLORS[best]);
+      baseColors[i * 3] = c.r;
+      baseColors[i * 3 + 1] = c.g;
+      baseColors[i * 3 + 2] = c.b;
       colors[i * 3] = c.r;
       colors[i * 3 + 1] = c.g;
       colors[i * 3 + 2] = c.b;
       seeds[i] = Math.random() * Math.PI * 2;
+      // Each particle drifts in and out of visibility at its own slow,
+      // uneven pace -- like something glimpsed in fog, not a uniformly lit
+      // cloud rotating in place.
+      twinkleSpeeds[i] = 0.25 + Math.random() * 0.5;
     }
 
     const geometry = new THREE.BufferGeometry();
@@ -119,7 +131,7 @@ export default function ElementOrb({ tally }: { tally: ElementTally }) {
       size: 0.055,
       vertexColors: true,
       transparent: true,
-      opacity: 0.5,
+      opacity: 0.62,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
     });
@@ -151,6 +163,7 @@ export default function ElementOrb({ tally }: { tally: ElementTally }) {
       const pull = 0.35;
 
       const pos = geometry.attributes.position.array as Float32Array;
+      const col = geometry.attributes.color.array as Float32Array;
       for (let i = 0; i < COUNT; i++) {
         const el = assignedEl[i];
         const weight = scores[el] / scoreTotal;
@@ -163,11 +176,19 @@ export default function ElementOrb({ tally }: { tally: ElementTally }) {
         const tx = bx * targetScale + pole[0] * weight * pull * 0.5;
         const ty = by * targetScale + pole[1] * weight * pull * 0.5;
         const tz = bz * targetScale + pole[2] * weight * pull * 0.5;
-        pos[i * 3] += (tx - pos[i * 3]) * 0.03 + wob * 0.02;
-        pos[i * 3 + 1] += (ty - pos[i * 3 + 1]) * 0.03 + wob * 0.02;
-        pos[i * 3 + 2] += (tz - pos[i * 3 + 2]) * 0.03 + wob * 0.02;
+        pos[i * 3] += (tx - pos[i * 3]) * 0.024 + wob * 0.02;
+        pos[i * 3 + 1] += (ty - pos[i * 3 + 1]) * 0.024 + wob * 0.02;
+        pos[i * 3 + 2] += (tz - pos[i * 3 + 2]) * 0.024 + wob * 0.02;
+
+        // Twinkle: each particle's own brightness drifts between faint and
+        // full over its own slow cycle, never fully off.
+        const twinkle = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * twinkleSpeeds[i] + seeds[i]));
+        col[i * 3] = baseColors[i * 3] * twinkle;
+        col[i * 3 + 1] = baseColors[i * 3 + 1] * twinkle;
+        col[i * 3 + 2] = baseColors[i * 3 + 2] * twinkle;
       }
       geometry.attributes.position.needsUpdate = true;
+      geometry.attributes.color.needsUpdate = true;
 
       renderer.render(scene, camera);
     }
