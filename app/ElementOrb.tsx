@@ -29,6 +29,11 @@ const ELEMENT_KEYS: Element[] = ["fire", "earth", "air", "water"];
 // work -- 2200 caused visible stutter on ordinary hardware. Trading some
 // density for smoothness; still much denser than the original 1200.
 const COUNT = 1500;
+// Distant, static backdrop stars -- cheap even at this count since they
+// never get per-vertex position updates (see animate() below), just a
+// single whole-group rotation each frame. Gives the element cloud
+// somewhere to float, instead of it being the entire visible universe.
+const STAR_COUNT = 900;
 
 // A live, ambient particle cloud that pulls toward whichever element(s)
 // are actually being tagged this session -- same mechanics as the
@@ -138,6 +143,32 @@ export default function ElementOrb({ tally }: { tally: ElementTally }) {
     const points = new THREE.Points(geometry, material);
     scene.add(points);
 
+    // The backdrop starfield -- scattered through a much bigger volume than
+    // the element cloud, static (no per-frame CPU work), excluded from fog
+    // so it reads as depth stretching away rather than getting swallowed by
+    // it. Purely decorative: never touches `tally`.
+    const starPositions = new Float32Array(STAR_COUNT * 3);
+    for (let i = 0; i < STAR_COUNT; i++) {
+      const v = new THREE.Vector3(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5)
+        .normalize()
+        .multiplyScalar(3.2 + Math.random() * 6.5);
+      starPositions[i * 3] = v.x;
+      starPositions[i * 3 + 1] = v.y;
+      starPositions[i * 3 + 2] = v.z;
+    }
+    const starGeometry = new THREE.BufferGeometry();
+    starGeometry.setAttribute("position", new THREE.BufferAttribute(starPositions, 3));
+    const starMaterial = new THREE.PointsMaterial({
+      color: 0xa39b8c,
+      size: 0.028,
+      transparent: true,
+      opacity: 0.55,
+      depthWrite: false,
+      fog: false,
+    });
+    const starPoints = new THREE.Points(starGeometry, starMaterial);
+    scene.add(starPoints);
+
     let t = 0;
     let raf = 0;
 
@@ -146,6 +177,7 @@ export default function ElementOrb({ tally }: { tally: ElementTally }) {
       t += 0.006;
       points.rotation.y += 0.001;
       points.rotation.x = Math.sin(t * 0.15) * 0.04;
+      starPoints.rotation.y += 0.00025;
 
       const tallyNow = tallyRef.current;
       const allZero = ELEMENT_KEYS.every((k) => tallyNow[k] === 0);
@@ -199,6 +231,8 @@ export default function ElementOrb({ tally }: { tally: ElementTally }) {
       cancelAnimationFrame(raf);
       geometry.dispose();
       material.dispose();
+      starGeometry.dispose();
+      starMaterial.dispose();
       renderer.dispose();
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
