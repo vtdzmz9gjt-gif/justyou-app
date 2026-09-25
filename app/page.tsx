@@ -2536,12 +2536,6 @@ export default function Home() {
 
       {hasStarted ? (
         <div className="element-orb-wrap" aria-hidden="true">
-          <div className="nebula-backdrop">
-            <div className="nebula-blob nebula-blob--fire" />
-            <div className="nebula-blob nebula-blob--water" />
-            <div className="nebula-blob nebula-blob--earth" />
-            <div className="nebula-blob nebula-blob--air" />
-          </div>
           <ElementOrb tally={elementTally} />
         </div>
       ) : (

@@ -23,6 +23,77 @@ const ELEMENT_POLES: Record<Element, [number, number, number]> = {
   water: [-1, 1, -1],
 };
 
+// A fullscreen procedural nebula, rendered directly in the fragment shader
+// (fractal value noise, several octaves) rather than blurred CSS circles --
+// genuine wispy cloud structure instead of a handful of soft blobs, which
+// is what actually reads as "a picture of deep space" rather than a
+// gradient effect. Vertex shader ignores the camera entirely (clip-space
+// quad) so it always fills the viewport regardless of camera movement.
+const NEBULA_VERTEX_SHADER = `
+  varying vec2 vUv;
+  void main() {
+    vUv = uv;
+    gl_Position = vec4(position.xy, 0.9999, 1.0);
+  }
+`;
+
+const NEBULA_FRAGMENT_SHADER = `
+  uniform float uTime;
+  uniform vec2 uResolution;
+  uniform vec3 uColorFire;
+  uniform vec3 uColorWater;
+  uniform vec3 uColorEarth;
+  uniform vec3 uColorAir;
+  varying vec2 vUv;
+
+  float hash(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
+  }
+
+  float noise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    float a = hash(i);
+    float b = hash(i + vec2(1.0, 0.0));
+    float c = hash(i + vec2(0.0, 1.0));
+    float d = hash(i + vec2(1.0, 1.0));
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    return mix(a, b, u.x) + (c - a) * u.y * (1.0 - u.x) + (d - b) * u.x * u.y;
+  }
+
+  float fbm(vec2 p) {
+    float v = 0.0;
+    float amp = 0.5;
+    for (int i = 0; i < 5; i++) {
+      v += amp * noise(p);
+      p *= 2.02;
+      amp *= 0.5;
+    }
+    return v;
+  }
+
+  void main() {
+    vec2 aspect = vec2(uResolution.x / uResolution.y, 1.0);
+    vec2 p = (vUv - 0.5) * aspect * 2.6;
+    vec2 drift = vec2(uTime * 0.009, uTime * 0.005);
+
+    float n1 = fbm(p * 1.3 + drift);
+    float n2 = fbm(p * 1.1 - drift * 1.3 + 8.0);
+    float n3 = fbm(p * 1.7 + drift * 0.6 + 20.0);
+
+    vec3 col = mix(uColorFire, uColorWater, n1);
+    col = mix(col, uColorEarth, n2 * 0.55);
+    col = mix(col, uColorAir, n3 * 0.35);
+
+    float dist = length(vUv - 0.5) * 2.0;
+    float vignette = smoothstep(1.5, 0.15, dist);
+    float density = fbm(p * 1.4 + drift * 0.8) * vignette;
+    float alpha = clamp(density * 0.4 - 0.06, 0.0, 0.4);
+
+    gl_FragColor = vec4(col, alpha);
+  }
+`;
+
 const ELEMENT_KEYS: Element[] = ["fire", "earth", "air", "water"];
 // Full-screen now, not a small corner accent, but a full-viewport canvas
 // updating this many points' positions on the CPU every frame is real
@@ -77,8 +148,29 @@ export default function ElementOrb({ tally }: { tally: ElementTally }) {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
+      nebulaMaterial.uniforms.uResolution.value.set(window.innerWidth, window.innerHeight);
     }
     window.addEventListener("resize", handleResize);
+
+    const nebulaMaterial = new THREE.ShaderMaterial({
+      vertexShader: NEBULA_VERTEX_SHADER,
+      fragmentShader: NEBULA_FRAGMENT_SHADER,
+      transparent: true,
+      depthWrite: false,
+      depthTest: false,
+      uniforms: {
+        uTime: { value: 0 },
+        uResolution: { value: new THREE.Vector2(window.innerWidth, window.innerHeight) },
+        uColorFire: { value: new THREE.Color(ELEMENT_COLORS.fire) },
+        uColorWater: { value: new THREE.Color(ELEMENT_COLORS.water) },
+        uColorEarth: { value: new THREE.Color(ELEMENT_COLORS.earth) },
+        uColorAir: { value: new THREE.Color(ELEMENT_COLORS.air) },
+      },
+    });
+    const nebulaMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), nebulaMaterial);
+    nebulaMesh.frustumCulled = false;
+    nebulaMesh.renderOrder = -1;
+    scene.add(nebulaMesh);
 
     const basePositions = new Float32Array(COUNT * 3);
     const positions = new Float32Array(COUNT * 3);
@@ -175,6 +267,7 @@ export default function ElementOrb({ tally }: { tally: ElementTally }) {
     function animate() {
       raf = requestAnimationFrame(animate);
       t += 0.006;
+      nebulaMaterial.uniforms.uTime.value = t;
       points.rotation.y += 0.001;
       points.rotation.x = Math.sin(t * 0.15) * 0.04;
       starPoints.rotation.y += 0.00025;
@@ -233,6 +326,8 @@ export default function ElementOrb({ tally }: { tally: ElementTally }) {
       material.dispose();
       starGeometry.dispose();
       starMaterial.dispose();
+      nebulaMesh.geometry.dispose();
+      nebulaMaterial.dispose();
       renderer.dispose();
       if (container.contains(renderer.domElement)) {
         container.removeChild(renderer.domElement);
