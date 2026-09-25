@@ -1248,6 +1248,87 @@ body {
   display: block;
 }
 
+/* Soft, slowly drifting color blooms behind the star/particle canvas --
+   reads as a nebula/galaxy image rather than a flat dark background, using
+   the same four element colors as the particles themselves. Pure CSS, no
+   external image. */
+.nebula-backdrop {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.nebula-blob {
+  position: absolute;
+  width: 65vw;
+  height: 65vw;
+  max-width: 620px;
+  max-height: 620px;
+  border-radius: 50%;
+  filter: blur(90px);
+  opacity: 0.28;
+  will-change: transform;
+}
+
+.nebula-blob--fire {
+  top: -12%;
+  left: 4%;
+  background: radial-gradient(circle, #e2632b, transparent 70%);
+  animation: nebulaDriftA 46s ease-in-out infinite;
+}
+
+.nebula-blob--water {
+  bottom: -16%;
+  right: -4%;
+  background: radial-gradient(circle, #4a7ba6, transparent 70%);
+  animation: nebulaDriftB 55s ease-in-out infinite;
+}
+
+.nebula-blob--earth {
+  bottom: 8%;
+  left: -14%;
+  background: radial-gradient(circle, #6b8f5c, transparent 70%);
+  animation: nebulaDriftC 60s ease-in-out infinite;
+}
+
+.nebula-blob--air {
+  top: 12%;
+  right: -12%;
+  background: radial-gradient(circle, #b8c4d9, transparent 70%);
+  animation: nebulaDriftA 50s ease-in-out infinite reverse;
+}
+
+@keyframes nebulaDriftA {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(6%, 8%) scale(1.12);
+  }
+}
+
+@keyframes nebulaDriftB {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(-8%, -5%) scale(1.08);
+  }
+}
+
+@keyframes nebulaDriftC {
+  0%,
+  100% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(5%, -7%) scale(1.15);
+  }
+}
+
 .orb-intro {
   position: fixed;
   top: 84px;
