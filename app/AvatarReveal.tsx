@@ -44,6 +44,49 @@ function sampleSphere(c: [number, number, number], radius: number) {
 const FEET_Y = -1.7;
 const HEAD_Y = 1.75;
 
+// A soft pad swelling open, like the light itself brightening as the
+// avatar resolves -- synthesized rather than a loaded file. Silently
+// no-ops if the browser blocks audio this far from a user gesture.
+function playRevealShimmer() {
+  try {
+    const AudioCtx = window.AudioContext || (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    if (ctx.state === "suspended") ctx.resume().catch(() => {});
+
+    const now = ctx.currentTime;
+    const master = ctx.createGain();
+    master.gain.setValueAtTime(0.0001, now);
+    master.gain.exponentialRampToValueAtTime(0.3, now + 3.6);
+    master.gain.exponentialRampToValueAtTime(0.0001, now + 9);
+    master.connect(ctx.destination);
+
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(200, now);
+    filter.frequency.exponentialRampToValueAtTime(2600, now + 5.2);
+    filter.Q.value = 0.7;
+    filter.connect(master);
+
+    const freqs = [130.81, 196.0, 261.63, 329.63];
+    freqs.forEach((f, i) => {
+      const osc = ctx.createOscillator();
+      osc.type = "sawtooth";
+      osc.frequency.value = f;
+      osc.detune.value = (i % 2 === 0 ? -1 : 1) * (6 + i * 2);
+      const g = ctx.createGain();
+      g.gain.value = 0.5 / freqs.length;
+      osc.connect(g).connect(filter);
+      osc.start(now);
+      osc.stop(now + 9.1);
+    });
+
+    window.setTimeout(() => ctx.close().catch(() => {}), 9600);
+  } catch {
+    /* audio blocked or unavailable -- the reveal still works visually */
+  }
+}
+
 // The elemental orb's live particle cloud resolving into a standing
 // figure at the genuine close of a session -- body colored bottom-up by
 // this session's elemental mix, largest share at the feet. Same
@@ -179,6 +222,7 @@ export default function AvatarReveal({
       renderer.render(scene, camera);
     }
     animate();
+    playRevealShimmer();
 
     const cardTimer = setTimeout(() => setShowCard(true), 2600);
 
