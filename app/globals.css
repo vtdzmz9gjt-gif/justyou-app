@@ -930,7 +930,8 @@ body {
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-faint);
-  text-shadow: 0 0 10px var(--bg), 0 0 18px var(--bg);
+  -webkit-text-stroke: 0.5px var(--bg);
+  text-shadow: 0 0 1px var(--bg), 0 0 10px var(--bg), 0 0 18px var(--bg);
 }
 
 .msg.assistant .msg-label {
@@ -943,19 +944,26 @@ body {
   line-height: 1.65;
   white-space: pre-wrap;
   margin: 0;
-  /* A soft halo in the page background color, not a boxed background --
-     keeps text readable over the full-screen elemental orb during active
-     chat without breaking the "no chat bubbles" look. */
-  text-shadow: 0 0 10px var(--bg), 0 0 18px var(--bg), 0 0 28px var(--bg);
+  /* A halo in the page background color, not a boxed background -- keeps
+     text readable over the full-screen elemental orb during active chat
+     without breaking the "no chat bubbles" look. The blurred layers give
+     the soft ambient glow; the unblurred text-stroke is what actually
+     guarantees legibility over the scene's brightest spots (the light
+     band, the figure) -- a blur alone loses too much opacity on body-
+     weight strokes to fully occlude a bright patch behind it. */
+  -webkit-text-stroke: 0.6px var(--bg);
+  text-shadow: 0 0 1px var(--bg), 0 0 10px var(--bg), 0 0 18px var(--bg), 0 0 28px var(--bg);
 }
 
 /* No chat bubbles -- text arrives in open space, closer to reading than
    messaging. Alignment + a thin border + color are what distinguish who
-   said what, not a boxed container. */
+   said what, not a boxed container. Brighter than the old muted tone --
+   that one only had enough contrast over the dark sky, not the scene's
+   brighter patches. */
 .msg.user .msg-bubble {
   padding-right: 1rem;
   border-right: 2px solid var(--border);
-  color: var(--text-muted);
+  color: #c9c1b0;
   font-weight: 500;
   text-align: right;
 }
