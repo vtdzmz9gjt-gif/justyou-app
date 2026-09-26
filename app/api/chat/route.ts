@@ -10,8 +10,8 @@ import {
 import { runChat } from "@/lib/anthropic";
 
 // runChat's tool-use loop can make up to 4 sequential calls to Claude in a
-// single turn (recording a commitment, signaling a stage, assigning a shape
-// family, then the actual reply) -- comfortably past Vercel's default
+// single turn (recording a commitment, signaling a stage, offering
+// branches, then the actual reply) -- comfortably past Vercel's default
 // function timeout on a slow round. Needs a paid plan; Hobby's 10s cap
 // can't be raised past this.
 export const maxDuration = 60;
@@ -51,7 +51,6 @@ export async function POST(req: NextRequest) {
   let result: {
     reply: string;
     stage?: string;
-    shapeFamily?: string;
     branches?: string[];
     element?: Element;
     committed?: boolean;
@@ -78,7 +77,6 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({
     reply: result.reply,
     stage: result.stage,
-    shapeFamily: result.shapeFamily,
     branches: result.branches,
     elementTally,
     win: result.win,

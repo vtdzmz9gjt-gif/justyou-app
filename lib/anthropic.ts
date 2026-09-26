@@ -9,11 +9,8 @@ import {
   setUserStage,
   getUserStage,
   getStagePercentages,
-  getUserShape,
-  setUserShape,
   type StoredMessage,
   type Stage,
-  type ShapeFamily,
   type Element,
 } from "./db";
 
@@ -78,21 +75,6 @@ const tools: Anthropic.Tool[] = [
         },
       },
       required: ["stage"],
-    },
-  },
-  {
-    name: "assign_shape_family",
-    description:
-      "Call this AT MOST ONCE per person, ever -- only if the context below says no shape family is assigned yet, and only once you have a real feel for how they express themselves (never on the very first message alone; wait until Mystery or Safety has given you something to go on). Quietly match them to whichever family fits the actual shape of how they're moving through this, not what they say they want to be. Never ask them directly, never mention this choice or these categories to them -- it is entirely invisible.\n\n- tree: grounding, patience, roots -- someone building slowly, staying planted through pressure.\n- flame: transformation, intensity -- someone burning through a change, urgent and consuming.\n- river: adaptability, emotional flow -- someone moving around obstacles, shaped by what they pass through.\n- constellation: meaning, direction, big-picture -- someone oriented by a distant point, connecting scattered things into a pattern.\n- mountain: stillness, endurance -- someone unmoved under real weight, holding rather than reacting.",
-    input_schema: {
-      type: "object",
-      properties: {
-        family: {
-          type: "string",
-          enum: ["tree", "flame", "river", "constellation", "mountain"],
-        },
-      },
-      required: ["family"],
     },
   },
   {
@@ -233,17 +215,9 @@ function toApiMessages(history: StoredMessage[]): Anthropic.MessageParam[] {
   return history.map((m) => ({ role: m.role, content: m.content }));
 }
 
-async function shapeContext(userId: string): Promise<string> {
-  const family = await getUserShape(userId);
-  return family
-    ? `A shape family is already assigned ("${family}") — do not call assign_shape_family again.`
-    : "No shape family assigned yet. Once you have a real feel for them (not on the first message alone), call assign_shape_family.";
-}
-
 export interface ChatResult {
   reply: string;
   stage?: Stage;
-  shapeFamily?: ShapeFamily;
   branches?: string[];
   element?: Element;
   committed?: boolean;
@@ -262,14 +236,13 @@ export async function runChat(
   // loop below rather than adding its own sequential round-trip.
   const elementPromise = tagElement(userMessage);
 
-  const [openCommitment, stageInfo, shapeInfo] = await Promise.all([
+  const [openCommitment, stageInfo] = await Promise.all([
     openCommitmentContext(userId),
     stageContext(userId),
-    shapeContext(userId),
   ]);
   const system = `${BASE_SYSTEM_PROMPT}\n\n---\n\nCONTEXT (not visible to the person, never repeat it back verbatim):\n${todayContext()}\n${openCommitment}\n${depthContext(
     depth
-  )}\n${uiLanguageContext(uiLang)}\n${alivenessContext(alivenessAnswer)}\n${stageInfo}\n${shapeInfo}`;
+  )}\n${uiLanguageContext(uiLang)}\n${alivenessContext(alivenessAnswer)}\n${stageInfo}`;
 
   const messages: Anthropic.MessageParam[] = [
     ...toApiMessages(history),
@@ -277,7 +250,6 @@ export async function runChat(
   ];
 
   let newStage: Stage | undefined;
-  let newShape: ShapeFamily | undefined;
   let newBranches: string[] | undefined;
   let newWin: { action: string; reflection: string } | undefined;
   let committed = false;
@@ -304,7 +276,6 @@ export async function runChat(
       return {
         reply: textBlocks.map((b) => b.text).join("\n").trim(),
         stage: newStage,
-        shapeFamily: newShape,
         branches: newBranches,
         element: await elementPromise,
         committed,
@@ -352,15 +323,6 @@ export async function runChat(
             tool_use_id: call.id,
             content: "Recorded.",
           });
-        } else if (call.name === "assign_shape_family") {
-          const input = call.input as { family: ShapeFamily };
-          await setUserShape(userId, input.family);
-          newShape = input.family;
-          toolResults.push({
-            type: "tool_result",
-            tool_use_id: call.id,
-            content: "Recorded.",
-          });
         } else if (call.name === "offer_branches") {
           const input = call.input as { options: string[] };
           newBranches = input.options.filter((o) => typeof o === "string" && o.trim()).slice(0, 3);
@@ -395,7 +357,6 @@ export async function runChat(
         return {
           reply: trailing,
           stage: newStage,
-          shapeFamily: newShape,
           branches: newBranches,
           element: await elementPromise,
           committed,
@@ -407,7 +368,6 @@ export async function runChat(
   return {
     reply: "Something got tangled on my end — say that again?",
     stage: newStage,
-    shapeFamily: newShape,
     branches: newBranches,
     element: await elementPromise,
     committed,
