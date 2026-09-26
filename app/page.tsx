@@ -12,6 +12,7 @@ import dynamic from "next/dynamic";
 import WinCelebration from "./WinCelebration";
 import WeeklyRecap from "./WeeklyRecap";
 import TreeOfLife, { type TreeState } from "./TreeOfLife";
+import { NODES as TREE_NODES, type SephirahKey } from "@/lib/tree";
 
 // three.js needs a real canvas/WebGL context -- both client-only, no SSR.
 const ElementOrb = dynamic(() => import("./ElementOrb"), { ssr: false });
@@ -1682,6 +1683,7 @@ export default function Home() {
   const [branches, setBranches] = useState<string[]>([]);
   const [showTree, setShowTree] = useState(false);
   const [treeState, setTreeState] = useState<TreeState>({});
+  const [connectionToast, setConnectionToast] = useState<string | null>(null);
   const [showPatternReview, setShowPatternReview] = useState(false);
   const [patternReview, setPatternReview] = useState<string | null>(null);
   const [loadingPatternReview, setLoadingPatternReview] = useState(false);
@@ -1997,6 +1999,16 @@ export default function Home() {
       .then((r) => r.json())
       .then((data) => {
         if (data.state) setTreeState(data.state);
+        // Surfaces at most once, ever, per path -- the server already
+        // guarantees that; the client just has to say it when it's told to.
+        if (data.newConnection) {
+          const a = TREE_NODES[data.newConnection.a as SephirahKey]?.subtitle;
+          const b = TREE_NODES[data.newConnection.b as SephirahKey]?.subtitle;
+          if (a && b) {
+            setConnectionToast(`You're starting to see how ${a} and ${b} connect.`);
+            window.setTimeout(() => setConnectionToast(null), 6000);
+          }
+        }
       })
       .catch(() => {
         /* quiet failure — the Tree just shows what it already had */
@@ -2145,6 +2157,8 @@ export default function Home() {
           onClose={() => setShowTree(false)}
         />
       )}
+
+      {connectionToast && <div className="tree-toast">{connectionToast}</div>}
 
       {winCelebration && (
         <WinCelebration

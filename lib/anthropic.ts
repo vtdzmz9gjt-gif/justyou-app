@@ -15,7 +15,7 @@ import {
   type Element,
   type SephirahWeight,
 } from "./db";
-import type { SephirahKey } from "@/app/TreeOfLife";
+import type { SephirahKey } from "@/lib/tree";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";

@@ -1,5 +1,5 @@
 import { neon } from "@neondatabase/serverless";
-import type { SephirahKey, SephirahState, TreeState } from "@/app/TreeOfLife";
+import { EDGES, type SephirahKey, type SephirahState, type TreeState } from "@/lib/tree";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -100,6 +100,17 @@ function ensureSchema(): Promise<void> {
         )
       `;
       await sql`CREATE INDEX IF NOT EXISTS sephirah_tags_user_idx ON sephirah_tags (user_id)`;
+      // One row per path, the first (and only the first) time both of its
+      // nodes are lit -- lets a "you're starting to see how X and Y
+      // connect" line surface exactly once, ever, per person per path.
+      await sql`
+        CREATE TABLE IF NOT EXISTS sephirah_path_acks (
+          user_id TEXT NOT NULL,
+          edge TEXT NOT NULL,
+          acknowledged_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          PRIMARY KEY (user_id, edge)
+        )
+      `;
       // Elemental orb (Fire/Earth/Air/Water) -- per-session, tagged on the
       // person's own messages only, never the AI's reply. Nullable: most
       // messages (administrative, ambiguous, or the assistant's own turns)
@@ -486,4 +497,39 @@ export async function getTreeState(userId: string): Promise<TreeState> {
     state[node] = { tier, groundedIn: latest.grounded_in };
   }
   return state;
+}
+
+function edgeKey(a: SephirahKey, b: SephirahKey): string {
+  return [a, b].sort().join("-");
+}
+
+// Finds the first currently-lit path (both ends tagged) that's never been
+// acknowledged before, and marks it acknowledged in the same call -- so
+// it surfaces exactly once, ever, per person per path. Not a popup, just
+// a fact the client can choose to say quietly once.
+export async function claimNewConnection(
+  userId: string,
+  state: TreeState
+): Promise<{ a: SephirahKey; b: SephirahKey } | null> {
+  await ensureSchema();
+  const litEdges = EDGES.filter(([a, b]) => state[a] && state[b]);
+  if (litEdges.length === 0) return null;
+
+  const existing = (await sql`
+    SELECT edge FROM sephirah_path_acks WHERE user_id = ${userId}
+  `) as unknown as { edge: string }[];
+  const acked = new Set(existing.map((r) => r.edge));
+
+  for (const [a, b] of litEdges) {
+    const key = edgeKey(a, b);
+    if (!acked.has(key)) {
+      await ensureUser(userId);
+      await sql`
+        INSERT INTO sephirah_path_acks (user_id, edge) VALUES (${userId}, ${key})
+        ON CONFLICT (user_id, edge) DO NOTHING
+      `;
+      return { a, b };
+    }
+  }
+  return null;
 }
