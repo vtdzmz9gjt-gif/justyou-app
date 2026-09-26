@@ -1681,9 +1681,7 @@ export default function Home() {
   const [mirrorLine, setMirrorLine] = useState<string | null>(null);
   const [branches, setBranches] = useState<string[]>([]);
   const [showTree, setShowTree] = useState(false);
-  // No tagging yet (Stage 2) -- every node genuinely is unspoken so far,
-  // not a placeholder.
-  const [treeState] = useState<TreeState>({});
+  const [treeState, setTreeState] = useState<TreeState>({});
   const [showPatternReview, setShowPatternReview] = useState(false);
   const [patternReview, setPatternReview] = useState<string | null>(null);
   const [loadingPatternReview, setLoadingPatternReview] = useState(false);
@@ -1989,6 +1987,22 @@ export default function Home() {
     }
   }
 
+  // Opens right away with whatever's already in state, then refreshes in
+  // the background -- same pattern as the element tally, not a blocking
+  // loading screen for a page that's mostly meant to be sat with quietly.
+  function openTree() {
+    setShowTree(true);
+    if (!userId) return;
+    fetch(`/api/tree?userId=${encodeURIComponent(userId)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.state) setTreeState(data.state);
+      })
+      .catch(() => {
+        /* quiet failure — the Tree just shows what it already had */
+      });
+  }
+
   async function handlePatternReview() {
     if (!userId) return;
     setShowPatternReview(true);
@@ -2118,7 +2132,7 @@ export default function Home() {
           closeLabel="continue"
           onClose={() => {
             setAvatarReveal(null);
-            setShowTree(true);
+            openTree();
           }}
         />
       )}
@@ -2190,7 +2204,7 @@ export default function Home() {
 
       {showSettings && (
         <div className="settings-panel">
-          <button type="button" className="tree-entry-btn" onClick={() => setShowTree(true)}>
+          <button type="button" className="tree-entry-btn" onClick={openTree}>
             <span>Your Tree</span>
             <span className="tree-entry-btn-arrow" aria-hidden="true">
               →
