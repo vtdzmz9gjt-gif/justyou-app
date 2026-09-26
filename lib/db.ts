@@ -256,6 +256,22 @@ export async function countLandedCommitments(userId: string): Promise<number> {
   return Number((rows[0] as { count: string | number }).count);
 }
 
+// Wins for the weekly recap -- the person's own browser clock decides when
+// a week has turned over (Sunday 7pm local, no timezone stored server-side),
+// so this just takes whatever "since" boundary the client already computed.
+export async function getRecentWins(
+  userId: string,
+  since: Date
+): Promise<{ action: string; resolved_at: string }[]> {
+  await ensureSchema();
+  const rows = await sql`
+    SELECT action, resolved_at FROM commitments
+    WHERE user_id = ${userId} AND status = 'landed' AND resolved_at >= ${since.toISOString()}
+    ORDER BY resolved_at ASC
+  `;
+  return rows as unknown as { action: string; resolved_at: string }[];
+}
+
 export async function getDueReminders(): Promise<(Commitment & { email: string })[]> {
   await ensureSchema();
   const rows = await sql`
