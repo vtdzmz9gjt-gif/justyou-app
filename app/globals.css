@@ -447,6 +447,24 @@ body {
   transition: stroke 1s ease, stroke-opacity 1s ease, stroke-width 1s ease;
 }
 
+.daat-point-hit {
+  cursor: pointer;
+}
+
+.daat-point-reveal {
+  opacity: 0;
+  animation: daatFadeIn 2.5s ease-in forwards;
+}
+
+@keyframes daatFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 .tree-insights {
   display: flex;
   flex-direction: column;

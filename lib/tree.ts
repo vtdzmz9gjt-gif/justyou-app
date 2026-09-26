@@ -87,3 +87,8 @@ export const TIER_RANK: Record<SephirahTier, number> = {
   returned_to: 1,
   deeply_worked: 2,
 };
+
+// Da'at, the hidden eleventh point -- not a sephirah, not taggable, never
+// named in the UI. Positioned between Keter and Tiferet along the central
+// pillar, appears only once earned (see lib/db.ts's claimDaatReveal).
+export const DAAT_POSITION = { x: 150, y: 119 };

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ensureUser, getTreeState, claimNewConnection } from "@/lib/db";
+import { ensureUser, getTreeState, claimNewConnection, claimDaatReveal } from "@/lib/db";
 import { getTensionInsights } from "@/lib/anthropic";
 
 // Returns the Tree of Life's current state -- one entry per sephirah that
@@ -9,9 +9,12 @@ import { getTensionInsights } from "@/lib/anthropic";
 //
 // Also claims at most one newly-lit path per request, if there is one --
 // a quiet, one-time "you're starting to see how X and Y connect" fact the
-// client can choose to say once and never again -- and returns any
+// client can choose to say once and never again -- returns any
 // tension-pair insights that qualify, generating one the first time a
-// pair becomes imbalanced and simply reusing the stored wording after.
+// pair becomes imbalanced and simply reusing the stored wording after --
+// and reports whether Da'at, the hidden eleventh point, has been earned,
+// and whether this is the first time it's being shown (so the client
+// knows whether to play its slow fade-in or just show it plainly).
 export async function GET(req: NextRequest) {
   const userId = req.nextUrl.searchParams.get("userId");
   if (!userId) {
@@ -22,5 +25,6 @@ export async function GET(req: NextRequest) {
   const state = await getTreeState(userId);
   const newConnection = await claimNewConnection(userId, state);
   const tensionInsights = await getTensionInsights(userId, state, lang);
-  return NextResponse.json({ state, newConnection, tensionInsights });
+  const daat = await claimDaatReveal(userId, state);
+  return NextResponse.json({ state, newConnection, tensionInsights, daat });
 }
