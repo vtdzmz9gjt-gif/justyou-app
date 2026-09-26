@@ -11,6 +11,7 @@ import {
 import dynamic from "next/dynamic";
 import WinCelebration from "./WinCelebration";
 import WeeklyRecap from "./WeeklyRecap";
+import TreeOfLife, { type TreeState } from "./TreeOfLife";
 
 // three.js needs a real canvas/WebGL context -- both client-only, no SSR.
 const ElementOrb = dynamic(() => import("./ElementOrb"), { ssr: false });
@@ -40,7 +41,6 @@ type AvatarRevealData = {
 const USER_ID_KEY = "the_return_user_id";
 const ONBOARDED_KEY = "the_return_onboarded";
 const LANG_KEY = "the_return_lang";
-const REVEAL_SHOWN_KEY = "the_return_reveal_shown";
 // Shown once, ever, the first time the orb appears for this person.
 const ORB_INTRO_SEEN_KEY = "the_return_orb_intro_seen";
 // sessionStorage, not localStorage -- shown once per fresh app open, not
@@ -85,318 +85,10 @@ const MOOD_COLORS: Record<string, { glow: string; pulse: string; speed: string }
 
 const MOOD_KEYS = ["Calm", "Anxious", "Angry", "Numb", "Tired", "Hopeful", "Stuck"];
 
-// --- Personalized shape family artwork: fragments -> whole across the five
-// stages. Which family someone gets is decided invisibly by the model (see
-// assign_shape_family in lib/anthropic.ts) -- never shown as a quiz, never
-// announced. Geometry ported from the approved mockup.
+// --- Narrative depth, signaled invisibly by the model (see signal_depth in
+// lib/anthropic.ts). Drives the ambient glow color -- never shown as a
+// quiz, never announced.
 const STAGE_ORDER = ["mystery", "safety", "recognition", "courage", "return"] as const;
-type ShapeFamily = "tree" | "flame" | "river" | "constellation" | "mountain";
-
-type FamilyPath = { d: string; dx: number; dy: number; rot: number };
-type FamilyDot = { cx: number; cy: number; r: number };
-
-const SHAPE_FAMILIES: Record<
-  ShapeFamily,
-  { color: string; paths: FamilyPath[]; dots: FamilyDot[]; stageLines: string[] }
-> = {
-  tree: {
-    color: "#C99A5B",
-    paths: [
-      { d: "M150,270 L150,140", dx: -40, dy: 30, rot: -25 },
-      { d: "M150,140 Q110,110 95,70", dx: 35, dy: -25, rot: 20 },
-      { d: "M150,140 Q190,110 205,68", dx: -30, dy: 25, rot: -18 },
-      { d: "M150,175 Q110,165 80,190", dx: 25, dy: 20, rot: 15 },
-      { d: "M150,175 Q190,165 220,195", dx: -25, dy: -20, rot: -15 },
-      { d: "M150,205 Q125,200 105,220", dx: 20, dy: 15, rot: 10 },
-      { d: "M150,205 Q175,200 195,222", dx: -20, dy: -15, rot: -10 },
-    ],
-    dots: [
-      { cx: 95, cy: 70, r: 2.5 },
-      { cx: 205, cy: 68, r: 2.5 },
-      { cx: 80, cy: 190, r: 2 },
-      { cx: 220, cy: 195, r: 2 },
-    ],
-    stageLines: [
-      "Something unfinished, barely a line.",
-      "The fragments start finding each other.",
-      "The pattern appears — it was always a tree.",
-      "The branches reach further than before.",
-      "Whole — every fragment, one shape.",
-    ],
-  },
-  flame: {
-    color: "#D97A4A",
-    paths: [
-      { d: "M150,260 Q130,220 150,190", dx: 30, dy: 20, rot: 20 },
-      { d: "M150,260 Q170,220 150,190", dx: -30, dy: 20, rot: -20 },
-      { d: "M150,195 Q125,150 145,110", dx: 25, dy: -25, rot: 18 },
-      { d: "M150,195 Q175,150 155,110", dx: -25, dy: -25, rot: -18 },
-      { d: "M150,115 Q135,80 150,55", dx: 18, dy: -15, rot: 12 },
-      { d: "M150,115 Q165,80 150,55", dx: -18, dy: -15, rot: -12 },
-    ],
-    dots: [{ cx: 150, cy: 55, r: 3 }],
-    stageLines: [
-      "A flicker, easy to miss.",
-      "Catching, but still unsteady.",
-      "It knows now it's meant to burn.",
-      "Rising, no longer asking permission.",
-      "A fire that doesn't need feeding to stay lit.",
-    ],
-  },
-  river: {
-    color: "#5FA3A0",
-    paths: [
-      { d: "M40,90 Q80,70 100,95", dx: -20, dy: 20, rot: 10 },
-      { d: "M100,95 Q140,120 130,150", dx: 20, dy: -15, rot: -10 },
-      { d: "M130,150 Q160,175 150,200", dx: -15, dy: 15, rot: 8 },
-      { d: "M150,200 Q190,220 185,245", dx: 15, dy: -15, rot: -8 },
-      { d: "M185,245 Q220,255 260,250", dx: -10, dy: 10, rot: 6 },
-    ],
-    dots: [],
-    stageLines: [
-      "Water with nowhere agreed to go.",
-      "Finding a direction, still shallow.",
-      "The current knows its own shape now.",
-      "Moving fast, carving its own bank.",
-      "One continuous line, all the way to the sea.",
-    ],
-  },
-  constellation: {
-    color: "#B9AEDB",
-    paths: [
-      { d: "M70,70 L120,110", dx: 30, dy: -25, rot: 0 },
-      { d: "M120,110 L110,170", dx: -25, dy: 20, rot: 0 },
-      { d: "M110,170 L160,200", dx: 20, dy: -20, rot: 0 },
-      { d: "M160,200 L215,175", dx: -20, dy: 20, rot: 0 },
-      { d: "M215,175 L230,110", dx: 20, dy: -15, rot: 0 },
-      { d: "M230,110 L180,75", dx: -20, dy: 15, rot: 0 },
-      { d: "M180,75 L120,110", dx: 15, dy: -15, rot: 0 },
-    ],
-    dots: [
-      { cx: 70, cy: 70, r: 3 },
-      { cx: 120, cy: 110, r: 2.5 },
-      { cx: 110, cy: 170, r: 2.5 },
-      { cx: 160, cy: 200, r: 3 },
-      { cx: 215, cy: 175, r: 2.5 },
-      { cx: 230, cy: 110, r: 2.5 },
-      { cx: 180, cy: 75, r: 2.5 },
-    ],
-    stageLines: [
-      "Scattered light, no shape yet.",
-      "A few points start to relate.",
-      "You can almost trace the figure.",
-      "The shape is unmistakable now.",
-      "A full constellation — it was always there.",
-    ],
-  },
-  mountain: {
-    color: "#9C978C",
-    paths: [
-      { d: "M40,230 L110,110", dx: -20, dy: 25, rot: 8 },
-      { d: "M110,110 L150,160", dx: 15, dy: -20, rot: -6 },
-      { d: "M150,160 L190,90", dx: -15, dy: 20, rot: 6 },
-      { d: "M190,90 L260,230", dx: 15, dy: -20, rot: -6 },
-      { d: "M40,230 L260,230", dx: 0, dy: 20, rot: 0 },
-    ],
-    dots: [
-      { cx: 110, cy: 110, r: 2 },
-      { cx: 190, cy: 90, r: 2.5 },
-    ],
-    stageLines: [
-      "Loose stone, no ground yet.",
-      "Something is starting to hold weight.",
-      "The base is set — it isn't moving.",
-      "Rising higher than the fog.",
-      "A mountain. Unshaken, from any side.",
-    ],
-  },
-};
-
-function ShapeArt({
-  family,
-  stage,
-  size,
-  className,
-}: {
-  family: ShapeFamily;
-  stage: string;
-  size: number;
-  className?: string;
-}) {
-  const fam = SHAPE_FAMILIES[family];
-  const stageIdx = Math.max(0, STAGE_ORDER.indexOf(stage as (typeof STAGE_ORDER)[number]));
-  const progress = stageIdx / 4;
-
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 300 300"
-      xmlns="http://www.w3.org/2000/svg"
-      className={className}
-    >
-      {fam.paths.map((p, i) => (
-        <path
-          key={i}
-          d={p.d}
-          stroke={fam.color}
-          fill="none"
-          strokeWidth={1.6}
-          strokeLinecap="round"
-          className="shape-fragment"
-          opacity={0.35 + 0.6 * progress}
-          transform={`translate(${p.dx * (1 - progress)},${p.dy * (1 - progress)}) rotate(${
-            p.rot * (1 - progress)
-          } 150 150)`}
-        />
-      ))}
-      {fam.dots.map((d, i) => (
-        <circle
-          key={i}
-          cx={d.cx}
-          cy={d.cy}
-          r={d.r}
-          fill={fam.color}
-          className="shape-fragment"
-          opacity={0.3 + 0.6 * progress}
-        />
-      ))}
-    </svg>
-  );
-}
-
-// Renders the shape artwork (at the given stage progress) onto a portrait
-// keepsake card as SVG markup, background + brand + caption included, so
-// there's something worth saving/sharing rather than a bare icon on
-// transparent ground. Plain string building (not a React render pass)
-// since it also has to survive going through an <img> src and canvas.
-function buildKeepsakeSvg(
-  family: ShapeFamily,
-  stage: string,
-  caption: string,
-  brand: string
-): string {
-  const fam = SHAPE_FAMILIES[family];
-  const stageIdx = Math.max(0, STAGE_ORDER.indexOf(stage as (typeof STAGE_ORDER)[number]));
-  const progress = stageIdx / 4;
-  const W = 720;
-  const H = 900;
-  const artSize = 420;
-  const artX = (W - artSize) / 2;
-  const artY = 150;
-
-  const escape = (s: string) =>
-    s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-  const paths = fam.paths
-    .map((p) => {
-      const tx = p.dx * (1 - progress);
-      const ty = p.dy * (1 - progress);
-      const rot = p.rot * (1 - progress);
-      return `<path d="${p.d}" stroke="${fam.color}" fill="none" stroke-width="2.4" stroke-linecap="round" opacity="${0.35 + 0.6 * progress}" transform="translate(${tx},${ty}) rotate(${rot} 150 150)" />`;
-    })
-    .join("");
-  const dots = fam.dots
-    .map(
-      (d) =>
-        `<circle cx="${d.cx}" cy="${d.cy}" r="${d.r}" fill="${fam.color}" opacity="${0.3 + 0.6 * progress}" />`
-    )
-    .join("");
-
-  // Rough character-count word wrap -- good enough for an exported image,
-  // not trying to match real text metrics.
-  const words = caption.split(" ");
-  const lines: string[] = [];
-  let cur = "";
-  for (const w of words) {
-    const next = cur ? `${cur} ${w}` : w;
-    if (next.length > 34 && cur) {
-      lines.push(cur);
-      cur = w;
-    } else {
-      cur = next;
-    }
-  }
-  if (cur) lines.push(cur);
-  const captionTspans = lines
-    .map((line, idx) => `<tspan x="${W / 2}" dy="${idx === 0 ? 0 : 34}">${escape(line)}</tspan>`)
-    .join("");
-
-  return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
-    <rect width="${W}" height="${H}" fill="#14120f" />
-    <text x="${W / 2}" y="80" text-anchor="middle" font-family="Georgia, serif" font-style="italic" font-size="30" fill="#c99a5b" letter-spacing="1">${escape(brand)}</text>
-    <svg x="${artX}" y="${artY}" width="${artSize}" height="${artSize}" viewBox="0 0 300 300">${paths}${dots}</svg>
-    <text x="${W / 2}" y="${artY + artSize + 70}" text-anchor="middle" font-family="Georgia, serif" font-size="24" fill="#ede8de">${captionTspans}</text>
-  </svg>`;
-}
-
-// Rasterizes the keepsake SVG to a PNG blob via an offscreen <img> + canvas
-// (browser-only -- no server-side image lib in play).
-async function keepsakePngBlob(svgMarkup: string): Promise<Blob> {
-  const W = 720;
-  const H = 900;
-  const svgBlob = new Blob([svgMarkup], { type: "image/svg+xml;charset=utf-8" });
-  const url = URL.createObjectURL(svgBlob);
-  try {
-    const img = new Image();
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error("Could not render artwork."));
-      img.src = url;
-    });
-    const canvas = document.createElement("canvas");
-    canvas.width = W * 2;
-    canvas.height = H * 2;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) throw new Error("Canvas unavailable.");
-    ctx.scale(2, 2);
-    ctx.drawImage(img, 0, 0, W, H);
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/png"));
-    if (!blob) throw new Error("Could not export artwork.");
-    return blob;
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-
-// Shares the keepsake image via the native share sheet when available
-// (mainly mobile), otherwise falls back to a plain file download.
-async function saveOrShareArtwork(
-  family: ShapeFamily,
-  stage: string,
-  caption: string,
-  brand: string
-) {
-  const blob = await keepsakePngBlob(buildKeepsakeSvg(family, stage, caption, brand));
-  const filename = `just-you-${family}-${stage}.png`;
-
-  const nav = navigator as Navigator & {
-    share?: (data: ShareData) => Promise<void>;
-    canShare?: (data: ShareData) => boolean;
-  };
-  if (nav.share && nav.canShare) {
-    const file = new File([blob], filename, { type: "image/png" });
-    if (nav.canShare({ files: [file] })) {
-      try {
-        await nav.share({ files: [file], title: brand });
-        return;
-      } catch {
-        // User dismissed the share sheet -- leave it at that rather than
-        // also forcing a download.
-        return;
-      }
-    }
-  }
-
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
 
 // The threshold moment: a few seconds of near-black stillness with one
 // quiet line, on every app open (not just first-time) -- the very first
@@ -432,89 +124,6 @@ function ThresholdOverlay({ line, onDone }: { line: string; onDone: () => void }
       }}
     >
       <p className="threshold-line">{line}</p>
-    </div>
-  );
-}
-
-// The Return-stage reveal: happens once, for real, at the true end of
-// someone's journey. Fragments assemble fully, a beat of stillness, then
-// the line. Not something to casually replay -- see REVEAL_SHOWN_KEY.
-function RevealOverlay({
-  family,
-  label,
-  saveLabel,
-  onClose,
-}: {
-  family: ShapeFamily;
-  label: string;
-  saveLabel: string;
-  onClose: () => void;
-}) {
-  const fam = SHAPE_FAMILIES[family];
-  const total = fam.paths.length + fam.dots.length;
-  let i = 0;
-  const revealLine =
-    "You didn’t choose this shape. You just kept being honest, and this is what it became.";
-  const [saving, setSaving] = useState(false);
-
-  async function handleSave() {
-    setSaving(true);
-    try {
-      await saveOrShareArtwork(family, "return", revealLine, label);
-    } catch {
-      // Best-effort keepsake export -- silently drop failures rather than
-      // interrupting the reveal moment with an error state.
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div className="reveal-overlay">
-      <div className="reveal-eyebrow">{label}</div>
-      <div className="reveal-art">
-        <svg viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
-          {fam.paths.map((p, idx) => {
-            const delay = 0.5 + (i++ / total) * 1.6;
-            return (
-              <path
-                key={`p${idx}`}
-                d={p.d}
-                stroke={fam.color}
-                fill="none"
-                strokeWidth={1.7}
-                strokeLinecap="round"
-                className="reveal-fragment"
-                style={{ animationDelay: `${delay}s` }}
-              />
-            );
-          })}
-          {fam.dots.map((d, idx) => {
-            const delay = 0.5 + (i++ / total) * 1.6;
-            return (
-              <circle
-                key={`d${idx}`}
-                cx={d.cx}
-                cy={d.cy}
-                r={d.r}
-                fill={fam.color}
-                className="reveal-fragment"
-                style={{ animationDelay: `${delay}s` }}
-              />
-            );
-          })}
-        </svg>
-      </div>
-      <div className="reveal-word">Whole.</div>
-      <div className="reveal-line">{revealLine}</div>
-      <div className="reveal-actions">
-        <button className="reveal-save" onClick={handleSave} disabled={saving}>
-          {saving ? "…" : saveLabel}
-        </button>
-        <button className="reveal-continue" onClick={onClose}>
-          continue
-        </button>
-      </div>
     </div>
   );
 }
@@ -2070,10 +1679,11 @@ export default function Home() {
   const [stage, setStage] = useState<string | null>(null);
   const [alivenessInput, setAlivenessInput] = useState("");
   const [mirrorLine, setMirrorLine] = useState<string | null>(null);
-  const [shapeFamily, setShapeFamily] = useState<ShapeFamily | null>(null);
   const [branches, setBranches] = useState<string[]>([]);
-  const [showReveal, setShowReveal] = useState(false);
-  const [savingArtwork, setSavingArtwork] = useState(false);
+  const [showTree, setShowTree] = useState(false);
+  // No tagging yet (Stage 2) -- every node genuinely is unspoken so far,
+  // not a placeholder.
+  const [treeState] = useState<TreeState>({});
   const [showPatternReview, setShowPatternReview] = useState(false);
   const [patternReview, setPatternReview] = useState<string | null>(null);
   const [loadingPatternReview, setLoadingPatternReview] = useState(false);
@@ -2212,19 +1822,13 @@ export default function Home() {
         /* quiet failure — the mirror line is a nice-to-have, not core */
       });
 
-    // Restores the persistent artwork + ambient stage color on a fresh
-    // load, since assign_shape_family / signal_depth only fire once each
-    // and won't repeat themselves on a later visit to re-tell the client.
+    // Restores the ambient stage color on a fresh load, since signal_depth
+    // only fires once per stage and won't repeat itself on a later visit
+    // to re-tell the client.
     fetch(`/api/shape?userId=${encodeURIComponent(id)}`)
       .then((r) => r.json())
       .then((data) => {
-        if (data.family) setShapeFamily(data.family);
-        if (data.stage) {
-          setStage(data.stage);
-          if (data.stage === "return" && !localStorage.getItem(REVEAL_SHOWN_KEY)) {
-            setShowReveal(true);
-          }
-        }
+        if (data.stage) setStage(data.stage);
       })
       .catch(() => {
         /* quiet failure — the ambient state just starts fresh this visit */
@@ -2305,17 +1909,9 @@ export default function Home() {
         return [...next, { id: data.assistantMessageId, role: "assistant", content: data.reply }];
       });
       if (data.stage) setStage(data.stage);
-      if (data.shapeFamily) setShapeFamily(data.shapeFamily);
       if (Array.isArray(data.branches) && data.branches.length > 0) setBranches(data.branches);
       if (data.elementTally) setElementTally(data.elementTally);
       if (data.win) setWinCelebration(data.win);
-      if (
-        data.stage === "return" &&
-        typeof window !== "undefined" &&
-        !localStorage.getItem(REVEAL_SHOWN_KEY)
-      ) {
-        setShowReveal(true);
-      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -2341,7 +1937,7 @@ export default function Home() {
   // Hides the visible transcript and restores the full opening experience
   // (mood picker, aliveness question) -- the AI keeps the entire history
   // as context on every future turn regardless; only what's shown resets.
-  // Stage, shape-family, and commitments are untouched, by design.
+  // Stage, the Tree of Life, and commitments are untouched, by design.
   function startFresh() {
     // The highest real (server-confirmed) message id seen so far -- an
     // optimistically-appended message with no id yet can't be a boundary,
@@ -2390,32 +1986,6 @@ export default function Home() {
       if (res.ok) setEmailSaved(true);
     } catch {
       /* silent — this is a nice-to-have */
-    }
-  }
-
-  function closeReveal() {
-    try {
-      localStorage.setItem(REVEAL_SHOWN_KEY, "1");
-    } catch {
-      /* private browsing or storage disabled — still closes for this visit */
-    }
-    setShowReveal(false);
-  }
-
-  async function handleSaveArtwork() {
-    if (!shapeFamily) return;
-    const currentStage = stage || "mystery";
-    const caption =
-      SHAPE_FAMILIES[shapeFamily].stageLines[
-        Math.max(0, STAGE_ORDER.indexOf(currentStage as (typeof STAGE_ORDER)[number]))
-      ];
-    setSavingArtwork(true);
-    try {
-      await saveOrShareArtwork(shapeFamily, currentStage, caption, s.returnLabel);
-    } catch {
-      /* best-effort keepsake export — no error UI for a nice-to-have */
-    } finally {
-      setSavingArtwork(false);
     }
   }
 
@@ -2473,17 +2043,6 @@ export default function Home() {
     );
   }
 
-  if (showReveal && shapeFamily) {
-    return (
-      <RevealOverlay
-        family={shapeFamily}
-        label={s.returnLabel}
-        saveLabel={s.saveLabel}
-        onClose={closeReveal}
-      />
-    );
-  }
-
   if (showOnboarding) {
     const screens = getOnboardingScreens(lang);
     const o = ONBOARDING_STRINGS[lang] || ONBOARDING_STRINGS.en;
@@ -2534,16 +2093,10 @@ export default function Home() {
         }}
       />
 
-      {hasStarted ? (
+      {hasStarted && (
         <div className="element-orb-wrap" aria-hidden="true">
           <ElementOrb tally={elementTally} />
         </div>
-      ) : (
-        shapeFamily && (
-          <div className="ambient-art" aria-hidden="true">
-            <ShapeArt family={shapeFamily} stage={stage || "mystery"} size={420} />
-          </div>
-        )
       )}
 
       {showOrbIntro && hasStarted && (
@@ -2563,7 +2116,19 @@ export default function Home() {
           headline={`${avatarReveal.dominant.charAt(0).toUpperCase()}${avatarReveal.dominant.slice(1)} carried tonight — ${avatarReveal.dominantPct}%.`}
           reflection={avatarReveal.reflection}
           closeLabel="continue"
-          onClose={() => setAvatarReveal(null)}
+          onClose={() => {
+            setAvatarReveal(null);
+            setShowTree(true);
+          }}
+        />
+      )}
+
+      {showTree && (
+        <TreeOfLife
+          state={treeState}
+          eyebrowLabel={s.returnLabel}
+          closeLabel="close"
+          onClose={() => setShowTree(false)}
         />
       )}
 
@@ -2625,24 +2190,12 @@ export default function Home() {
 
       {showSettings && (
         <div className="settings-panel">
-          {shapeFamily && (
-            <div className="artwork-card">
-              <ShapeArt family={shapeFamily} stage={stage || "mystery"} size={96} />
-              <div className="artwork-caption">
-                {SHAPE_FAMILIES[shapeFamily].stageLines[
-                  Math.max(0, STAGE_ORDER.indexOf((stage || "mystery") as (typeof STAGE_ORDER)[number]))
-                ]}
-              </div>
-              <button
-                type="button"
-                className="artwork-save-btn"
-                onClick={handleSaveArtwork}
-                disabled={savingArtwork}
-              >
-                {savingArtwork ? "…" : s.saveLabel}
-              </button>
-            </div>
-          )}
+          <button type="button" className="tree-entry-btn" onClick={() => setShowTree(true)}>
+            <span>Your Tree</span>
+            <span className="tree-entry-btn-arrow" aria-hidden="true">
+              →
+            </span>
+          </button>
           {mirrorLine && (
             <div className="mirror-card">
               <div className="mirror-card-label">{s.returnLabel}</div>

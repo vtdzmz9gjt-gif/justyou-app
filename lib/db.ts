@@ -310,27 +310,6 @@ export async function getUserStage(userId: string): Promise<Stage | undefined> {
   return (rows[0] as { stage: Stage } | undefined)?.stage;
 }
 
-// --- Personalized shape family (Tree / Flame / River / Constellation / Mountain) ---
-// Quietly matched once, early on, from the feel of how someone expresses
-// themselves -- never a quiz, never announced. See lib/anthropic.ts's
-// assign_shape_family tool.
-
-export type ShapeFamily = "tree" | "flame" | "river" | "constellation" | "mountain";
-
-export async function getUserShape(userId: string): Promise<ShapeFamily | undefined> {
-  await ensureSchema();
-  const rows = await sql`SELECT family FROM user_shape WHERE user_id = ${userId}`;
-  return (rows[0] as { family: ShapeFamily } | undefined)?.family;
-}
-
-export async function setUserShape(userId: string, family: ShapeFamily) {
-  await ensureUser(userId);
-  await sql`
-    INSERT INTO user_shape (user_id, family) VALUES (${userId}, ${family})
-    ON CONFLICT (user_id) DO NOTHING
-  `;
-}
-
 // Real, current percentage of all users sitting at each stage right now —
 // not a fabricated or hardcoded number. Used only for the empathetic
 // "this is where most people are" framing, never for ranking one user
