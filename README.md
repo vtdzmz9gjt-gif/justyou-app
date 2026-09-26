@@ -78,3 +78,4 @@ under real "heavy" messages, and whether the follow-up loop's check-in
 feels like genuine care rather than a notification.
 
 
+
