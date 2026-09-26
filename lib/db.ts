@@ -143,6 +143,13 @@ function ensureSchema(): Promise<void> {
           revealed_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
       `;
+      // A person's own chosen time to talk, most days, plus the timezone
+      // their browser detected for them -- never asked as a hard rule, just
+      // so a future check-in nudge can land at a time that's actually
+      // theirs instead of an arbitrary fixed hour. Both nullable: most
+      // people won't set this, and the app works the same either way.
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_time TEXT`;
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS timezone TEXT`;
       // Elemental orb (Fire/Earth/Air/Water) -- per-session, tagged on the
       // person's own messages only, never the AI's reply. Nullable: most
       // messages (administrative, ambiguous, or the assistant's own turns)
@@ -202,10 +209,17 @@ export async function setUserEmail(userId: string, email: string) {
   await sql`UPDATE users SET email = ${email} WHERE id = ${userId}`;
 }
 
+export async function setUserSchedule(userId: string, preferredTime: string, timezone: string) {
+  await ensureUser(userId);
+  await sql`UPDATE users SET preferred_time = ${preferredTime}, timezone = ${timezone} WHERE id = ${userId}`;
+}
+
 export async function getUser(userId: string) {
   await ensureSchema();
   const rows = await sql`SELECT * FROM users WHERE id = ${userId}`;
-  return rows[0] as { id: string; email: string | null } | undefined;
+  return rows[0] as
+    | { id: string; email: string | null; preferred_time: string | null; timezone: string | null }
+    | undefined;
 }
 
 export async function getMessages(userId: string): Promise<StoredMessage[]> {

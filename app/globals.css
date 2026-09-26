@@ -167,7 +167,8 @@ body {
   flex: 1 1 260px;
 }
 
-.settings-panel input[type="email"] {
+.settings-panel input[type="email"],
+.settings-panel input[type="time"] {
   flex: 1;
   background: var(--surface-raised);
   border: 1px solid var(--border);
@@ -178,7 +179,8 @@ body {
   font-size: 0.85rem;
 }
 
-.settings-panel input[type="email"]:focus-visible {
+.settings-panel input[type="email"]:focus-visible,
+.settings-panel input[type="time"]:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
