@@ -111,6 +111,19 @@ function ensureSchema(): Promise<void> {
           PRIMARY KEY (user_id, edge)
         )
       `;
+      // One generated insight per person per tension pair, ever -- written
+      // once, then always reused rather than regenerated, so the wording
+      // stays stable and no pair costs more than one model call in a
+      // person's whole lifetime with the app.
+      await sql`
+        CREATE TABLE IF NOT EXISTS sephirah_pair_insights (
+          user_id TEXT NOT NULL,
+          pair TEXT NOT NULL,
+          insight TEXT NOT NULL,
+          generated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          PRIMARY KEY (user_id, pair)
+        )
+      `;
       // Elemental orb (Fire/Earth/Air/Water) -- per-session, tagged on the
       // person's own messages only, never the AI's reply. Nullable: most
       // messages (administrative, ambiguous, or the assistant's own turns)
@@ -532,4 +545,41 @@ export async function claimNewConnection(
     }
   }
   return null;
+}
+
+// The most recent substantive-or-deeper disclosures for one node -- used
+// as grounding material for a tension-pair insight, so the model has real
+// content to reflect from rather than just a node name.
+export async function getGroundedNotes(
+  userId: string,
+  node: SephirahKey,
+  limit = 6
+): Promise<string[]> {
+  await ensureSchema();
+  const rows = (await sql`
+    SELECT grounded_in FROM sephirah_tags
+    WHERE user_id = ${userId} AND node = ${node} AND weight != 'surface'
+    ORDER BY created_at DESC
+    LIMIT ${limit}
+  `) as unknown as { grounded_in: string }[];
+  return rows.map((r) => r.grounded_in);
+}
+
+export async function getStoredTensionInsight(
+  userId: string,
+  pair: string
+): Promise<string | undefined> {
+  await ensureSchema();
+  const rows = await sql`
+    SELECT insight FROM sephirah_pair_insights WHERE user_id = ${userId} AND pair = ${pair}
+  `;
+  return (rows[0] as { insight: string } | undefined)?.insight;
+}
+
+export async function saveTensionInsight(userId: string, pair: string, insight: string) {
+  await ensureUser(userId);
+  await sql`
+    INSERT INTO sephirah_pair_insights (user_id, pair, insight) VALUES (${userId}, ${pair}, ${insight})
+    ON CONFLICT (user_id, pair) DO NOTHING
+  `;
 }
