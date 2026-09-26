@@ -1684,6 +1684,7 @@ export default function Home() {
   const [showTree, setShowTree] = useState(false);
   const [treeState, setTreeState] = useState<TreeState>({});
   const [connectionToast, setConnectionToast] = useState<string | null>(null);
+  const [tensionInsights, setTensionInsights] = useState<{ pair: string; insight: string }[]>([]);
   const [showPatternReview, setShowPatternReview] = useState(false);
   const [patternReview, setPatternReview] = useState<string | null>(null);
   const [loadingPatternReview, setLoadingPatternReview] = useState(false);
@@ -1995,7 +1996,7 @@ export default function Home() {
   function openTree() {
     setShowTree(true);
     if (!userId) return;
-    fetch(`/api/tree?userId=${encodeURIComponent(userId)}`)
+    fetch(`/api/tree?userId=${encodeURIComponent(userId)}&lang=${encodeURIComponent(lang)}`)
       .then((r) => r.json())
       .then((data) => {
         if (data.state) setTreeState(data.state);
@@ -2009,6 +2010,7 @@ export default function Home() {
             window.setTimeout(() => setConnectionToast(null), 6000);
           }
         }
+        if (Array.isArray(data.tensionInsights)) setTensionInsights(data.tensionInsights);
       })
       .catch(() => {
         /* quiet failure — the Tree just shows what it already had */
@@ -2152,6 +2154,7 @@ export default function Home() {
       {showTree && (
         <TreeOfLife
           state={treeState}
+          tensionInsights={tensionInsights}
           eyebrowLabel={s.returnLabel}
           closeLabel="close"
           onClose={() => setShowTree(false)}

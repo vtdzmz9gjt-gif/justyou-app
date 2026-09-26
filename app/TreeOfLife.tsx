@@ -126,11 +126,13 @@ function NodeDetail({
 // tension-pair logic this component doesn't know about.
 export default function TreeOfLife({
   state,
+  tensionInsights,
   eyebrowLabel,
   closeLabel,
   onClose,
 }: {
   state: TreeState;
+  tensionInsights?: { pair: string; insight: string }[];
   eyebrowLabel: string;
   closeLabel: string;
   onClose: () => void;
@@ -199,6 +201,15 @@ export default function TreeOfLife({
             );
           })}
         </svg>
+        {tensionInsights && tensionInsights.length > 0 && (
+          <div className="tree-insights">
+            {tensionInsights.map((t) => (
+              <p key={t.pair} className="tree-insight">
+                {t.insight}
+              </p>
+            ))}
+          </div>
+        )}
         <p className="tree-hint">
           Dark points are things you haven&rsquo;t spoken yet — that&rsquo;s information too, not something
           missing. This carries across every conversation; the shape you just saw does not.

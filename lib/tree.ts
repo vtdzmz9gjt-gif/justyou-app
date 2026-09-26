@@ -73,3 +73,17 @@ export const EDGES: [SephirahKey, SephirahKey][] = [
   ["hod", "yesod"],
   ["yesod", "malkuth"],
 ];
+
+// The three structurally significant tensions worth naming when
+// lopsided -- not all pairs, just these.
+export const TENSION_PAIRS: { key: string; a: SephirahKey; b: SephirahKey }[] = [
+  { key: "chesed_gevurah", a: "chesed", b: "gevurah" },
+  { key: "netzach_hod", a: "netzach", b: "hod" },
+  { key: "chokhmah_binah", a: "chokhmah", b: "binah" },
+];
+
+export const TIER_RANK: Record<SephirahTier, number> = {
+  lightly_touched: 0,
+  returned_to: 1,
+  deeply_worked: 2,
+};

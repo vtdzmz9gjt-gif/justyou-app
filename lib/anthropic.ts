@@ -10,12 +10,15 @@ import {
   getUserStage,
   getStagePercentages,
   recordSephirahTag,
+  getGroundedNotes,
+  getStoredTensionInsight,
+  saveTensionInsight,
   type StoredMessage,
   type Stage,
   type Element,
   type SephirahWeight,
 } from "./db";
-import type { SephirahKey } from "@/lib/tree";
+import { NODES, TENSION_PAIRS, TIER_RANK, type SephirahKey, type TreeState } from "@/lib/tree";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
@@ -744,4 +747,97 @@ ${transcript}`;
     .map((b) => b.text)
     .join(" ")
     .trim();
+}
+
+// --- Tree of Life: tension-pair insight ---
+// Fresh generation grounded in real content, same principle as everything
+// else in this build -- no fixed phrase bank. Called at most once per
+// person per pair, ever; see getTensionInsights.
+async function generateTensionInsight(
+  engagedLabel: string,
+  quietLabel: string,
+  groundedNotes: string[],
+  uiLang?: string | null
+): Promise<string> {
+  const notes = groundedNotes.map((n) => `- ${n}`).join("\n");
+  const langLine =
+    uiLang && uiLang !== "en"
+      ? `Reply in the language this person has been using (UI language: "${uiLang}").`
+      : "Reply in English.";
+
+  const system = `You are the voice of Just You. Across real conversations, this person has substantively engaged with "${engagedLabel}" -- specifically:
+${notes}
+
+They have said little or nothing, by comparison, about its counterpart in the Tree of Life, "${quietLabel}".
+
+Write one or two short, direct sentences naming this specific imbalance -- grounded only in the actual pattern above, never inventing detail beyond it. Match the voice already established: direct, warm, a close friend who sees clearly, truth over comfort -- never therapy language, never a diagnosis or a label, no exclamation points. Direction only, not a template to copy: "You know how to push. You haven't learned how to accept a limit, and that's costing you something specific."
+
+${langLine}`;
+
+  const response = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 200,
+    system,
+    messages: [{ role: "user", content: "Name it." }],
+  });
+
+  return response.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join(" ")
+    .trim();
+}
+
+// Checks the three structurally significant pairs against the Tree's
+// current state. A pair only qualifies once one side is genuinely
+// "returned to" or deeper while the other is absent or only lightly
+// touched -- never from a single session, never from raw mention counts.
+// Once generated for a pair, the wording is permanent: this returns the
+// stored insight on every later call rather than asking the model again.
+export async function getTensionInsights(
+  userId: string,
+  state: TreeState,
+  uiLang?: string | null
+): Promise<{ pair: string; insight: string }[]> {
+  const results: { pair: string; insight: string }[] = [];
+  for (const p of TENSION_PAIRS) {
+    const existing = await getStoredTensionInsight(userId, p.key);
+    if (existing) {
+      results.push({ pair: p.key, insight: existing });
+      continue;
+    }
+
+    const aRank = state[p.a] ? TIER_RANK[state[p.a]!.tier] : -1;
+    const bRank = state[p.b] ? TIER_RANK[state[p.b]!.tier] : -1;
+
+    let engaged: SephirahKey | undefined;
+    let quiet: SephirahKey | undefined;
+    if (aRank >= 1 && bRank <= 0) {
+      engaged = p.a;
+      quiet = p.b;
+    } else if (bRank >= 1 && aRank <= 0) {
+      engaged = p.b;
+      quiet = p.a;
+    }
+    if (!engaged || !quiet) continue;
+
+    const notes = await getGroundedNotes(userId, engaged);
+    if (notes.length === 0) continue;
+
+    try {
+      const insight = await generateTensionInsight(
+        `${NODES[engaged].title} (${NODES[engaged].subtitle})`,
+        `${NODES[quiet].title} (${NODES[quiet].subtitle})`,
+        notes,
+        uiLang
+      );
+      if (insight) {
+        await saveTensionInsight(userId, p.key, insight);
+        results.push({ pair: p.key, insight });
+      }
+    } catch (err) {
+      console.error("generateTensionInsight error", err);
+    }
+  }
+  return results;
 }
