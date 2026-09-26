@@ -19,6 +19,12 @@
   --font-display: "Fraunces", "Iowan Old Style", "Palatino Linotype", serif;
   --font-body: "Karla", "Segoe UI", system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  /* Tells the browser this page only supports a dark appearance -- without
+     it, the elastic overscroll bounce on iOS/Android (and native form
+     control chrome) defaults to white, since html has no background of
+     its own below. */
+  color-scheme: dark;
 }
 
 * {
@@ -28,6 +34,10 @@
 html,
 body {
   height: 100%;
+}
+
+html {
+  background: var(--bg);
 }
 
 body {
