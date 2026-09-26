@@ -247,6 +247,7 @@ export interface ChatResult {
   branches?: string[];
   element?: Element;
   committed?: boolean;
+  win?: { action: string; reflection: string };
 }
 
 export async function runChat(
@@ -278,6 +279,7 @@ export async function runChat(
   let newStage: Stage | undefined;
   let newShape: ShapeFamily | undefined;
   let newBranches: string[] | undefined;
+  let newWin: { action: string; reflection: string } | undefined;
   let committed = false;
 
   // Tool-use loop: the model may call record_commitment / resolve_open_commitment /
@@ -306,6 +308,7 @@ export async function runChat(
         branches: newBranches,
         element: await elementPromise,
         committed,
+        win: newWin,
       };
     }
 
@@ -325,8 +328,16 @@ export async function runChat(
           });
         } else if (call.name === "resolve_open_commitment") {
           const input = call.input as { outcome: "landed" | "tried" | "not_landed" };
-          await resolveCommitment(userId, input.outcome);
+          const resolved = await resolveCommitment(userId, input.outcome);
           const landedCount = await countLandedCommitments(userId);
+          if (input.outcome === "landed" && resolved) {
+            const reflection = await generateWinReflection(
+              resolved.action,
+              [...history, { role: "user", content: userMessage }] as StoredMessage[],
+              uiLang
+            );
+            newWin = { action: resolved.action, reflection };
+          }
           toolResults.push({
             type: "tool_result",
             tool_use_id: call.id,
@@ -388,6 +399,7 @@ export async function runChat(
           branches: newBranches,
           element: await elementPromise,
           committed,
+          win: newWin,
         };
     }
   }
@@ -399,6 +411,7 @@ export async function runChat(
     branches: newBranches,
     element: await elementPromise,
     committed,
+    win: newWin,
   };
 }
 
@@ -537,6 +550,86 @@ ${transcript}`;
     max_tokens: 300,
     system,
     messages: [{ role: "user", content: "Give the reflection." }],
+  });
+
+  return response.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join(" ")
+    .trim();
+}
+
+// --- Weekly wins recap ---
+// Shown once a week, client-triggered (their own browser clock, Sunday
+// 7pm local) -- a short line tying the week's landed commitments together,
+// grounded only in the actions themselves (no raw conversation content,
+// same boundary as the mirror line).
+export async function generateWeeklyRecapLine(
+  wins: { action: string }[],
+  uiLang?: string | null
+): Promise<string> {
+  const list = wins.map((w) => `- ${w.action}`).join("\n");
+
+  const langLine =
+    uiLang && uiLang !== "en"
+      ? `Reply in the language this conversation is mostly in (UI language: "${uiLang}").`
+      : "Reply in English.";
+
+  const system = `You are the voice of Just You, closing out a week of real follow-through. Write ONE short sentence, under 25 words, marking the pattern across this week's actual wins below -- specific to what they did, not generic motivation ("Keep it up!", "Amazing week!"). Match the voice already established: direct, warm, a close friend who sees clearly.
+
+${langLine}
+
+This week's landed commitments:
+${list}`;
+
+  const response = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 150,
+    system,
+    messages: [{ role: "user", content: "Write the line." }],
+  });
+
+  return response.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join(" ")
+    .trim();
+}
+
+// --- Win celebration ---
+// Fires the moment resolve_open_commitment lands with outcome "landed" --
+// an actual accomplishment, not a passive reflection like the pattern
+// review or mirror line. Grounded in the specific action and whatever
+// they just said about how it went, never generic praise.
+export async function generateWinReflection(
+  action: string,
+  recentMessages: { role: "user" | "assistant"; content: string }[],
+  uiLang?: string | null
+): Promise<string> {
+  const transcript = recentMessages
+    .slice(-12)
+    .map((m) => `${m.role === "user" ? "Them" : "You"}: ${m.content}`)
+    .join("\n");
+
+  const langLine =
+    uiLang && uiLang !== "en"
+      ? `Reply in the language this conversation is mostly in (UI language: "${uiLang}").`
+      : "Reply in English unless the conversation below is clearly in another language.";
+
+  const system = `You are the voice of Just You. Someone just told you they actually followed through on a real commitment: "${action}".
+
+Write 1-2 short sentences marking it -- specific to what they actually said about how it went (a detail, a timing, something that shows this was real and not just checked off), never generic congratulations ("Great job!", "Way to go!", "Amazing!"). Match the voice already established: direct, warm, a close friend who sees clearly -- never cheerleader-y, never therapy language, no exclamation points unless one is genuinely earned.
+
+${langLine}
+
+Recent conversation:
+${transcript}`;
+
+  const response = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 200,
+    system,
+    messages: [{ role: "user", content: "Mark it." }],
   });
 
   return response.content

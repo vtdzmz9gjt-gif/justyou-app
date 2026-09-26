@@ -9,6 +9,8 @@ import {
   type KeyboardEvent,
 } from "react";
 import dynamic from "next/dynamic";
+import WinCelebration from "./WinCelebration";
+import WeeklyRecap from "./WeeklyRecap";
 
 // three.js needs a real canvas/WebGL context -- both client-only, no SSR.
 const ElementOrb = dynamic(() => import("./ElementOrb"), { ssr: false });
@@ -54,6 +56,12 @@ const LAST_COMMITMENT_SEEN_KEY = "the_return_last_commitment_seen";
 // count-based value from before this just gets ignored as "show
 // everything," which is a safe default, not a broken one.
 const VISIBLE_FROM_KEY = "the_return_visible_from_id";
+// The ISO timestamp of the most recent Sunday-7pm-local boundary the
+// weekly recap has already been shown for -- computed fresh from the
+// visitor's own browser clock every time (see weeklyRecapBoundary below),
+// never stored server-side, so it's always correct for their actual
+// timezone with no setup.
+const WEEKLY_RECAP_SHOWN_KEY = "the_return_weekly_recap_shown";
 
 // --- Stage colors, matching the arc discussed for the ambient background ---
 const STAGE_COLORS: Record<string, { glow: string; pulse: string }> = {
@@ -571,6 +579,8 @@ type Strings = {
   // Not yet translated for every language -- falls back to English, see
   // ORB_INTRO_FALLBACK below.
   orbIntroLine?: string;
+  winHeadline?: string;
+  weeklyRecapHeadline?: string;
 };
 
 const ALIVENESS_FALLBACK = {
@@ -602,6 +612,14 @@ const START_FRESH_FALLBACK = {
 
 const ORB_INTRO_FALLBACK = {
   orbIntroLine: "Every true thing you say shapes this. By the end, you'll see the shape.",
+};
+
+const WIN_FALLBACK = {
+  winHeadline: "You did it.",
+};
+
+const WEEKLY_RECAP_FALLBACK = {
+  weeklyRecapHeadline: "This week.",
 };
 
 const STRINGS: Record<string, Strings> = {
@@ -637,6 +655,8 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLandedLabel: "Last time: {action} — and you did it.",
     startFreshLabel: "start fresh",
     orbIntroLine: "Every true thing you say shapes this. By the end, you'll see the shape.",
+    winHeadline: "You did it.",
+    weeklyRecapHeadline: "This week.",
   },
   es: {
     brand: "Just You",
@@ -664,6 +684,8 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLandedLabel: "La última vez: {action} — y lo hiciste.",
     startFreshLabel: "empezar de nuevo",
     orbIntroLine: "Cada cosa verdadera que digas le da forma a esto. Al final, verás la forma.",
+    winHeadline: "Lo lograste.",
+    weeklyRecapHeadline: "Esta semana.",
   },
   fr: {
     brand: "Just You",
@@ -691,6 +713,8 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLandedLabel: "La dernière fois : {action} — et tu l'as fait.",
     startFreshLabel: "recommencer",
     orbIntroLine: "Chaque chose vraie que tu dis façonne ceci. À la fin, tu verras la forme.",
+    winHeadline: "Tu l'as fait.",
+    weeklyRecapHeadline: "Cette semaine.",
   },
   de: {
     brand: "Just You",
@@ -718,6 +742,8 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLandedLabel: "Letztes Mal: {action} — und du hast es geschafft.",
     startFreshLabel: "neu anfangen",
     orbIntroLine: "Jede wahre Sache, die du sagst, formt das hier. Am Ende siehst du die Form.",
+    winHeadline: "Du hast es geschafft.",
+    weeklyRecapHeadline: "Diese Woche.",
   },
   pt: {
     brand: "Just You",
@@ -745,6 +771,8 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLandedLabel: "Da última vez: {action} — e você fez isso.",
     startFreshLabel: "recomeçar",
     orbIntroLine: "Cada coisa verdadeira que você diz molda isso. No final, você verá a forma.",
+    winHeadline: "Você conseguiu.",
+    weeklyRecapHeadline: "Esta semana.",
   },
   it: {
     brand: "Just You",
@@ -772,6 +800,8 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLandedLabel: "L'ultima volta: {action} — e l'hai fatto.",
     startFreshLabel: "ricomincia",
     orbIntroLine: "Ogni cosa vera che dici dà forma a questo. Alla fine, vedrai la forma.",
+    winHeadline: "Ce l'hai fatta.",
+    weeklyRecapHeadline: "Questa settimana.",
   },
   he: {
     brand: "Just You",
@@ -798,6 +828,8 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLandedLabel: "בפעם הקודמת: {action} — ועשית את זה.",
     startFreshLabel: "להתחיל מחדש",
     orbIntroLine: "כל דבר אמיתי שאתה אומר מעצב את זה. בסוף, תראה את הצורה.",
+    winHeadline: "עשית את זה.",
+    weeklyRecapHeadline: "השבוע.",
   },
   ar: {
     brand: "Just You",
@@ -824,6 +856,8 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLandedLabel: "آخر مرة: {action} — وقد فعلتها.",
     startFreshLabel: "ابدأ من جديد",
     orbIntroLine: "كل شيء حقيقي تقوله يشكّل هذا. في النهاية، سترى الشكل.",
+    winHeadline: "لقد فعلتها.",
+    weeklyRecapHeadline: "هذا الأسبوع.",
   },
   hi: {
     brand: "Just You",
@@ -851,6 +885,8 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLandedLabel: "पिछली बार: {action} — और तुमने कर दिखाया।",
     startFreshLabel: "नई शुरुआत करें",
     orbIntroLine: "तुम जो भी सच कहते हो, वह इसे आकार देता है। अंत में, तुम आकार देख लोगे।",
+    winHeadline: "तुमने कर दिखाया।",
+    weeklyRecapHeadline: "इस हफ्ते।",
   },
   zh: {
     brand: "Just You",
@@ -877,6 +913,8 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLandedLabel: "上次：{action}——你做到了。",
     startFreshLabel: "重新开始",
     orbIntroLine: "你说的每一句真话都在塑造这个。到最后，你会看到它的形状。",
+    winHeadline: "你做到了。",
+    weeklyRecapHeadline: "这一周。",
   },
   ja: {
     brand: "Just You",
@@ -904,6 +942,8 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLandedLabel: "前回：{action} — そして、やり遂げました。",
     startFreshLabel: "最初からやり直す",
     orbIntroLine: "あなたが語るすべての真実が、これを形作ります。最後には、その形が見えるでしょう。",
+    winHeadline: "やり遂げた。",
+    weeklyRecapHeadline: "今週。",
   },
   ru: {
     brand: "Just You",
@@ -931,6 +971,8 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLandedLabel: "В прошлый раз: {action} — и ты это сделал.",
     startFreshLabel: "начать заново",
     orbIntroLine: "Каждая правда, которую ты говоришь, формирует это. В конце ты увидишь форму.",
+    winHeadline: "Ты сделал это.",
+    weeklyRecapHeadline: "На этой неделе.",
   },
   sq: {
     brand: "Just You",
@@ -957,6 +999,8 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLandedLabel: "Herën e fundit: {action} — dhe e bëre.",
     startFreshLabel: "fillo nga e para",
     orbIntroLine: "Çdo gjë e vërtetë që thua e formon këtë. Në fund, do ta shohësh formën.",
+    winHeadline: "E bëre.",
+    weeklyRecapHeadline: "Këtë javë.",
   },
   el: {
     brand: "Just You",
@@ -984,6 +1028,8 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLandedLabel: "Την τελευταία φορά: {action} — και το έκανες.",
     startFreshLabel: "ξεκίνα από την αρχή",
     orbIntroLine: "Κάθε αληθινό πράγμα που λες, το διαμορφώνει αυτό. Στο τέλος, θα δεις τη μορφή.",
+    winHeadline: "Το έκανες.",
+    weeklyRecapHeadline: "Αυτή την εβδομάδα.",
   },
   hy: {
     brand: "Just You",
@@ -1011,6 +1057,8 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLandedLabel: "Վերջին անգամ․ {action} — և դու արեցիր դա։",
     startFreshLabel: "սկսել նորից",
     orbIntroLine: "Ամեն ճշմարիտ բան, որ ասում ես, ձևավորում է սա։ Վերջում կտեսնես ձևը։",
+    winHeadline: "Դու արեցիր դա։",
+    weeklyRecapHeadline: "Այս շաբաթ։",
   },
   sr: {
     brand: "Just You",
@@ -1038,6 +1086,8 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLandedLabel: "Prošli put: {action} — i uspeo si.",
     startFreshLabel: "počni ispočetka",
     orbIntroLine: "Svaka istinita stvar koju kažeš oblikuje ovo. Na kraju ćeš videti oblik.",
+    winHeadline: "Uspeo si.",
+    weeklyRecapHeadline: "Ove nedelje.",
   },
   hr: {
     brand: "Just You",
@@ -1065,6 +1115,8 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLandedLabel: "Prošli put: {action} — i uspio si.",
     startFreshLabel: "počni ispočetka",
     orbIntroLine: "Svaka istinita stvar koju kažeš oblikuje ovo. Na kraju ćeš vidjeti oblik.",
+    winHeadline: "Uspio si.",
+    weeklyRecapHeadline: "Ovaj tjedan.",
   },
   bs: {
     brand: "Just You",
@@ -1092,6 +1144,8 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLandedLabel: "Prošli put: {action} — i uspio si.",
     startFreshLabel: "počni ispočetka",
     orbIntroLine: "Svaka istinita stvar koju kažeš oblikuje ovo. Na kraju ćeš vidjeti oblik.",
+    winHeadline: "Uspio si.",
+    weeklyRecapHeadline: "Ove sedmice.",
   },
   bg: {
     brand: "Just You",
@@ -1119,6 +1173,8 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLandedLabel: "Последния път: {action} — и го направи.",
     startFreshLabel: "започни отначало",
     orbIntroLine: "Всяко истинско нещо, което казваш, оформя това. В края ще видиш формата.",
+    winHeadline: "Успя.",
+    weeklyRecapHeadline: "Тази седмица.",
   },
   mk: {
     brand: "Just You",
@@ -1146,6 +1202,8 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLandedLabel: "Минатиот пат: {action} — и го направи тоа.",
     startFreshLabel: "почни одново",
     orbIntroLine: "Секое вистинско нешто што го кажуваш ја обликува ова. На крајот, ќе ја видиш формата.",
+    winHeadline: "Успеа.",
+    weeklyRecapHeadline: "Оваа недела.",
   },
   ro: {
     brand: "Just You",
@@ -1173,6 +1231,8 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLandedLabel: "Data trecută: {action} — și ai făcut-o.",
     startFreshLabel: "ia-o de la capăt",
     orbIntroLine: "Fiecare lucru adevărat pe care îl spui dă formă acestui lucru. La final, vei vedea forma.",
+    winHeadline: "Ai reușit.",
+    weeklyRecapHeadline: "Săptămâna aceasta.",
   },
   sl: {
     brand: "Just You",
@@ -1200,6 +1260,8 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLandedLabel: "Zadnjič: {action} — in si to naredil.",
     startFreshLabel: "začni znova",
     orbIntroLine: "Vsaka resnična stvar, ki jo poveš, oblikuje to. Na koncu boš videl obliko.",
+    winHeadline: "Uspelo ti je.",
+    weeklyRecapHeadline: "Ta teden.",
   },
 };
 
@@ -1959,6 +2021,19 @@ function getUserId(): string {
   return id;
 }
 
+// The most recent Sunday 7pm in the visitor's own local time that has
+// already passed -- entirely from their browser's clock, so it's exactly
+// right for their real timezone without storing or asking for one.
+function lastWeeklyRecapBoundary(now: Date): Date {
+  const boundary = new Date(now);
+  boundary.setHours(19, 0, 0, 0);
+  boundary.setDate(boundary.getDate() - boundary.getDay());
+  if (boundary > now) {
+    boundary.setDate(boundary.getDate() - 7);
+  }
+  return boundary;
+}
+
 export default function Home() {
   const [lang, setLang] = useState("en");
   const [showThreshold, setShowThreshold] = useState(true);
@@ -1983,6 +2058,13 @@ export default function Home() {
   // card -- the avatar is a second page after "your pattern," not something
   // that pops up on top of it.
   const [pendingAvatarReveal, setPendingAvatarReveal] = useState<AvatarRevealData | null>(null);
+  const [winCelebration, setWinCelebration] = useState<{ action: string; reflection: string } | null>(
+    null
+  );
+  const [weeklyRecap, setWeeklyRecap] = useState<{
+    wins: { action: string }[];
+    summary: string | null;
+  } | null>(null);
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
   const [depth, setDepth] = useState<Depth | null>(null);
   const [stage, setStage] = useState<string | null>(null);
@@ -2063,6 +2145,32 @@ export default function Home() {
 
     const id = getUserId();
     setUserId(id);
+
+    try {
+      const recapBoundary = lastWeeklyRecapBoundary(new Date());
+      if (localStorage.getItem(WEEKLY_RECAP_SHOWN_KEY) !== recapBoundary.toISOString()) {
+        const since = new Date(recapBoundary);
+        since.setDate(since.getDate() - 7);
+        fetch(
+          `/api/weekly-recap?userId=${encodeURIComponent(id)}&since=${encodeURIComponent(
+            since.toISOString()
+          )}&lang=${encodeURIComponent(detected)}`
+        )
+          .then((r) => r.json())
+          .then((data) => {
+            if (Array.isArray(data.wins) && data.wins.length > 0) {
+              setWeeklyRecap({ wins: data.wins, summary: data.summary ?? null });
+            }
+            localStorage.setItem(WEEKLY_RECAP_SHOWN_KEY, recapBoundary.toISOString());
+          })
+          .catch(() => {
+            /* fine — retries next time they open the app */
+          });
+      }
+    } catch {
+      /* private browsing or storage disabled -- weekly recap just won't show */
+    }
+
     fetch(`/api/chat?userId=${encodeURIComponent(id)}&sinceMessageId=${boundary}`)
       .then((r) => r.json())
       .then((data) => {
@@ -2200,6 +2308,7 @@ export default function Home() {
       if (data.shapeFamily) setShapeFamily(data.shapeFamily);
       if (Array.isArray(data.branches) && data.branches.length > 0) setBranches(data.branches);
       if (data.elementTally) setElementTally(data.elementTally);
+      if (data.win) setWinCelebration(data.win);
       if (
         data.stage === "return" &&
         typeof window !== "undefined" &&
@@ -2255,6 +2364,7 @@ export default function Home() {
     setElementTally(EMPTY_TALLY);
     setAvatarReveal(null);
     setPendingAvatarReveal(null);
+    setWinCelebration(null);
     setShowSettings(false);
     const questions = (STRINGS[lang] || STRINGS.en).questions;
     setOpeningQuestion(questions[Math.floor(Math.random() * questions.length)]);
@@ -2454,6 +2564,27 @@ export default function Home() {
           reflection={avatarReveal.reflection}
           closeLabel="continue"
           onClose={() => setAvatarReveal(null)}
+        />
+      )}
+
+      {winCelebration && (
+        <WinCelebration
+          eyebrowLabel={s.returnLabel}
+          headline={s.winHeadline || WIN_FALLBACK.winHeadline}
+          reflection={winCelebration.reflection}
+          closeLabel="continue"
+          onClose={() => setWinCelebration(null)}
+        />
+      )}
+
+      {weeklyRecap && (
+        <WeeklyRecap
+          eyebrowLabel={s.returnLabel}
+          headline={s.weeklyRecapHeadline || WEEKLY_RECAP_FALLBACK.weeklyRecapHeadline}
+          summary={weeklyRecap.summary}
+          wins={weeklyRecap.wins}
+          closeLabel="close"
+          onClose={() => setWeeklyRecap(null)}
         />
       )}
 
