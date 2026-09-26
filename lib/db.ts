@@ -1,5 +1,12 @@
 import { neon } from "@neondatabase/serverless";
-import { EDGES, type SephirahKey, type SephirahState, type TreeState } from "@/lib/tree";
+import {
+  EDGES,
+  TENSION_PAIRS,
+  TIER_RANK,
+  type SephirahKey,
+  type SephirahState,
+  type TreeState,
+} from "@/lib/tree";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -122,6 +129,18 @@ function ensureSchema(): Promise<void> {
           insight TEXT NOT NULL,
           generated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
           PRIMARY KEY (user_id, pair)
+        )
+      `;
+      // Da'at, the hidden eleventh point -- one row the first (and only
+      // the first) time it's earned, so the client knows to play its slow
+      // fade-in only once and just show it plainly on every later visit.
+      // The qualification itself (>=2 of 3 tension pairs both "returned
+      // to" or deeper) is never stored -- always recomputed from the
+      // sephirah_tags history, same as every other tier in this system.
+      await sql`
+        CREATE TABLE IF NOT EXISTS daat_reveals (
+          user_id TEXT PRIMARY KEY,
+          revealed_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
       `;
       // Elemental orb (Fire/Earth/Air/Water) -- per-session, tagged on the
@@ -582,4 +601,38 @@ export async function saveTensionInsight(userId: string, pair: string, insight: 
     INSERT INTO sephirah_pair_insights (user_id, pair, insight) VALUES (${userId}, ${pair}, ${insight})
     ON CONFLICT (user_id, pair) DO NOTHING
   `;
+}
+
+// Da'at earns itself once at least two of the three tension pairs have
+// both sides at "returned to" or deeper -- never a tap count, and never
+// something a person can see coming: no partial progress is exposed
+// anywhere. "justNow" tells the client whether this is the first time
+// it's ever been claimed (play the slow fade-in) or it's already been
+// seen before (just show it, no animation).
+export async function claimDaatReveal(
+  userId: string,
+  state: TreeState
+): Promise<{ revealed: boolean; justNow: boolean }> {
+  await ensureSchema();
+  const resolvedPairs = TENSION_PAIRS.filter((p) => {
+    const a = state[p.a];
+    const b = state[p.b];
+    return a && b && TIER_RANK[a.tier] >= TIER_RANK.returned_to && TIER_RANK[b.tier] >= TIER_RANK.returned_to;
+  }).length;
+
+  if (resolvedPairs < 2) {
+    return { revealed: false, justNow: false };
+  }
+
+  const existing = await sql`SELECT 1 FROM daat_reveals WHERE user_id = ${userId}`;
+  if (existing.length > 0) {
+    return { revealed: true, justNow: false };
+  }
+
+  await ensureUser(userId);
+  await sql`
+    INSERT INTO daat_reveals (user_id) VALUES (${userId})
+    ON CONFLICT (user_id) DO NOTHING
+  `;
+  return { revealed: true, justNow: true };
 }

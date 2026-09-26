@@ -5,6 +5,7 @@ import {
   NODE_ORDER,
   NODES,
   EDGES,
+  DAAT_POSITION,
   type SephirahKey,
   type SephirahTier,
   type SephirahState,
@@ -79,6 +80,42 @@ const TIER_DEPTH: Record<SephirahTier, number> = {
   deeply_worked: 1,
 };
 
+// Da'at's own fixed content -- never shown as progress, never named
+// anywhere in the UI. It explains itself when tapped; it doesn't need a
+// title.
+const DAAT_WISDOM = {
+  essence:
+    "Not a tenth thing you have to be. It's the point where two things you thought were opposites turn out to be the same motion — usually only visible once you've actually lived both sides of a tension, not just picked one.",
+  shadow:
+    "Mistaking it for a destination — something to reach and hold, instead of something that appears and passes.",
+  next: "Nothing to do here. This one shows up on its own, when it's actually earned — not on request.",
+};
+
+function DaatDetail({ onClose, closeLabel }: { onClose: () => void; closeLabel: string }) {
+  return (
+    <div className="tree-detail-overlay" onClick={onClose}>
+      <div className="tree-detail-card" onClick={(e) => e.stopPropagation()}>
+        <p className="tree-detail-name">&middot;</p>
+        <div className="tree-detail-block">
+          <p className="tree-detail-label">Essence</p>
+          <p className="tree-detail-text">{DAAT_WISDOM.essence}</p>
+        </div>
+        <div className="tree-detail-block">
+          <p className="tree-detail-label">Shadow</p>
+          <p className="tree-detail-text">{DAAT_WISDOM.shadow}</p>
+        </div>
+        <div className="tree-detail-block">
+          <p className="tree-detail-label">Next step</p>
+          <p className="tree-detail-text">{DAAT_WISDOM.next}</p>
+        </div>
+        <button type="button" className="tree-detail-close" onClick={onClose}>
+          {closeLabel}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function NodeDetail({
   sephirah,
   state,
@@ -127,17 +164,20 @@ function NodeDetail({
 export default function TreeOfLife({
   state,
   tensionInsights,
+  daat,
   eyebrowLabel,
   closeLabel,
   onClose,
 }: {
   state: TreeState;
   tensionInsights?: { pair: string; insight: string }[];
+  daat?: { revealed: boolean; justNow: boolean };
   eyebrowLabel: string;
   closeLabel: string;
   onClose: () => void;
 }) {
   const [openNode, setOpenNode] = useState<SephirahKey | null>(null);
+  const [daatOpen, setDaatOpen] = useState(false);
 
   return (
     <div className="tree-overlay">
@@ -200,6 +240,29 @@ export default function TreeOfLife({
               </g>
             );
           })}
+          {daat?.revealed && (
+            <g className={daat.justNow ? "daat-point daat-point-reveal" : "daat-point"}>
+              <circle
+                cx={DAAT_POSITION.x}
+                cy={DAAT_POSITION.y}
+                r={5}
+                className="daat-point-dot"
+                fill="none"
+                stroke="var(--accent)"
+                strokeWidth={1}
+                strokeDasharray="2 2.5"
+                strokeOpacity={0.85}
+              />
+              <circle
+                cx={DAAT_POSITION.x}
+                cy={DAAT_POSITION.y}
+                r={14}
+                fill="transparent"
+                className="daat-point-hit"
+                onClick={() => setDaatOpen(true)}
+              />
+            </g>
+          )}
         </svg>
         {tensionInsights && tensionInsights.length > 0 && (
           <div className="tree-insights">
@@ -226,6 +289,7 @@ export default function TreeOfLife({
           closeLabel={closeLabel}
         />
       )}
+      {daatOpen && <DaatDetail onClose={() => setDaatOpen(false)} closeLabel={closeLabel} />}
     </div>
   );
 }

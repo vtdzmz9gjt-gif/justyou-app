@@ -1685,6 +1685,10 @@ export default function Home() {
   const [treeState, setTreeState] = useState<TreeState>({});
   const [connectionToast, setConnectionToast] = useState<string | null>(null);
   const [tensionInsights, setTensionInsights] = useState<{ pair: string; insight: string }[]>([]);
+  const [daat, setDaat] = useState<{ revealed: boolean; justNow: boolean }>({
+    revealed: false,
+    justNow: false,
+  });
   const [showPatternReview, setShowPatternReview] = useState(false);
   const [patternReview, setPatternReview] = useState<string | null>(null);
   const [loadingPatternReview, setLoadingPatternReview] = useState(false);
@@ -2011,6 +2015,7 @@ export default function Home() {
           }
         }
         if (Array.isArray(data.tensionInsights)) setTensionInsights(data.tensionInsights);
+        if (data.daat) setDaat(data.daat);
       })
       .catch(() => {
         /* quiet failure — the Tree just shows what it already had */
@@ -2155,6 +2160,7 @@ export default function Home() {
         <TreeOfLife
           state={treeState}
           tensionInsights={tensionInsights}
+          daat={daat}
           eyebrowLabel={s.returnLabel}
           closeLabel="close"
           onClose={() => setShowTree(false)}
