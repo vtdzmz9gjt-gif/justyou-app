@@ -9,10 +9,13 @@ import {
   setUserStage,
   getUserStage,
   getStagePercentages,
+  recordSephirahTag,
   type StoredMessage,
   type Stage,
   type Element,
+  type SephirahWeight,
 } from "./db";
+import type { SephirahKey } from "@/app/TreeOfLife";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
@@ -156,6 +159,127 @@ async function tagElement(userMessage: string): Promise<Element | undefined> {
   }
 }
 
+// Same shape as tag_element -- its own forced, single-purpose call, not a
+// tool competing for attention in the main loop. Judges ONE message
+// against the ten sephirot. The tier (lightly touched / returned to /
+// deeply worked) is never decided here -- that's derived later from the
+// whole tag history in lib/db.ts's getTreeState. This call only judges
+// how substantial THIS ONE disclosure is, on its own.
+const SEPHIRAH_TAG_TOOL: Anthropic.Tool = {
+  name: "tag_sephirah",
+  description:
+    "Classify whether this message genuinely reveals something real about one specific sephirah, and how substantial that single disclosure is.",
+  input_schema: {
+    type: "object",
+    properties: {
+      node: {
+        type: "string",
+        enum: [
+          "keter",
+          "chokhmah",
+          "binah",
+          "chesed",
+          "gevurah",
+          "tiferet",
+          "netzach",
+          "hod",
+          "yesod",
+          "malkuth",
+          "none",
+        ],
+      },
+      weight: {
+        type: "string",
+        enum: ["surface", "substantive", "confronted"],
+        description: "Ignored when node is \"none\".",
+      },
+      grounded_in: {
+        type: "string",
+        description:
+          "One short sentence paraphrasing exactly what in the message justifies this node and weight. Ignored when node is \"none\".",
+      },
+    },
+    required: ["node"],
+  },
+};
+
+const SEPHIRAH_TAG_SYSTEM = `You're judging a single message from someone in a reflective conversation app against the ten sephirot of the Tree of Life. Most messages genuinely reveal nothing about any of them -- use "none" freely; this should be your answer on most turns. Only pick a node when the message actually discloses something real about how this person operates, not because a topic was merely mentioned.
+
+The ten nodes:
+- keter: their deepest why -- purpose beneath every other purpose.
+- chokhmah: raw force, drive, the paternal influence, what starts things in them.
+- binah: depth, understanding, containment, the maternal influence.
+- chesed: generosity -- how and why they give to others.
+- gevurah: restraint, discipline, boundaries -- what they hold in check.
+- tiferet: the balance point -- who they are underneath, their core self.
+- netzach: endurance, ambition, the will that keeps pushing.
+- hod: humility, self-doubt, real limits -- what actually holds them back.
+- yesod: daily habits and patterns -- the ground they stand on, often without noticing.
+- malkuth: the real world -- what they actually did, not what they planned or felt.
+
+If more than one node seems to fit, pick the single best one -- never tag more than one node per message.
+
+Once you've picked a node (not "none"), judge how substantial this ONE disclosure is, on its own:
+- surface: stated as fact, no visible cost to saying it -- could have been said to a stranger.
+- substantive: specific and personal, real stakes or vulnerability, genuine new information about how they operate.
+- confronted: the language itself shows resistance or a shift while saying it -- hedging then pushing through, retracting or reframing their own prior self-description, catching themselves mid-thought. This is about friction visible IN THE WORDS, not about how the message is delivered.
+
+Tone is not a signal. Humor, self-deprecation, and casualness are common, ordinary ways real friction gets voiced -- plenty of people confront something true about themselves while laughing, not just while being solemn. Do not downgrade a message to "surface" or "substantive" just because it's delivered lightly, and do not treat a joke as automatic evidence of "confronted" either. Judge weight only by what's actually admitted and whether the sentence itself contains resistance, retraction, or reframing -- never by how heavy or light it sounds.
+
+A comfortable, well-worn self-label ("that's just classic me") is a signal AGAINST "confronted" even when what's being named is real and specific -- it reads as an already-settled story, not a live realization. Reserve "confronted" for a visible pivot: catching an excuse, contradicting how they'd usually put it, admitting something that undercuts their own prior framing.
+
+Call tag_sephirah with your single best answer. When node is "none", you can omit weight and grounded_in.`;
+
+// Same parallel, non-blocking shape as tagElement -- fired alongside the
+// whole conversational loop, awaited only at the return points.
+async function tagSephirah(
+  userMessage: string
+): Promise<{ node: SephirahKey; weight: SephirahWeight; groundedIn: string } | undefined> {
+  try {
+    const response = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 200,
+      system: SEPHIRAH_TAG_SYSTEM,
+      tools: [SEPHIRAH_TAG_TOOL],
+      tool_choice: { type: "tool", name: "tag_sephirah" },
+      messages: [{ role: "user", content: `Judge this message:\n\n"${userMessage}"` }],
+    });
+    const call = response.content.find(
+      (b): b is Anthropic.ToolUseBlock => b.type === "tool_use" && b.name === "tag_sephirah"
+    );
+    const input = call?.input as
+      | { node?: string; weight?: string; grounded_in?: string }
+      | undefined;
+    const node = input?.node;
+    if (
+      node === "keter" ||
+      node === "chokhmah" ||
+      node === "binah" ||
+      node === "chesed" ||
+      node === "gevurah" ||
+      node === "tiferet" ||
+      node === "netzach" ||
+      node === "hod" ||
+      node === "yesod" ||
+      node === "malkuth"
+    ) {
+      const weight = input?.weight;
+      const groundedIn = input?.grounded_in;
+      if (
+        (weight === "surface" || weight === "substantive" || weight === "confronted") &&
+        typeof groundedIn === "string" &&
+        groundedIn.trim()
+      ) {
+        return { node, weight, groundedIn: groundedIn.trim() };
+      }
+    }
+    return undefined;
+  } catch (err) {
+    console.error("tagSephirah error", err);
+    return undefined;
+  }
+}
+
 function todayContext(): string {
   const today = new Date().toISOString().slice(0, 10);
   return `Today's date is ${today}.`;
@@ -220,8 +344,27 @@ export interface ChatResult {
   stage?: Stage;
   branches?: string[];
   element?: Element;
+  sephirah?: SephirahKey;
   committed?: boolean;
   win?: { action: string; reflection: string };
+}
+
+// Awaits the classification and, if it named a real node, writes it --
+// same fire-now/await-later shape as elementPromise, just with a DB
+// write folded in once the judgment lands. Logged, not thrown, on
+// failure: a missed tag should never break the actual reply.
+async function resolveSephirahTag(
+  userId: string,
+  promise: ReturnType<typeof tagSephirah>
+): Promise<SephirahKey | undefined> {
+  const tag = await promise;
+  if (!tag) return undefined;
+  try {
+    await recordSephirahTag(userId, tag.node, tag.weight, tag.groundedIn);
+  } catch (err) {
+    console.error("recordSephirahTag error", err);
+  }
+  return tag.node;
 }
 
 export async function runChat(
@@ -235,6 +378,7 @@ export async function runChat(
   // Fired now, awaited later -- runs alongside the whole conversational
   // loop below rather than adding its own sequential round-trip.
   const elementPromise = tagElement(userMessage);
+  const sephirahPromise = resolveSephirahTag(userId, tagSephirah(userMessage));
 
   const [openCommitment, stageInfo] = await Promise.all([
     openCommitmentContext(userId),
@@ -278,6 +422,7 @@ export async function runChat(
         stage: newStage,
         branches: newBranches,
         element: await elementPromise,
+        sephirah: await sephirahPromise,
         committed,
         win: newWin,
       };
@@ -359,6 +504,7 @@ export async function runChat(
           stage: newStage,
           branches: newBranches,
           element: await elementPromise,
+          sephirah: await sephirahPromise,
           committed,
           win: newWin,
         };
@@ -370,6 +516,7 @@ export async function runChat(
     stage: newStage,
     branches: newBranches,
     element: await elementPromise,
+    sephirah: await sephirahPromise,
     committed,
     win: newWin,
   };

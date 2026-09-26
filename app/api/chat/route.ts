@@ -53,6 +53,7 @@ export async function POST(req: NextRequest) {
     stage?: string;
     branches?: string[];
     element?: Element;
+    sephirah?: string;
     committed?: boolean;
     win?: { action: string; reflection: string };
   };
@@ -66,7 +67,9 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  console.log(`[chat] userId=${userId} element=${result.element ?? "none"}`);
+  console.log(
+    `[chat] userId=${userId} element=${result.element ?? "none"} sephirah=${result.sephirah ?? "none"}`
+  );
 
   const userMessageId = await addMessage(userId, "user", message.trim(), result.element);
   const assistantMessageId = await addMessage(userId, "assistant", result.reply);

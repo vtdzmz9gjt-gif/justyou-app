@@ -1,4 +1,5 @@
 import { neon } from "@neondatabase/serverless";
+import type { SephirahKey, SephirahState, TreeState } from "@/app/TreeOfLife";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -81,6 +82,24 @@ function ensureSchema(): Promise<void> {
           generated_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
       `;
+      // Tree of Life -- append-only, one row per genuine disclosure the AI
+      // judged as belonging to a sephirah. The tier (lightly touched /
+      // returned to / deeply worked) is always derived by reading this
+      // history, never stored as a counter, so it can't drift.
+      await sql`
+        CREATE TABLE IF NOT EXISTS sephirah_tags (
+          id SERIAL PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          node TEXT NOT NULL CHECK (node IN (
+            'keter','chokhmah','binah','chesed','gevurah',
+            'tiferet','netzach','hod','yesod','malkuth'
+          )),
+          weight TEXT NOT NULL CHECK (weight IN ('surface','substantive','confronted')),
+          grounded_in TEXT NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `;
+      await sql`CREATE INDEX IF NOT EXISTS sephirah_tags_user_idx ON sephirah_tags (user_id)`;
       // Elemental orb (Fire/Earth/Air/Water) -- per-session, tagged on the
       // person's own messages only, never the AI's reply. Nullable: most
       // messages (administrative, ambiguous, or the assistant's own turns)
@@ -409,4 +428,62 @@ export async function getSignals(): Promise<Signals> {
     returningUsers: Number(returningRows[0].count),
     commitmentOutcomes,
   };
+}
+
+// --- Tree of Life -----------------------------------------------------
+// Judged by tag_sephirah in lib/anthropic.ts, one row per genuine
+// disclosure. Never a quiz, never announced. See TreeOfLife.tsx for the
+// node/tier types this shares.
+
+export type SephirahWeight = "surface" | "substantive" | "confronted";
+
+export async function recordSephirahTag(
+  userId: string,
+  node: SephirahKey,
+  weight: SephirahWeight,
+  groundedIn: string
+) {
+  await ensureUser(userId);
+  await sql`
+    INSERT INTO sephirah_tags (user_id, node, weight, grounded_in)
+    VALUES (${userId}, ${node}, ${weight}, ${groundedIn})
+  `;
+}
+
+// Tier is always derived from the full tag history, never a stored
+// counter -- lightly touched needs only one tag; returned to needs
+// substantive-or-deeper tags on 2+ distinct calendar days (not 2+
+// mentions in one sitting); deeply worked additionally needs at least
+// one "confronted" tag anywhere in that history.
+export async function getTreeState(userId: string): Promise<TreeState> {
+  await ensureSchema();
+  const rows = (await sql`
+    SELECT node, weight, grounded_in, created_at::date as day
+    FROM sephirah_tags
+    WHERE user_id = ${userId}
+    ORDER BY created_at ASC
+  `) as unknown as { node: SephirahKey; weight: SephirahWeight; grounded_in: string; day: string }[];
+
+  const byNode = new Map<SephirahKey, typeof rows>();
+  for (const row of rows) {
+    const list = byNode.get(row.node) ?? [];
+    list.push(row);
+    byNode.set(row.node, list);
+  }
+
+  const state: TreeState = {};
+  for (const [node, tags] of byNode) {
+    const substantiveOrDeeper = tags.filter((t) => t.weight !== "surface");
+    const distinctDays = new Set(substantiveOrDeeper.map((t) => t.day));
+    const hasConfronted = tags.some((t) => t.weight === "confronted");
+
+    let tier: SephirahState["tier"] = "lightly_touched";
+    if (distinctDays.size >= 2) {
+      tier = hasConfronted ? "deeply_worked" : "returned_to";
+    }
+
+    const latest = tags[tags.length - 1];
+    state[node] = { tier, groundedIn: latest.grounded_in };
+  }
+  return state;
 }
