@@ -160,9 +160,11 @@ export default function FamilyConstellation({
       <div className="tree-card">
         <p className="tree-heading">Where it comes from</p>
         <svg viewBox="0 0 310 300" className="tree-svg" aria-hidden="true">
+          {/* Once broken, the ancestral trace-line is gone -- the pattern
+              no longer needs to be explained by where it came from. */}
           {THEME_ORDER.map((theme) => {
             const s = state[theme];
-            if (!s || !s.tracesTo) return null;
+            if (!s || !s.tracesTo || s.broken) return null;
             const anchor = s.tracesTo === "father" ? FATHER_POSITION : MOTHER_POSITION;
             const node = THEMES[theme];
             return (
@@ -192,9 +194,9 @@ export default function FamilyConstellation({
                 x2={node.x}
                 y2={node.y}
                 className="tree-path"
-                stroke="var(--accent)"
-                strokeOpacity={0.85}
-                strokeWidth={1.4}
+                stroke={s.broken ? "#e8b83c" : "var(--accent)"}
+                strokeOpacity={s.broken ? 1 : 0.85}
+                strokeWidth={s.broken ? 1.8 : 1.4}
               />
             );
           })}

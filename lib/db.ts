@@ -162,6 +162,11 @@ function ensureSchema(): Promise<void> {
         )
       `;
       await sql`CREATE INDEX IF NOT EXISTS family_pattern_tags_user_idx ON family_pattern_tags (user_id)`;
+      // The "pattern broken" milestone -- judged by the same
+      // tag_family_pattern call, on the same row, not a separate tool or
+      // table. Defaults false: most disclosures are recognition, not a
+      // reported instance of actually acting differently.
+      await sql`ALTER TABLE family_pattern_tags ADD COLUMN IF NOT EXISTS pattern_broken_instance BOOLEAN NOT NULL DEFAULT false`;
       // "Your pattern" -- a personal, AI-generated reflection shown in a
       // node/theme's detail panel, grounded in the full accumulated tag
       // history for it (shared shape for both the Tree and Family
@@ -634,19 +639,20 @@ export async function recordFamilyPatternTag(
   theme: FamilyTheme,
   weight: SephirahWeight,
   tracesTo: FamilyLine,
-  groundedIn: string
+  groundedIn: string,
+  patternBrokenInstance = false
 ) {
   await ensureUser(userId);
   await sql`
-    INSERT INTO family_pattern_tags (user_id, theme, weight, traces_to, grounded_in)
-    VALUES (${userId}, ${theme}, ${weight}, ${tracesTo}, ${groundedIn})
+    INSERT INTO family_pattern_tags (user_id, theme, weight, traces_to, grounded_in, pattern_broken_instance)
+    VALUES (${userId}, ${theme}, ${weight}, ${tracesTo}, ${groundedIn}, ${patternBrokenInstance})
   `;
 }
 
 export async function getFamilyState(userId: string): Promise<FamilyState> {
   await ensureSchema();
   const rows = (await sql`
-    SELECT theme, weight, traces_to, grounded_in, created_at::date as day
+    SELECT theme, weight, traces_to, grounded_in, pattern_broken_instance, created_at::date as day
     FROM family_pattern_tags
     WHERE user_id = ${userId}
     ORDER BY created_at ASC
@@ -655,6 +661,7 @@ export async function getFamilyState(userId: string): Promise<FamilyState> {
     weight: SephirahWeight;
     traces_to: FamilyLine;
     grounded_in: string;
+    pattern_broken_instance: boolean;
     day: string;
   }[];
 
@@ -669,7 +676,12 @@ export async function getFamilyState(userId: string): Promise<FamilyState> {
   for (const [theme, tags] of byTheme) {
     const tier = deriveTier(tags);
     const latest = tags[tags.length - 1];
-    state[theme] = { tier, groundedIn: latest.grounded_in, tracesTo: latest.traces_to };
+    // The milestone -- 2+ distinct calendar days with a genuine reported
+    // instance, same anti-gaming shape as "returned to". One dramatic
+    // report alone never qualifies.
+    const brokenDays = new Set(tags.filter((t) => t.pattern_broken_instance).map((t) => t.day));
+    const broken = brokenDays.size >= 2;
+    state[theme] = { tier, groundedIn: latest.grounded_in, tracesTo: latest.traces_to, broken };
   }
   return state;
 }

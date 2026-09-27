@@ -12,7 +12,17 @@ export type FamilyLine = "father" | "mother";
 // null/absent tracesTo = disclosed but the AI hasn't yet judged which
 // ancestral line it traces to -- shouldn't normally happen (tag_family_pattern
 // judges both at once) but kept optional rather than assumed.
-export type FamilyPatternState = { tier: SephirahTier; groundedIn?: string; tracesTo?: FamilyLine };
+//
+// broken = the long-term milestone: 2+ distinct calendar days where a
+// concrete, unambiguous instance of acting differently than the
+// inherited pattern was reported -- not just recognized. Absent/false
+// means either untouched or not yet earned; there's no in-between state.
+export type FamilyPatternState = {
+  tier: SephirahTier;
+  groundedIn?: string;
+  tracesTo?: FamilyLine;
+  broken?: boolean;
+};
 export type FamilyState = Partial<Record<FamilyTheme, FamilyPatternState>>;
 
 export const THEME_ORDER: FamilyTheme[] = ["money", "love", "work_life", "body"];
