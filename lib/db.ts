@@ -150,6 +150,11 @@ function ensureSchema(): Promise<void> {
       // people won't set this, and the app works the same either way.
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS preferred_time TEXT`;
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS timezone TEXT`;
+      // The local calendar date (in the person's own timezone) a check-in
+      // nudge last went out -- the only guard against sending the same
+      // nudge more than once while the cron's 20-minute match window keeps
+      // being true across several 15-minute runs.
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_checkin_sent_date DATE`;
       // Elemental orb (Fire/Earth/Air/Water) -- per-session, tagged on the
       // person's own messages only, never the AI's reply. Nullable: most
       // messages (administrative, ambiguous, or the assistant's own turns)
@@ -365,6 +370,36 @@ export async function getDueReminders(): Promise<(Commitment & { email: string }
 export async function markReminderSent(commitmentId: number) {
   await ensureSchema();
   await sql`UPDATE commitments SET reminder_sent = 1 WHERE id = ${commitmentId}`;
+}
+
+// People whose own chosen check-in time (in their own timezone) is right
+// now, per this run of the cron -- a 20-minute window against a cron that
+// fires every 15 minutes, so a run landing a few minutes late still
+// catches everyone. last_checkin_sent_date is the only thing stopping the
+// same person being nudged again on a later run inside that same window,
+// or again later the same day.
+//
+// Known limitation, not worth solving for now: a preferred time in the
+// last ~20 minutes before local midnight won't match, since the window
+// math doesn't wrap across a day boundary. Affects only people who
+// specifically chose a time that late.
+export async function getDueCheckIns(): Promise<{ id: string; email: string; local_date: string }[]> {
+  await ensureSchema();
+  const rows = await sql`
+    SELECT id, email, (now() AT TIME ZONE timezone)::date::text AS local_date
+    FROM users
+    WHERE email IS NOT NULL
+      AND preferred_time IS NOT NULL
+      AND timezone IS NOT NULL
+      AND (now() AT TIME ZONE timezone)::time >= preferred_time::time
+      AND (now() AT TIME ZONE timezone)::time < (preferred_time::time + INTERVAL '20 minutes')
+      AND (last_checkin_sent_date IS DISTINCT FROM (now() AT TIME ZONE timezone)::date)
+  `;
+  return rows as unknown as { id: string; email: string; local_date: string }[];
+}
+
+export async function markCheckInSent(userId: string, localDate: string) {
+  await sql`UPDATE users SET last_checkin_sent_date = ${localDate} WHERE id = ${userId}`;
 }
 
 // --- Stage tracking (Mystery / Safety / Recognition / Courage / Return) ---
