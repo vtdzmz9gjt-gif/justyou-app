@@ -242,6 +242,21 @@ const CHECKIN_FALLBACK = {
     "When's usually a good time for you? I'll check in warmly around then — never a hard rule, just less random than a stranger's guess.",
 };
 
+// A plain dropdown list of half-hour slots, rather than a native <input
+// type="time"> -- that native picker is unreliable across browsers (some
+// show a value while still failing the browser's own "field is empty"
+// validation), while a <select> just works everywhere. Value is always
+// 24h "HH:MM" to match the server's expected format; label is a friendly
+// 12h string.
+const CHECKIN_TIME_OPTIONS: { value: string; label: string }[] = Array.from({ length: 48 }, (_, i) => {
+  const hour24 = Math.floor(i / 2);
+  const minute = i % 2 === 0 ? "00" : "30";
+  const value = `${String(hour24).padStart(2, "0")}:${minute}`;
+  const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12;
+  const period = hour24 < 12 ? "AM" : "PM";
+  return { value, label: `${hour12}:${minute} ${period}` };
+});
+
 const STRINGS: Record<string, Strings> = {
   en: {
     brand: "Just You",
@@ -2292,12 +2307,20 @@ export default function Home() {
             <span className="settings-status">{s.savedLabel}</span>
           ) : (
             <form onSubmit={saveCheckIn}>
-              <input
-                type="time"
+              <select
                 value={checkInTime}
                 onChange={(e) => setCheckInTime(e.target.value)}
                 required
-              />
+              >
+                <option value="" disabled>
+                  Choose a time
+                </option>
+                {CHECKIN_TIME_OPTIONS.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
               <button type="submit">{s.saveLabel}</button>
             </form>
           )}

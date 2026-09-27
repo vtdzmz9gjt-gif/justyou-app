@@ -168,7 +168,7 @@ body {
 }
 
 .settings-panel input[type="email"],
-.settings-panel input[type="time"] {
+.settings-panel select {
   flex: 1;
   background: var(--surface-raised);
   border: 1px solid var(--border);
@@ -180,7 +180,7 @@ body {
 }
 
 .settings-panel input[type="email"]:focus-visible,
-.settings-panel input[type="time"]:focus-visible {
+.settings-panel select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
