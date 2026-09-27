@@ -7,6 +7,7 @@ import {
   type SephirahState,
   type TreeState,
 } from "@/lib/tree";
+import type { FamilyTheme, FamilyLine, FamilyState } from "@/lib/family";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -143,6 +144,22 @@ function ensureSchema(): Promise<void> {
           revealed_at TIMESTAMPTZ NOT NULL DEFAULT now()
         )
       `;
+      // Family Constellation -- append-only, one row per genuine disclosure
+      // the AI judged as tracing a real pattern to a specific parent. Same
+      // tiering shape as sephirah_tags (tier always derived by reading this
+      // history), plus traces_to, which sephirah_tags has no equivalent of.
+      await sql`
+        CREATE TABLE IF NOT EXISTS family_pattern_tags (
+          id SERIAL PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          theme TEXT NOT NULL CHECK (theme IN ('money','love','work_life','body')),
+          weight TEXT NOT NULL CHECK (weight IN ('surface','substantive','confronted')),
+          traces_to TEXT NOT NULL CHECK (traces_to IN ('father','mother')),
+          grounded_in TEXT NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `;
+      await sql`CREATE INDEX IF NOT EXISTS family_pattern_tags_user_idx ON family_pattern_tags (user_id)`;
       // A person's own chosen time to talk, most days, plus the timezone
       // their browser detected for them -- never asked as a hard rule, just
       // so a future check-in nudge can land at a time that's actually
@@ -576,6 +593,64 @@ export async function getTreeState(userId: string): Promise<TreeState> {
 
     const latest = tags[tags.length - 1];
     state[node] = { tier, groundedIn: latest.grounded_in };
+  }
+  return state;
+}
+
+// --- Family Constellation -----------------------------------------------
+// Judged by tag_family_pattern in lib/anthropic.ts, one row per genuine
+// disclosure that actually traced to a specific parent. Same tiering
+// shape and rules as the Tree of Life above -- see getTreeState.
+
+export async function recordFamilyPatternTag(
+  userId: string,
+  theme: FamilyTheme,
+  weight: SephirahWeight,
+  tracesTo: FamilyLine,
+  groundedIn: string
+) {
+  await ensureUser(userId);
+  await sql`
+    INSERT INTO family_pattern_tags (user_id, theme, weight, traces_to, grounded_in)
+    VALUES (${userId}, ${theme}, ${weight}, ${tracesTo}, ${groundedIn})
+  `;
+}
+
+export async function getFamilyState(userId: string): Promise<FamilyState> {
+  await ensureSchema();
+  const rows = (await sql`
+    SELECT theme, weight, traces_to, grounded_in, created_at::date as day
+    FROM family_pattern_tags
+    WHERE user_id = ${userId}
+    ORDER BY created_at ASC
+  `) as unknown as {
+    theme: FamilyTheme;
+    weight: SephirahWeight;
+    traces_to: FamilyLine;
+    grounded_in: string;
+    day: string;
+  }[];
+
+  const byTheme = new Map<FamilyTheme, typeof rows>();
+  for (const row of rows) {
+    const list = byTheme.get(row.theme) ?? [];
+    list.push(row);
+    byTheme.set(row.theme, list);
+  }
+
+  const state: FamilyState = {};
+  for (const [theme, tags] of byTheme) {
+    const substantiveOrDeeper = tags.filter((t) => t.weight !== "surface");
+    const distinctDays = new Set(substantiveOrDeeper.map((t) => t.day));
+    const hasConfronted = tags.some((t) => t.weight === "confronted");
+
+    let tier: "lightly_touched" | "returned_to" | "deeply_worked" = "lightly_touched";
+    if (distinctDays.size >= 2) {
+      tier = hasConfronted ? "deeply_worked" : "returned_to";
+    }
+
+    const latest = tags[tags.length - 1];
+    state[theme] = { tier, groundedIn: latest.grounded_in, tracesTo: latest.traces_to };
   }
   return state;
 }

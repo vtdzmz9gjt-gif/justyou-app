@@ -2071,6 +2071,14 @@ export default function Home() {
       .catch(() => {
         /* quiet failure — the Tree just shows what it already had */
       });
+    fetch(`/api/family?userId=${encodeURIComponent(userId)}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.state) setFamilyState(data.state);
+      })
+      .catch(() => {
+        /* quiet failure — Family Constellation just shows what it already had */
+      });
   }
 
   async function handlePatternReview() {
