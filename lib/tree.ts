@@ -36,14 +36,21 @@ export const NODE_ORDER: SephirahKey[] = [
   "malkuth",
 ];
 
+// Chokhmah/Binah are labeled "Drive"/"Depth" rather than the traditional
+// "Father-line"/"Mother-line" -- they still represent the same archetypal
+// masculine/feminine energies, just not a literally-your-parents framing,
+// which is reserved for the separate Family Constellation system (a real
+// Father/Mother pair there). Netzach's subtitle moved from "Drive" to
+// "Endurance" (matching its own essence text) to free up "Drive" for
+// Chokhmah without a collision between the two systems.
 export const NODES: Record<SephirahKey, { title: string; subtitle: string; x: number; y: number }> = {
   keter: { title: "Keter", subtitle: "Crown", x: 150, y: 28 },
-  chokhmah: { title: "Chokhmah", subtitle: "Father-line", x: 224, y: 78 },
-  binah: { title: "Binah", subtitle: "Mother-line", x: 76, y: 78 },
+  chokhmah: { title: "Chokhmah", subtitle: "Drive", x: 224, y: 78 },
+  binah: { title: "Binah", subtitle: "Depth", x: 76, y: 78 },
   chesed: { title: "Chesed", subtitle: "Giving", x: 224, y: 168 },
   gevurah: { title: "Gevurah", subtitle: "Boundaries", x: 76, y: 168 },
   tiferet: { title: "Tiferet", subtitle: "Self", x: 150, y: 210 },
-  netzach: { title: "Netzach", subtitle: "Drive", x: 224, y: 268 },
+  netzach: { title: "Netzach", subtitle: "Endurance", x: 224, y: 268 },
   hod: { title: "Hod", subtitle: "Self-doubt", x: 76, y: 268 },
   yesod: { title: "Yesod", subtitle: "Foundation", x: 150, y: 320 },
   malkuth: { title: "Malkuth", subtitle: "Real world", x: 150, y: 385 },
