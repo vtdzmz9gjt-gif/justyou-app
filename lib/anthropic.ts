@@ -241,6 +241,8 @@ Tone is not a signal. Humor, self-deprecation, and casualness are common, ordina
 
 A comfortable, well-worn self-label ("that's just classic me") is a signal AGAINST "confronted" even when what's being named is real and specific -- it reads as an already-settled story, not a live realization. Reserve "confronted" for a visible pivot: catching an excuse, contradicting how they'd usually put it, admitting something that undercuts their own prior framing.
 
+This judgment is independent of whatever tag_family_pattern decides on the same message. A real internal-structure disclosure belongs here even when no family-origin connection was found or confirmed in the same conversation, and the reverse is equally true -- neither tool's answer should influence the other's.
+
 Call tag_sephirah with your single best answer. When node is "none", you can omit weight and grounded_in.`;
 
 // Same forced, single-purpose, parallel shape as SEPHIRAH_TAG_TOOL. Judges
@@ -291,6 +293,8 @@ Only pick a theme when BOTH of these are true from what was actually said:
 2. That pattern is actually connected, in the person's own words, to a specific parent -- something they modeled, taught, or passed down, stated or clearly implied by what's actually said.
 
 If a real pattern is disclosed but nothing connects it to a specific parent, do NOT guess which line it's from -- use "none". A pattern with no stated ancestral connection isn't this system's material, even if it's genuinely something real about the person (it may belong to a different part of this app instead -- not your concern here).
+
+The same applies when the conversation explicitly explored a family-origin angle and the person denied it or didn't confirm it ("my parents were pretty steady, actually") -- that's a real, informative answer, not a prompt to guess anyway. Use "none" here even when a different, unrelated pattern lands well elsewhere in the same conversation -- a lens that was tried and came up empty is never tagged just because another lens succeeded.
 
 The four themes:
 - money: their relationship to money -- scarcity, safety, proof, what it means to have or not have it.
