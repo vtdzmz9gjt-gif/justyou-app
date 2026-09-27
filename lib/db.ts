@@ -3,8 +3,10 @@ import {
   EDGES,
   TENSION_PAIRS,
   TIER_RANK,
+  deriveTier,
   type SephirahKey,
   type SephirahState,
+  type SephirahWeight,
   type TreeState,
 } from "@/lib/tree";
 import type { FamilyTheme, FamilyLine, FamilyState } from "@/lib/family";
@@ -544,7 +546,7 @@ export async function getSignals(): Promise<Signals> {
 // disclosure. Never a quiz, never announced. See TreeOfLife.tsx for the
 // node/tier types this shares.
 
-export type SephirahWeight = "surface" | "substantive" | "confronted";
+export type { SephirahWeight };
 
 export async function recordSephirahTag(
   userId: string,
@@ -560,10 +562,8 @@ export async function recordSephirahTag(
 }
 
 // Tier is always derived from the full tag history, never a stored
-// counter -- lightly touched needs only one tag; returned to needs
-// substantive-or-deeper tags on 2+ distinct calendar days (not 2+
-// mentions in one sitting); deeply worked additionally needs at least
-// one "confronted" tag anywhere in that history.
+// counter -- see lib/tree.ts's deriveTier for the actual rule, shared
+// with Family Constellation's getFamilyState below.
 export async function getTreeState(userId: string): Promise<TreeState> {
   await ensureSchema();
   const rows = (await sql`
@@ -582,15 +582,7 @@ export async function getTreeState(userId: string): Promise<TreeState> {
 
   const state: TreeState = {};
   for (const [node, tags] of byNode) {
-    const substantiveOrDeeper = tags.filter((t) => t.weight !== "surface");
-    const distinctDays = new Set(substantiveOrDeeper.map((t) => t.day));
-    const hasConfronted = tags.some((t) => t.weight === "confronted");
-
-    let tier: SephirahState["tier"] = "lightly_touched";
-    if (distinctDays.size >= 2) {
-      tier = hasConfronted ? "deeply_worked" : "returned_to";
-    }
-
+    const tier: SephirahState["tier"] = deriveTier(tags);
     const latest = tags[tags.length - 1];
     state[node] = { tier, groundedIn: latest.grounded_in };
   }
@@ -640,15 +632,7 @@ export async function getFamilyState(userId: string): Promise<FamilyState> {
 
   const state: FamilyState = {};
   for (const [theme, tags] of byTheme) {
-    const substantiveOrDeeper = tags.filter((t) => t.weight !== "surface");
-    const distinctDays = new Set(substantiveOrDeeper.map((t) => t.day));
-    const hasConfronted = tags.some((t) => t.weight === "confronted");
-
-    let tier: "lightly_touched" | "returned_to" | "deeply_worked" = "lightly_touched";
-    if (distinctDays.size >= 2) {
-      tier = hasConfronted ? "deeply_worked" : "returned_to";
-    }
-
+    const tier = deriveTier(tags);
     const latest = tags[tags.length - 1];
     state[theme] = { tier, groundedIn: latest.grounded_in, tracesTo: latest.traces_to };
   }
