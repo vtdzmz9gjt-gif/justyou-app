@@ -274,6 +274,11 @@ const FAMILY_TAG_TOOL: Anthropic.Tool = {
         description:
           "One short sentence paraphrasing exactly what in the message justifies this theme, trace, and weight. Ignored when theme is \"none\".",
       },
+      pattern_broken_instance: {
+        type: "boolean",
+        description:
+          "True only if this message describes a clear, specific, unambiguous PAST-TENSE instance of the person actually acting differently than this inherited pattern -- not a hope, plan, or self-assessment. Default false. Any real ambiguity defaults to false. Ignored when theme is \"none\".",
+      },
     },
     required: ["theme"],
   },
@@ -304,7 +309,13 @@ Tone is not a signal. Humor, self-deprecation, and casualness are common, ordina
 
 A comfortable, well-worn self-label ("that's just classic me") is a signal AGAINST "confronted" even when what's being named is real and specific -- it reads as an already-settled story, not a live realization. Reserve "confronted" for a visible pivot: catching an excuse, contradicting how they'd usually put it, admitting something that undercuts their own prior framing.
 
-Call tag_family_pattern with your single best answer. When theme is "none", you can omit traces_to, weight, and grounded_in.`;
+Separately, also judge pattern_broken_instance: true only if this message describes a clear, specific, unambiguous PAST-TENSE instance of the person actually acting differently than the inherited pattern they just named -- something that already happened, not a hope, plan, or self-assessment. The bar is deliberately high: is this clearly and specifically an instance of breaking THIS pattern, not just adjacent to it or mentioned in passing? Any real ambiguity means false -- never credit a near-miss. Four calibration cases:
+- "Yeah I definitely got that from my dad -- I guess I do the same thing." -> false. Recognition only, no reported instance.
+- "My rent was late and instead of hiding it and scrambling alone like I always do, I actually told my roommate before she asked. First time I've done that." -> true. Concrete, specific, past-tense.
+- "I think I'm finally starting to get better about this." -> false. Intention/hope, no actual instance.
+- "lol ok this is dumb but I actually told my boss no to extra hours last week, which never happens." -> true. Joking delivery, but a real specific instance underneath -- same tone-is-not-a-signal rule as weight above.
+
+Call tag_family_pattern with your single best answer. When theme is "none", you can omit traces_to, weight, grounded_in, and pattern_broken_instance.`;
 
 // Same parallel, non-blocking shape as tagElement -- fired alongside the
 // whole conversational loop, awaited only at the return points.
@@ -357,10 +368,15 @@ async function tagSephirah(
 }
 
 // Same shape as tagSephirah.
-async function tagFamilyPattern(
-  userMessage: string
-): Promise<
-  { theme: FamilyTheme; tracesTo: FamilyLine; weight: SephirahWeight; groundedIn: string } | undefined
+async function tagFamilyPattern(userMessage: string): Promise<
+  | {
+      theme: FamilyTheme;
+      tracesTo: FamilyLine;
+      weight: SephirahWeight;
+      groundedIn: string;
+      patternBrokenInstance: boolean;
+    }
+  | undefined
 > {
   try {
     const response = await anthropic.messages.create({
@@ -375,7 +391,13 @@ async function tagFamilyPattern(
       (b): b is Anthropic.ToolUseBlock => b.type === "tool_use" && b.name === "tag_family_pattern"
     );
     const input = call?.input as
-      | { theme?: string; traces_to?: string; weight?: string; grounded_in?: string }
+      | {
+          theme?: string;
+          traces_to?: string;
+          weight?: string;
+          grounded_in?: string;
+          pattern_broken_instance?: boolean;
+        }
       | undefined;
     const theme = input?.theme;
     if (theme === "money" || theme === "love" || theme === "work_life" || theme === "body") {
@@ -388,7 +410,13 @@ async function tagFamilyPattern(
         typeof groundedIn === "string" &&
         groundedIn.trim()
       ) {
-        return { theme, tracesTo, weight, groundedIn: groundedIn.trim() };
+        return {
+          theme,
+          tracesTo,
+          weight,
+          groundedIn: groundedIn.trim(),
+          patternBrokenInstance: input?.pattern_broken_instance === true,
+        };
       }
     }
     return undefined;
@@ -536,7 +564,14 @@ async function resolveFamilyPatternTag(
   const tag = await promise;
   if (!tag) return undefined;
   try {
-    await recordFamilyPatternTag(userId, tag.theme, tag.weight, tag.tracesTo, tag.groundedIn);
+    await recordFamilyPatternTag(
+      userId,
+      tag.theme,
+      tag.weight,
+      tag.tracesTo,
+      tag.groundedIn,
+      tag.patternBrokenInstance
+    );
   } catch (err) {
     console.error("recordFamilyPatternTag error", err);
   }
