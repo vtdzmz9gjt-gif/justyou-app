@@ -386,7 +386,11 @@ async function tagFamilyPattern(userMessage: string): Promise<
     const response = await anthropic.messages.create({
       model: MODEL,
       max_tokens: 200,
-      system: FAMILY_TAG_SYSTEM,
+      // ~1,266 tokens -- comfortably over this model's 1,024-token
+      // minimum cacheable prefix, unlike ELEMENT_TAG_SYSTEM (~232) and
+      // SEPHIRAH_TAG_SYSTEM (~795), which are left uncached below since
+      // a marker under the minimum silently creates no cache entry.
+      system: [{ type: "text", text: FAMILY_TAG_SYSTEM, cache_control: { type: "ephemeral", ttl: "1h" } }],
       tools: [FAMILY_TAG_TOOL],
       tool_choice: { type: "tool", name: "tag_family_pattern" },
       messages: [{ role: "user", content: `Judge this message:\n\n"${userMessage}"` }],
@@ -618,9 +622,19 @@ export async function runChat(
     treeContext(userId),
     crossLinkContext(userId),
   ]);
-  const system = `${BASE_SYSTEM_PROMPT}\n\n---\n\nCONTEXT (not visible to the person, never repeat it back verbatim):\n${todayContext()}\n${openCommitment}\n${depthContext(
+  // Split into a frozen block (cached -- identical for every user, every
+  // turn, forever) and a dynamic block (never cached -- today's date,
+  // stage, Tree state, etc. change per user/turn and would invalidate a
+  // shared breakpoint if mixed into the same block). See prompt-caching
+  // notes below the tools array for why this split exists.
+  const contextText = `CONTEXT (not visible to the person, never repeat it back verbatim):\n${todayContext()}\n${openCommitment}\n${depthContext(
     depth
   )}\n${uiLanguageContext(uiLang)}\n${alivenessContext(alivenessAnswer)}\n${stageInfo}\n${treeInfo}\n${crossLinkInfo}`;
+
+  const system: Anthropic.TextBlockParam[] = [
+    { type: "text", text: BASE_SYSTEM_PROMPT, cache_control: { type: "ephemeral", ttl: "1h" } },
+    { type: "text", text: contextText },
+  ];
 
   const messages: Anthropic.MessageParam[] = [
     ...toApiMessages(history),
@@ -641,7 +655,18 @@ export async function runChat(
       system,
       tools,
       messages,
+      // Automatic caching for the growing message history -- the SDK
+      // places the breakpoint on the last cacheable block and moves it
+      // forward as the conversation grows, so prior turns become cache
+      // reads instead of full-price resends. Same 1h TTL as the system
+      // breakpoint above -- a longer-TTL entry must appear before any
+      // shorter one, and this app's per-user reply gaps can easily
+      // exceed 5 minutes.
+      cache_control: { type: "ephemeral", ttl: "1h" },
     });
+    console.log(
+      `[cache] round=${round} input=${response.usage.input_tokens} cache_write=${response.usage.cache_creation_input_tokens ?? 0} cache_read=${response.usage.cache_read_input_tokens ?? 0}`
+    );
 
     const toolUses = response.content.filter(
       (b): b is Anthropic.ToolUseBlock => b.type === "tool_use"
