@@ -226,6 +226,11 @@ type Strings = {
   // Avatar Reveal headline template -- "{element}" and "{pct}" are
   // substituted with the translated element noun and the percentage.
   avatarHeadlineTemplate: string;
+  // The longer privacy note, for the settings panel -- same facts as the
+  // short onboarding version (see ONBOARDING_STRINGS' privacy1/privacy2),
+  // just with a bit more detail for anyone who wants to revisit it later.
+  privacyLong1: string;
+  privacyLong2: string;
 };
 
 const ALIVENESS_FALLBACK = {
@@ -336,6 +341,8 @@ const STRINGS: Record<string, Strings> = {
     sendAriaLabel: "Send",
     elementLabels: { fire: "Fire", earth: "Earth", air: "Air", water: "Water" },
     avatarHeadlineTemplate: "{element} — {pct}% tonight.",
+    privacyLong1: "Your conversations are stored securely, tied to a private, anonymous ID generated on this device — never your name or a public account. That's what lets the app remember you between conversations and notice real patterns over time, instead of starting over every time you open it.",
+    privacyLong2: "Your data is never sold, never shared with advertisers or other third parties, and never used to train AI models — Just You's or anyone else's. Everything is encrypted both in transit and at rest. Conversations are never read, reviewed, or shared with anyone, including us — they exist only so the app can respond to you with real context.",
   },
   es: {
     brand: "Just You",
@@ -379,6 +386,8 @@ const STRINGS: Record<string, Strings> = {
     sendAriaLabel: "Enviar",
     elementLabels: { fire: "Fuego", earth: "Tierra", air: "Aire", water: "Agua" },
     avatarHeadlineTemplate: "{element} — {pct}% esta noche.",
+    privacyLong1: "Tus conversaciones se guardan de forma segura, vinculadas a un ID privado y anónimo generado en este dispositivo — nunca tu nombre ni una cuenta pública. Eso es lo que permite que la app te recuerde entre conversaciones y note patrones reales con el tiempo, en vez de empezar de cero cada vez que la abres.",
+    privacyLong2: "Tus datos nunca se venden, nunca se comparten con anunciantes u otros terceros, y nunca se usan para entrenar modelos de IA — ni de Just You ni de nadie más. Todo está cifrado tanto en tránsito como en reposo. Las conversaciones nunca son leídas, revisadas ni compartidas con nadie, ni siquiera con nosotros — existen solo para que la app pueda responderte con contexto real.",
   },
   fr: {
     brand: "Just You",
@@ -422,6 +431,8 @@ const STRINGS: Record<string, Strings> = {
     sendAriaLabel: "Envoyer",
     elementLabels: { fire: "Feu", earth: "Terre", air: "Air", water: "Eau" },
     avatarHeadlineTemplate: "{element} — {pct}% ce soir.",
+    privacyLong1: "Tes conversations sont stockées de façon sécurisée, rattachées à un identifiant privé et anonyme généré sur cet appareil — jamais ton nom ni un compte public. C'est ce qui permet à l'appli de se souvenir de toi d'une conversation à l'autre et de remarquer de vrais schémas dans le temps, au lieu de repartir de zéro à chaque ouverture.",
+    privacyLong2: "Tes données ne sont jamais vendues, jamais partagées avec des annonceurs ou d'autres tiers, et jamais utilisées pour entraîner des modèles d'IA — ni ceux de Just You, ni ceux de qui que ce soit d'autre. Tout est chiffré à la fois en transit et au repos. Les conversations ne sont jamais lues, examinées ni partagées avec qui que ce soit, nous y compris — elles n'existent que pour que l'appli puisse te répondre avec un vrai contexte.",
   },
   de: {
     brand: "Just You",
@@ -465,6 +476,8 @@ const STRINGS: Record<string, Strings> = {
     sendAriaLabel: "Senden",
     elementLabels: { fire: "Feuer", earth: "Erde", air: "Luft", water: "Wasser" },
     avatarHeadlineTemplate: "{element} — {pct}% heute Abend.",
+    privacyLong1: "Deine Gespräche werden sicher gespeichert, verknüpft mit einer privaten, anonymen ID, die auf diesem Gerät erzeugt wird — nie mit deinem Namen oder einem öffentlichen Konto. Nur so kann die App sich zwischen Gesprächen an dich erinnern und echte Muster über die Zeit erkennen, statt jedes Mal beim Öffnen von vorne anzufangen.",
+    privacyLong2: "Deine Daten werden nie verkauft, nie an Werbetreibende oder andere Dritte weitergegeben und nie zum Trainieren von KI-Modellen verwendet — weder von Just You noch von irgendjemand anderem. Alles ist sowohl bei der Übertragung als auch bei der Speicherung verschlüsselt. Gespräche werden von niemandem gelesen, überprüft oder weitergegeben, auch nicht von uns — sie existieren nur, damit die App dir mit echtem Kontext antworten kann.",
   },
   pt: {
     brand: "Just You",
@@ -508,6 +521,8 @@ const STRINGS: Record<string, Strings> = {
     sendAriaLabel: "Enviar",
     elementLabels: { fire: "Fogo", earth: "Terra", air: "Ar", water: "Água" },
     avatarHeadlineTemplate: "{element} — {pct}% esta noite.",
+    privacyLong1: "Suas conversas são armazenadas com segurança, vinculadas a um ID privado e anônimo gerado neste dispositivo — nunca seu nome ou uma conta pública. É isso que permite que o app se lembre de você entre conversas e note padrões reais ao longo do tempo, em vez de recomeçar do zero toda vez que você o abre.",
+    privacyLong2: "Seus dados nunca são vendidos, nunca são compartilhados com anunciantes ou outros terceiros, e nunca são usados para treinar modelos de IA — nem do Just You, nem de mais ninguém. Tudo é criptografado tanto em trânsito quanto em repouso. As conversas nunca são lidas, revisadas ou compartilhadas com ninguém, nem mesmo conosco — elas existem apenas para que o app possa responder a você com contexto real.",
   },
   it: {
     brand: "Just You",
@@ -551,6 +566,8 @@ const STRINGS: Record<string, Strings> = {
     sendAriaLabel: "Invia",
     elementLabels: { fire: "Fuoco", earth: "Terra", air: "Aria", water: "Acqua" },
     avatarHeadlineTemplate: "{element} — {pct}% stasera.",
+    privacyLong1: "Le tue conversazioni vengono archiviate in modo sicuro, collegate a un ID privato e anonimo generato su questo dispositivo — mai il tuo nome o un account pubblico. È questo che permette all'app di ricordarti tra una conversazione e l'altra e di notare schemi reali nel tempo, invece di ricominciare da zero ogni volta che la apri.",
+    privacyLong2: "I tuoi dati non vengono mai venduti, mai condivisi con inserzionisti o altre terze parti, e mai usati per addestrare modelli di IA — né di Just You né di chiunque altro. Tutto è crittografato sia in transito che a riposo. Le conversazioni non vengono mai lette, esaminate o condivise con nessuno, nemmeno con noi — esistono solo perché l'app possa risponderti con un contesto reale.",
   },
   he: {
     brand: "Just You",
@@ -593,6 +610,8 @@ const STRINGS: Record<string, Strings> = {
     sendAriaLabel: "שלח",
     elementLabels: { fire: "אש", earth: "אדמה", air: "אוויר", water: "מים" },
     avatarHeadlineTemplate: "{element} — {pct}% הערב.",
+    privacyLong1: "השיחות שלך נשמרות בצורה מאובטחת, מקושרות למזהה פרטי ואנונימי שנוצר במכשיר הזה — לעולם לא השם שלך או חשבון ציבורי. זה מה שמאפשר לאפליקציה לזכור אותך בין שיחות ולהבחין בדפוסים אמיתיים לאורך זמן, במקום להתחיל מחדש בכל פעם שאתה פותח אותה.",
+    privacyLong2: "המידע שלך לעולם לא נמכר, לעולם לא משותף עם מפרסמים או גורמים שלישיים אחרים, ולעולם לא משמש לאימון מודלים של בינה מלאכותית — לא של Just You ולא של אף אחד אחר. הכול מוצפן הן בזמן העברה והן באחסון. שיחות לעולם לא נקראות, נבדקות או משותפות עם אף אחד, כולל אנחנו — הן קיימות רק כדי שהאפליקציה תוכל להגיב אליך עם הקשר אמיתי.",
   },
   ar: {
     brand: "Just You",
@@ -635,6 +654,8 @@ const STRINGS: Record<string, Strings> = {
     sendAriaLabel: "إرسال",
     elementLabels: { fire: "نار", earth: "أرض", air: "هواء", water: "ماء" },
     avatarHeadlineTemplate: "{element} — {pct}% الليلة.",
+    privacyLong1: "يتم تخزين محادثاتك بأمان، مرتبطة بمعرف خاص ومجهول يُنشأ على هذا الجهاز — وليس اسمك أو حسابًا عامًا أبدًا. هذا ما يتيح للتطبيق تذكرك بين المحادثات وملاحظة أنماط حقيقية بمرور الوقت، بدلاً من البدء من الصفر في كل مرة تفتحه فيها.",
+    privacyLong2: "لا تُباع بياناتك أبدًا، ولا تُشارك أبدًا مع المعلنين أو أطراف ثالثة أخرى، ولا تُستخدم أبدًا لتدريب نماذج الذكاء الاصطناعي — سواء الخاصة بـ Just You أو بأي جهة أخرى. كل شيء مشفر أثناء النقل وفي حالة التخزين. لا تُقرأ المحادثات أو تُراجع أو تُشارك مع أي شخص أبدًا، بما في ذلك نحن — فهي موجودة فقط حتى يتمكن التطبيق من الرد عليك بسياق حقيقي.",
   },
   hi: {
     brand: "Just You",
@@ -678,6 +699,8 @@ const STRINGS: Record<string, Strings> = {
     sendAriaLabel: "भेजें",
     elementLabels: { fire: "अग्नि", earth: "पृथ्वी", air: "वायु", water: "जल" },
     avatarHeadlineTemplate: "{element} — आज रात {pct}%.",
+    privacyLong1: "तुम्हारी बातचीत सुरक्षित रूप से संग्रहीत की जाती है, इस डिवाइस पर बनाई गई एक निजी, गुमनाम ID से जुड़ी हुई — कभी भी तुम्हारे नाम या किसी सार्वजनिक अकाउंट से नहीं। यही वह चीज़ है जो ऐप को बातचीत के बीच तुम्हें याद रखने और समय के साथ असली पैटर्न पहचानने देती है, बजाय हर बार खोलने पर शुरुआत से शुरू करने के।",
+    privacyLong2: "तुम्हारा डेटा कभी नहीं बेचा जाता, कभी भी विज्ञापनदाताओं या अन्य तीसरे पक्षों के साथ साझा नहीं किया जाता, और कभी भी AI मॉडल को प्रशिक्षित करने के लिए इस्तेमाल नहीं किया जाता — न तो Just You के लिए, न ही किसी और के लिए। सब कुछ ट्रांज़िट और स्टोरेज दोनों में एन्क्रिप्टेड है। बातचीत को कभी भी किसी के द्वारा, यहां तक कि हमारे द्वारा भी, पढ़ा, समीक्षा या साझा नहीं किया जाता — ये केवल इसलिए मौजूद हैं ताकि ऐप तुम्हें असली संदर्भ के साथ जवाब दे सके।",
   },
   zh: {
     brand: "Just You",
@@ -720,6 +743,8 @@ const STRINGS: Record<string, Strings> = {
     sendAriaLabel: "发送",
     elementLabels: { fire: "火", earth: "土", air: "风", water: "水" },
     avatarHeadlineTemplate: "{element} — 今晚 {pct}%。",
+    privacyLong1: "你的对话会被安全存储，并与在此设备上生成的一个私密、匿名ID相关联——绝不会关联你的姓名或公开账户。这也是应用能在不同对话之间记住你、并随着时间发现真实模式，而不是每次打开都从零开始的原因。",
+    privacyLong2: "你的数据绝不会被出售，绝不会与广告商或其他第三方共享，也绝不会用于训练任何AI模型——无论是Just You的还是其他任何人的。所有数据在传输和存储过程中均已加密。对话内容绝不会被任何人阅读、审查或分享，包括我们自己——它们的存在只是为了让应用能够基于真实的语境回应你。",
   },
   ja: {
     brand: "Just You",
@@ -763,6 +788,8 @@ const STRINGS: Record<string, Strings> = {
     sendAriaLabel: "送信",
     elementLabels: { fire: "火", earth: "地", air: "風", water: "水" },
     avatarHeadlineTemplate: "{element} — 今夜 {pct}%。",
+    privacyLong1: "あなたの会話は安全に保存され、このデバイス上で生成される非公開の匿名IDに紐づけられます——あなたの名前や公開アカウントに紐づくことは決してありません。だからこそ、アプリは会話をまたいであなたを覚えていられ、開くたびにゼロから始めるのではなく、時間をかけて本当のパターンに気づくことができます。",
+    privacyLong2: "あなたのデータが売られることは決してなく、広告主や他の第三者と共有されることも決してなく、Just Youであれ他の誰であれ、AIモデルの学習に使われることも決してありません。すべて通信中も保存中も暗号化されています。会話が誰かに——私たちも含めて——読まれたり、確認されたり、共有されたりすることは決してありません。会話が存在するのは、アプリが本当の文脈をもってあなたに応答するためだけです。",
   },
   ru: {
     brand: "Just You",
@@ -806,6 +833,8 @@ const STRINGS: Record<string, Strings> = {
     sendAriaLabel: "Отправить",
     elementLabels: { fire: "Огонь", earth: "Земля", air: "Воздух", water: "Вода" },
     avatarHeadlineTemplate: "{element} — {pct}% сегодня вечером.",
+    privacyLong1: "Твои разговоры хранятся в безопасности, привязанные к приватному, анонимному ID, созданному на этом устройстве — никогда не к твоему имени или публичному аккаунту. Именно это позволяет приложению помнить тебя между разговорами и замечать настоящие закономерности со временем, а не начинать с нуля каждый раз, когда ты его открываешь.",
+    privacyLong2: "Твои данные никогда не продаются, никогда не передаются рекламодателям или другим третьим лицам и никогда не используются для обучения ИИ-моделей — ни Just You, ни чьих-либо ещё. Всё зашифровано как при передаче, так и при хранении. Разговоры никто и никогда не читает, не просматривает и не передаёт, включая нас самих — они существуют только для того, чтобы приложение могло отвечать тебе с реальным контекстом.",
   },
   sq: {
     brand: "Just You",
@@ -848,6 +877,8 @@ const STRINGS: Record<string, Strings> = {
     sendAriaLabel: "Dërgo",
     elementLabels: { fire: "Zjarri", earth: "Toka", air: "Ajri", water: "Uji" },
     avatarHeadlineTemplate: "{element} — {pct}% sonte.",
+    privacyLong1: "Bisedat e tua ruhen në mënyrë të sigurt, të lidhura me një ID private dhe anonime të krijuar në këtë pajisje — kurrë me emrin tënd apo një llogari publike. Kjo është ajo që i mundëson aplikacionit të të mbajë mend nga një bisedë në tjetrën dhe të vërejë modele të vërteta me kalimin e kohës, në vend që të fillojë nga e para çdo herë që e hap.",
+    privacyLong2: "Të dhënat e tua nuk shiten kurrë, nuk ndahen kurrë me reklamues apo palë të treta të tjera, dhe nuk përdoren kurrë për të trajnuar modele IA — as të Just You, as të askujt tjetër. Gjithçka është e koduar si gjatë transmetimit ashtu edhe kur ruhet. Bisedat nuk lexohen, shqyrtohen apo ndahen kurrë me askënd, përfshirë ne — ato ekzistojnë vetëm që aplikacioni të mund të të përgjigjet me kontekst të vërtetë.",
   },
   el: {
     brand: "Just You",
@@ -891,6 +922,8 @@ const STRINGS: Record<string, Strings> = {
     sendAriaLabel: "Αποστολή",
     elementLabels: { fire: "Φωτιά", earth: "Γη", air: "Αέρας", water: "Νερό" },
     avatarHeadlineTemplate: "{element} — {pct}% απόψε.",
+    privacyLong1: "Οι συνομιλίες σου αποθηκεύονται με ασφάλεια, συνδεδεμένες με ένα ιδιωτικό, ανώνυμο αναγνωριστικό που δημιουργείται σε αυτή τη συσκευή — ποτέ με το όνομά σου ή έναν δημόσιο λογαριασμό. Αυτό είναι που επιτρέπει στην εφαρμογή να σε θυμάται από τη μία συνομιλία στην άλλη και να παρατηρεί πραγματικά μοτίβα με τον καιρό, αντί να ξεκινά από την αρχή κάθε φορά που την ανοίγεις.",
+    privacyLong2: "Τα δεδομένα σου δεν πωλούνται ποτέ, δεν κοινοποιούνται ποτέ σε διαφημιστές ή άλλα τρίτα μέρη, και δεν χρησιμοποιούνται ποτέ για την εκπαίδευση μοντέλων ΤΝ — ούτε του Just You ούτε κανενός άλλου. Όλα είναι κρυπτογραφημένα τόσο κατά τη μεταφορά όσο και κατά την αποθήκευση. Οι συνομιλίες δεν διαβάζονται, δεν εξετάζονται ούτε κοινοποιούνται ποτέ σε κανέναν, ούτε καν σε εμάς — υπάρχουν μόνο για να μπορεί η εφαρμογή να σου απαντά με πραγματικό πλαίσιο.",
   },
   hy: {
     brand: "Just You",
@@ -934,6 +967,8 @@ const STRINGS: Record<string, Strings> = {
     sendAriaLabel: "Ուղարկել",
     elementLabels: { fire: "Կրակ", earth: "Հող", air: "Օդ", water: "Ջուր" },
     avatarHeadlineTemplate: "{element} — {pct}% այս գիշեր։",
+    privacyLong1: "Քո զրույցները պահվում են անվտանգ կերպով, կապված այս սարքի վրա ստեղծված մասնավոր, անանուն ID-ի հետ — երբեք քո անվան կամ հանրային հաշվի հետ։ Հենց դա է թույլ տալիս հավելվածին հիշել քեզ զրույցների միջև և ժամանակի ընթացքում նկատել իրական օրինաչափություններ, փոխանակ ամեն անգամ այն բացելիս սկսելու զրոյից։",
+    privacyLong2: "Քո տվյալները երբեք չեն վաճառվում, երբեք չեն կիսվում գովազդատուների կամ այլ երրորդ կողմերի հետ, և երբեք չեն օգտագործվում ԱԲ մոդելներ ուսուցանելու համար՝ ո՛չ Just You-ի, ո՛չ որևէ ուրիշի։ Ամեն ինչ գաղտնագրված է ինչպես փոխանցման, այնպես էլ պահպանման ընթացքում։ Զրույցները երբեք չեն կարդացվում, չեն վերանայվում կամ չեն կիսվում որևէ մեկի հետ, ներառյալ մեզ հետ․ դրանք գոյություն ունեն միայն այն պատճառով, որ հավելվածը կարողանա պատասխանել քեզ իրական համատեքստով։",
   },
   sr: {
     brand: "Just You",
@@ -977,6 +1012,8 @@ const STRINGS: Record<string, Strings> = {
     sendAriaLabel: "Pošalji",
     elementLabels: { fire: "Vatra", earth: "Zemlja", air: "Vazduh", water: "Voda" },
     avatarHeadlineTemplate: "{element} — {pct}% večeras.",
+    privacyLong1: "Tvoji razgovori se bezbedno čuvaju, povezani sa privatnim, anonimnim ID-jem generisanim na ovom uređaju — nikada sa tvojim imenom ili javnim nalogom. Upravo to omogućava aplikaciji da te pamti između razgovora i vremenom primeti stvarne obrasce, umesto da svaki put kad je otvoriš počinje ispočetka.",
+    privacyLong2: "Tvoji podaci se nikada ne prodaju, nikada ne dele sa oglašivačima ili drugim trećim licima, i nikada se ne koriste za treniranje AI modela — ni Just You-ovih, ni bilo čijih drugih. Sve je šifrovano i tokom prenosa i tokom čuvanja. Razgovori se nikada ne čitaju, ne pregledaju niti dele sa bilo kim, uključujući nas — postoje samo da bi aplikacija mogla da ti odgovori sa stvarnim kontekstom.",
   },
   hr: {
     brand: "Just You",
@@ -1020,6 +1057,8 @@ const STRINGS: Record<string, Strings> = {
     sendAriaLabel: "Pošalji",
     elementLabels: { fire: "Vatra", earth: "Zemlja", air: "Zrak", water: "Voda" },
     avatarHeadlineTemplate: "{element} — {pct}% večeras.",
+    privacyLong1: "Tvoji razgovori se sigurno čuvaju, povezani s privatnim, anonimnim ID-om generiranim na ovom uređaju — nikada s tvojim imenom ili javnim računom. Upravo to omogućuje aplikaciji da te pamti između razgovora i s vremenom primijeti stvarne obrasce, umjesto da svaki put kad je otvoriš počinje ispočetka.",
+    privacyLong2: "Tvoji podaci nikada se ne prodaju, nikada se ne dijele s oglašivačima ili drugim trećim stranama, i nikada se ne koriste za treniranje AI modela — ni Just You-ovih, ni bilo čijih drugih. Sve je šifrirano i tijekom prijenosa i tijekom pohrane. Razgovori se nikada ne čitaju, ne pregledavaju niti dijele s bilo kim, uključujući nas — postoje samo kako bi aplikacija mogla odgovoriti tebi sa stvarnim kontekstom.",
   },
   bs: {
     brand: "Just You",
@@ -1063,6 +1102,8 @@ const STRINGS: Record<string, Strings> = {
     sendAriaLabel: "Pošalji",
     elementLabels: { fire: "Vatra", earth: "Zemlja", air: "Zrak", water: "Voda" },
     avatarHeadlineTemplate: "{element} — {pct}% večeras.",
+    privacyLong1: "Tvoji razgovori se sigurno čuvaju, povezani s privatnim, anonimnim ID-om generisanim na ovom uređaju — nikada s tvojim imenom ili javnim računom. Upravo to omogućava aplikaciji da te pamti između razgovora i s vremenom primijeti stvarne obrasce, umjesto da svaki put kad je otvoriš počinje ispočetka.",
+    privacyLong2: "Tvoji podaci se nikada ne prodaju, nikada se ne dijele s oglašivačima ili drugim trećim stranama, i nikada se ne koriste za treniranje AI modela — ni Just You-ovih, ni bilo čijih drugih. Sve je šifrirano i tokom prijenosa i tokom čuvanja. Razgovori se nikada ne čitaju, ne pregledaju niti dijele s bilo kim, uključujući nas — postoje samo kako bi aplikacija mogla odgovoriti tebi sa stvarnim kontekstom.",
   },
   bg: {
     brand: "Just You",
@@ -1106,6 +1147,8 @@ const STRINGS: Record<string, Strings> = {
     sendAriaLabel: "Изпрати",
     elementLabels: { fire: "Огън", earth: "Земя", air: "Въздух", water: "Вода" },
     avatarHeadlineTemplate: "{element} — {pct}% тази вечер.",
+    privacyLong1: "Разговорите ти се съхраняват сигурно, свързани с частен, анонимен ID, генериран на това устройство — никога с твоето име или публичен акаунт. Именно това позволява на приложението да те помни между разговорите и да забелязва реални модели с течение на времето, вместо да започва от нулата всеки път, когато го отвориш.",
+    privacyLong2: "Данните ти никога не се продават, никога не се споделят с рекламодатели или други трети страни и никога не се използват за обучение на AI модели — нито на Just You, нито на когото и да било друг. Всичко е криптирано както при пренос, така и при съхранение. Разговорите никога не се четат, преглеждат или споделят с никого, включително с нас — те съществуват само за да може приложението да ти отговаря с реален контекст.",
   },
   mk: {
     brand: "Just You",
@@ -1149,6 +1192,8 @@ const STRINGS: Record<string, Strings> = {
     sendAriaLabel: "Испрати",
     elementLabels: { fire: "Оган", earth: "Земја", air: "Воздух", water: "Вода" },
     avatarHeadlineTemplate: "{element} — {pct}% вечерва.",
+    privacyLong1: "Твоите разговори се чуваат безбедно, поврзани со приватен, анонимен ID генериран на овој уред — никогаш со твоето име или јавна сметка. Токму тоа ѝ овозможува на апликацијата да те памти помеѓу разговорите и да забележи вистински обрасци со текот на времето, наместо секој пат кога ќе ја отвориш да почнува од нула.",
+    privacyLong2: "Твоите податоци никогаш не се продаваат, никогаш не се споделуваат со рекламодавачи или други трети страни, и никогаш не се користат за обучување на AI модели — ниту на Just You, ниту на кој било друг. Сè е криптирано и при пренос и при складирање. Разговорите никогаш не се читаат, прегледуваат или споделуваат со никого, вклучувајќи нè — тие постојат само за да може апликацијата да ти одговори со вистински контекст.",
   },
   ro: {
     brand: "Just You",
@@ -1192,6 +1237,8 @@ const STRINGS: Record<string, Strings> = {
     sendAriaLabel: "Trimite",
     elementLabels: { fire: "Foc", earth: "Pământ", air: "Aer", water: "Apă" },
     avatarHeadlineTemplate: "{element} — {pct}% în seara asta.",
+    privacyLong1: "Conversațiile tale sunt stocate în siguranță, asociate cu un ID privat și anonim generat pe acest dispozitiv — niciodată cu numele tău sau cu un cont public. Asta îi permite aplicației să își amintească de tine între conversații și să observe tipare reale de-a lungul timpului, în loc să o ia de la zero de fiecare dată când o deschizi.",
+    privacyLong2: "Datele tale nu sunt niciodată vândute, niciodată partajate cu agenți de publicitate sau alte terțe părți, și niciodată folosite pentru a antrena modele de IA — nici ale Just You, nici ale altcuiva. Totul este criptat atât în tranzit, cât și la stocare. Conversațiile nu sunt niciodată citite, examinate sau partajate cu nimeni, nici măcar cu noi — există doar pentru ca aplicația să îți poată răspunde cu context real.",
   },
   sl: {
     brand: "Just You",
@@ -1235,6 +1282,8 @@ const STRINGS: Record<string, Strings> = {
     sendAriaLabel: "Pošlji",
     elementLabels: { fire: "Ogenj", earth: "Zemlja", air: "Zrak", water: "Voda" },
     avatarHeadlineTemplate: "{element} — {pct}% nocoj.",
+    privacyLong1: "Tvoji pogovori se varno shranjujejo, povezani z zasebnim, anonimnim ID-jem, ustvarjenim na tej napravi — nikoli s tvojim imenom ali javnim računom. Prav to aplikaciji omogoča, da si te zapomni med pogovori in sčasoma opazi resnične vzorce, namesto da vsakič, ko jo odpreš, začne znova.",
+    privacyLong2: "Tvoji podatki nikoli niso prodani, nikoli deljeni z oglaševalci ali drugimi tretjimi osebami, in nikoli uporabljeni za učenje AI modelov — ne Just You-jevih, ne kogar koli drugega. Vse je šifrirano tako med prenosom kot v mirovanju. Pogovori nikoli niso brani, pregledani ali deljeni s komer koli, vključno z nami — obstajajo samo zato, da lahko aplikacija odgovori s pravim kontekstom.",
   },
 };
 
@@ -1345,6 +1394,8 @@ type OnboardingCopy = {
   beforeYouStartHint: string;
   p6: string;
   p7: string;
+  privacy1: string;
+  privacy2: string;
   continueLabel: string;
   beginLabel: string;
 };
@@ -1373,6 +1424,8 @@ const ONBOARDING_STRINGS: Record<string, OnboardingCopy> = {
     beforeYouStartHint: "Before you start",
     p6: "You won't get there today, and that's fine. Nobody starts anywhere but the beginning. Wherever you actually are right now, it'll meet you there.",
     p7: "One more thing: sometimes a reply takes longer than usual. That's on purpose — in the silence, you get the most answers.",
+    privacy1: "Your conversations are stored securely so the app can remember you between sessions — that's what lets it notice real patterns over time instead of starting over every time.",
+    privacy2: "They're never sold, never used to train AI models, and encrypted both in transit and at rest. Conversations are never read, reviewed, or shared with anyone.",
     continueLabel: "Continue",
     beginLabel: "Begin",
   },
@@ -1399,6 +1452,8 @@ const ONBOARDING_STRINGS: Record<string, OnboardingCopy> = {
     beforeYouStartHint: "Antes de empezar",
     p6: "Hoy no vas a llegar, y está bien. Nadie empieza en otro lugar que no sea el principio. Donde sea que estés ahora mismo, te va a encontrar ahí.",
     p7: "Una cosa más: a veces una respuesta tarda más de lo habitual. Es a propósito — en el silencio es donde llegan las mejores respuestas.",
+    privacy1: "Tus conversaciones se guardan de forma segura para que la app pueda recordarte entre sesiones — eso es lo que le permite notar patrones reales con el tiempo, en vez de empezar de cero cada vez.",
+    privacy2: "Nunca se venden, nunca se usan para entrenar modelos de IA, y están cifradas tanto en tránsito como en reposo. Las conversaciones nunca son leídas, revisadas ni compartidas con nadie.",
     continueLabel: "Continuar",
     beginLabel: "Empezar",
   },
@@ -1425,6 +1480,8 @@ const ONBOARDING_STRINGS: Record<string, OnboardingCopy> = {
     beforeYouStartHint: "Avant de commencer",
     p6: "Tu n'y arriveras pas aujourd'hui, et c'est normal. Personne ne commence ailleurs qu'au début. Où que tu sois vraiment en ce moment, ça te retrouvera là.",
     p7: "Encore une chose : parfois une réponse met plus de temps que d'habitude. C'est voulu — c'est dans le silence qu'on trouve les meilleures réponses.",
+    privacy1: "Tes conversations sont stockées de façon sécurisée pour que l'appli puisse se souvenir de toi d'une session à l'autre — c'est ce qui lui permet de remarquer de vrais schémas dans le temps, au lieu de repartir de zéro à chaque fois.",
+    privacy2: "Elles ne sont jamais vendues, jamais utilisées pour entraîner des modèles d'IA, et chiffrées à la fois en transit et au repos. Les conversations ne sont jamais lues, examinées ni partagées avec qui que ce soit.",
     continueLabel: "Continuer",
     beginLabel: "Commencer",
   },
@@ -1451,6 +1508,8 @@ const ONBOARDING_STRINGS: Record<string, OnboardingCopy> = {
     beforeYouStartHint: "Bevor du anfängst",
     p6: "Du wirst heute nicht dort ankommen, und das ist okay. Niemand beginnt irgendwo anders als am Anfang. Wo auch immer du gerade wirklich bist — es wird dich dort abholen.",
     p7: "Noch etwas: Manchmal dauert eine Antwort länger als gewöhnlich. Das ist Absicht — im Schweigen findest du die besten Antworten.",
+    privacy1: "Deine Gespräche werden sicher gespeichert, damit die App sich zwischen den Sitzungen an dich erinnern kann — nur so kann sie echte Muster über die Zeit erkennen, statt jedes Mal von vorne anzufangen.",
+    privacy2: "Sie werden nie verkauft, nie zum Trainieren von KI-Modellen verwendet und sowohl bei der Übertragung als auch bei der Speicherung verschlüsselt. Gespräche werden von niemandem gelesen, überprüft oder weitergegeben.",
     continueLabel: "Weiter",
     beginLabel: "Anfangen",
   },
@@ -1477,6 +1536,8 @@ const ONBOARDING_STRINGS: Record<string, OnboardingCopy> = {
     beforeYouStartHint: "Antes de começar",
     p6: "Você não vai chegar lá hoje, e está tudo bem. Ninguém começa em outro lugar além do início. Onde você estiver agora, é aí que isso vai te encontrar.",
     p7: "Mais uma coisa: às vezes uma resposta demora mais que o normal. Isso é de propósito — é no silêncio que se encontram as melhores respostas.",
+    privacy1: "Suas conversas são armazenadas com segurança para que o app possa se lembrar de você entre sessões — é isso que permite notar padrões reais ao longo do tempo, em vez de recomeçar do zero toda vez.",
+    privacy2: "Elas nunca são vendidas, nunca são usadas para treinar modelos de IA, e são criptografadas tanto em trânsito quanto em repouso. As conversas nunca são lidas, revisadas ou compartilhadas com ninguém.",
     continueLabel: "Continuar",
     beginLabel: "Começar",
   },
@@ -1503,6 +1564,8 @@ const ONBOARDING_STRINGS: Record<string, OnboardingCopy> = {
     beforeYouStartHint: "Prima di iniziare",
     p6: "Non ci arriverai oggi, e va bene così. Nessuno comincia altrove se non dall'inizio. Ovunque tu sia davvero in questo momento, ti troverà lì.",
     p7: "Un'altra cosa: a volte una risposta richiede più tempo del solito. È voluto — è nel silenzio che si trovano le risposte migliori.",
+    privacy1: "Le tue conversazioni vengono archiviate in modo sicuro così che l'app possa ricordarti tra una sessione e l'altra — è questo che le permette di notare schemi reali nel tempo, invece di ricominciare da zero ogni volta.",
+    privacy2: "Non vengono mai vendute, mai usate per addestrare modelli di IA, e sono crittografate sia in transito che a riposo. Le conversazioni non vengono mai lette, esaminate o condivise con nessuno.",
     continueLabel: "Continua",
     beginLabel: "Inizia",
   },
@@ -1529,6 +1592,8 @@ const ONBOARDING_STRINGS: Record<string, OnboardingCopy> = {
     beforeYouStartHint: "לפני שתתחיל",
     p6: "לא תגיע לשם היום, וזה בסדר. אף אחד לא מתחיל במקום אחר מלבד ההתחלה. בכל מקום שאתה נמצא בו באמת עכשיו, זה יפגוש אותך שם.",
     p7: "עוד דבר אחד: לפעמים תשובה לוקחת יותר זמן מהרגיל. זה בכוונה — בשתיקה מוצאים את התשובות הכי טובות.",
+    privacy1: "השיחות שלך נשמרות בצורה מאובטחת כדי שהאפליקציה תוכל לזכור אותך בין הפעלות — זה מה שמאפשר לה להבחין בדפוסים אמיתיים לאורך זמן, במקום להתחיל מחדש בכל פעם.",
+    privacy2: "הן לעולם לא נמכרות, לעולם לא משמשות לאימון מודלים של בינה מלאכותית, ומוצפנות הן בזמן העברה והן באחסון. שיחות לעולם לא נקראות, נבדקות או משותפות עם אף אחד.",
     continueLabel: "המשך",
     beginLabel: "התחל",
   },
@@ -1555,6 +1620,8 @@ const ONBOARDING_STRINGS: Record<string, OnboardingCopy> = {
     beforeYouStartHint: "قبل أن تبدأ",
     p6: "لن تصل إلى هناك اليوم، ولا بأس بذلك. لا أحد يبدأ من أي مكان سوى البداية. أينما كنت فعلاً الآن، سيجدك هناك.",
     p7: "شيء أخير: أحيانًا يستغرق الرد وقتًا أطول من المعتاد. هذا مقصود — في الصمت تجد أفضل الإجابات.",
+    privacy1: "يتم تخزين محادثاتك بأمان حتى يتمكن التطبيق من تذكرك بين الجلسات — وهذا ما يتيح له ملاحظة أنماط حقيقية بمرور الوقت، بدلاً من البدء من الصفر في كل مرة.",
+    privacy2: "لا يتم بيعها أبدًا، ولا تُستخدم أبدًا لتدريب نماذج الذكاء الاصطناعي، وهي مشفرة أثناء النقل وفي حالة التخزين. لا تُقرأ المحادثات أو تُراجع أو تُشارك مع أي شخص أبدًا.",
     continueLabel: "استمر",
     beginLabel: "ابدأ",
   },
@@ -1581,6 +1648,8 @@ const ONBOARDING_STRINGS: Record<string, OnboardingCopy> = {
     beforeYouStartHint: "शुरू करने से पहले",
     p6: "आज तुम वहाँ नहीं पहुँचोगे, और यह ठीक है। कोई भी शुरुआत के अलावा कहीं और से शुरू नहीं करता। तुम अभी असल में जहाँ भी हो, यह तुम्हें वहीं मिलेगा।",
     p7: "एक बात और: कभी-कभी जवाब आने में सामान्य से ज़्यादा समय लगता है। यह जानबूझकर है — सन्नाटे में ही सबसे सच्चे जवाब मिलते हैं।",
+    privacy1: "तुम्हारी बातचीत सुरक्षित रूप से संग्रहीत की जाती है ताकि ऐप सत्रों के बीच तुम्हें याद रख सके — यही वह चीज़ है जो इसे समय के साथ असली पैटर्न पहचानने देती है, बजाय हर बार शुरुआत से शुरू करने के।",
+    privacy2: "इन्हें कभी नहीं बेचा जाता, कभी भी AI मॉडल को प्रशिक्षित करने के लिए इस्तेमाल नहीं किया जाता, और ट्रांज़िट और स्टोरेज दोनों में एन्क्रिप्टेड रहती हैं। बातचीत को कभी भी किसी के द्वारा पढ़ा, समीक्षा या साझा नहीं किया जाता।",
     continueLabel: "जारी रखें",
     beginLabel: "शुरू करें",
   },
@@ -1607,6 +1676,8 @@ const ONBOARDING_STRINGS: Record<string, OnboardingCopy> = {
     beforeYouStartHint: "开始之前",
     p6: "今天你不会到达那里，这没关系。没有人会从别的地方开始，只能从起点开始。无论你现在真正身处何处，它都会在那里与你相遇。",
     p7: "还有一件事：有时候回复会比平常慢一些。这是有意为之——答案往往就藏在沉默之中。",
+    privacy1: "你的对话会被安全存储，这样应用才能在不同会话之间记住你——这也是它能随着时间发现真实模式、而不是每次都从零开始的原因。",
+    privacy2: "对话内容绝不会被出售，绝不会用于训练AI模型，并且在传输和存储过程中均已加密。对话内容绝不会被任何人阅读、审查或分享。",
     continueLabel: "继续",
     beginLabel: "开始",
   },
@@ -1633,6 +1704,8 @@ const ONBOARDING_STRINGS: Record<string, OnboardingCopy> = {
     beforeYouStartHint: "始める前に",
     p6: "今日そこには辿り着かない。それでいい。誰も始まり以外の場所から始めることはできない。あなたが今実際にいる場所——そこであなたを迎えてくれる。",
     p7: "もう一つ：時々、返信が普段より遅くなることがある。それは意図的なこと——本当の答えは沈黙の中にある。",
+    privacy1: "あなたの会話は安全に保存され、アプリがセッションをまたいであなたを覚えていられるようにします——だからこそ、毎回ゼロから始めるのではなく、時間をかけて本当のパターンに気づくことができます。",
+    privacy2: "会話が売られることは決してなく、AIモデルの学習に使われることも決してなく、通信中も保存中も暗号化されています。会話が誰かに読まれたり、確認されたり、共有されたりすることは決してありません。",
     continueLabel: "続ける",
     beginLabel: "始める",
   },
@@ -1659,6 +1732,8 @@ const ONBOARDING_STRINGS: Record<string, OnboardingCopy> = {
     beforeYouStartHint: "Перед началом",
     p6: "Сегодня ты туда не доберёшься, и это нормально. Никто не начинает не с начала. Где бы ты сейчас реально ни был, оно встретит тебя там.",
     p7: "Ещё одно: иногда ответ приходит дольше обычного. Это намеренно — именно в тишине приходят самые настоящие ответы.",
+    privacy1: "Твои разговоры хранятся в безопасности, чтобы приложение могло помнить тебя между сеансами — именно это позволяет ему замечать настоящие закономерности со временем, а не начинать с нуля каждый раз.",
+    privacy2: "Они никогда не продаются, никогда не используются для обучения ИИ-моделей и зашифрованы как при передаче, так и при хранении. Разговоры никто и никогда не читает, не просматривает и не передаёт третьим лицам.",
     continueLabel: "Продолжить",
     beginLabel: "Начать",
   },
@@ -1685,6 +1760,8 @@ const ONBOARDING_STRINGS: Record<string, OnboardingCopy> = {
     beforeYouStartHint: "Para se të fillosh",
     p6: "Nuk do të arrish atje sot, dhe kjo është në rregull. Askush nuk fillon diku tjetër përveçse nga fillimi. Kudo që të jesh vërtet tani, do të të gjejë atje.",
     p7: "Edhe një gjë: ndonjëherë një përgjigje merr më shumë kohë se zakonisht. Kjo është me qëllim — në heshtje gjenden përgjigjet më të vërteta.",
+    privacy1: "Bisedat e tua ruhen në mënyrë të sigurt që aplikacioni të mund të të mbajë mend nga një sesion në tjetrin — kjo është ajo që i mundëson të vërejë modele të vërteta me kalimin e kohës, në vend që të fillojë nga e para çdo herë.",
+    privacy2: "Ato nuk shiten kurrë, nuk përdoren kurrë për të trajnuar modele IA, dhe janë të koduara si gjatë transmetimit ashtu edhe kur ruhen. Bisedat nuk lexohen, shqyrtohen apo ndahen kurrë me askënd.",
     continueLabel: "Vazhdo",
     beginLabel: "Fillo",
   },
@@ -1711,6 +1788,8 @@ const ONBOARDING_STRINGS: Record<string, OnboardingCopy> = {
     beforeYouStartHint: "Πριν ξεκινήσεις",
     p6: "Δεν θα φτάσεις εκεί σήμερα, και δεν πειράζει. Κανείς δεν ξεκινά από πουθενά αλλού παρά από την αρχή. Όπου πραγματικά βρίσκεσαι τώρα, εκεί θα σε συναντήσει.",
     p7: "Ακόμα ένα πράγμα: μερικές φορές μια απάντηση χρειάζεται περισσότερο χρόνο από το συνηθισμένο. Είναι σκόπιμο — μέσα στη σιωπή βρίσκονται οι πιο αληθινές απαντήσεις.",
+    privacy1: "Οι συνομιλίες σου αποθηκεύονται με ασφάλεια ώστε η εφαρμογή να μπορεί να σε θυμάται από τη μία συνεδρία στην άλλη — αυτό είναι που της επιτρέπει να παρατηρεί πραγματικά μοτίβα με τον καιρό, αντί να ξεκινά από την αρχή κάθε φορά.",
+    privacy2: "Δεν πωλούνται ποτέ, δεν χρησιμοποιούνται ποτέ για την εκπαίδευση μοντέλων ΤΝ, και είναι κρυπτογραφημένες τόσο κατά τη μεταφορά όσο και κατά την αποθήκευση. Οι συνομιλίες δεν διαβάζονται, δεν εξετάζονται ούτε κοινοποιούνται ποτέ σε κανέναν.",
     continueLabel: "Συνέχεια",
     beginLabel: "Ξεκίνα",
   },
@@ -1737,6 +1816,8 @@ const ONBOARDING_STRINGS: Record<string, OnboardingCopy> = {
     beforeYouStartHint: "Նախքան սկսելը",
     p6: "Այսօր դու չես հասնի այնտեղ, և դա լավ է։ Ոչ ոք չի սկսում որևէ այլ տեղից, քան սկիզբը։ Որտեղ էլ որ իրականում գտնվես հիմա, այն կհանդիպի քեզ այնտեղ։",
     p7: "Եվս մեկ բան․ երբեմն պատասխանը սովորականից ավելի երկար է տևում։ Դա միտումնավոր է — հենց լռության մեջ են գտնվում ամենաիրական պատասխանները։",
+    privacy1: "Քո զրույցները պահվում են անվտանգ կերպով, որպեսզի հավելվածը կարողանա հիշել քեզ նստաշրջանների միջև — հենց դա է թույլ տալիս նրան ժամանակի ընթացքում նկատել իրական օրինաչափություններ, փոխանակ ամեն անգամ սկսելու զրոյից։",
+    privacy2: "Դրանք երբեք չեն վաճառվում, երբեք չեն օգտագործվում ԱԲ մոդելներ ուսուցանելու համար, և գաղտնագրված են ինչպես փոխանցման, այնպես էլ պահպանման ընթացքում։ Զրույցները երբեք չեն կարդացվում, չեն վերանայվում կամ չեն կիսվում որևէ մեկի հետ։",
     continueLabel: "Շարունակել",
     beginLabel: "Սկսել",
   },
@@ -1763,6 +1844,8 @@ const ONBOARDING_STRINGS: Record<string, OnboardingCopy> = {
     beforeYouStartHint: "Pre nego što počneš",
     p6: "Danas nećeš stići tamo, i to je u redu. Niko ne počinje nigde osim od početka. Gde god da si zaista sada, tu će te i pronaći.",
     p7: "Još nešto: ponekad odgovor traje duže nego obično. To je namerno — u tišini se nalaze najbolji odgovori.",
+    privacy1: "Tvoji razgovori se bezbedno čuvaju kako bi aplikacija mogla da te pamti između sesija — upravo to joj omogućava da vremenom primeti stvarne obrasce, umesto da svaki put počinje ispočetka.",
+    privacy2: "Nikada se ne prodaju, nikada se ne koriste za treniranje AI modela, i šifrovani su i tokom prenosa i tokom čuvanja. Razgovori se nikada ne čitaju, ne pregledaju niti dele sa bilo kim.",
     continueLabel: "Nastavi",
     beginLabel: "Počni",
   },
@@ -1789,6 +1872,8 @@ const ONBOARDING_STRINGS: Record<string, OnboardingCopy> = {
     beforeYouStartHint: "Prije nego počneš",
     p6: "Danas nećeš stići tamo, i to je u redu. Nitko ne počinje nigdje osim od početka. Gdje god da si zaista sada, tu će te i pronaći.",
     p7: "Još nešto: ponekad odgovor traje dulje nego inače. To je namjerno — u tišini se nalaze najbolji odgovori.",
+    privacy1: "Tvoji razgovori se sigurno čuvaju kako bi aplikacija mogla pamtiti tebe između sesija — upravo to joj omogućuje da s vremenom primijeti stvarne obrasce, umjesto da svaki put počinje ispočetka.",
+    privacy2: "Nikada se ne prodaju, nikada se ne koriste za treniranje AI modela, i šifrirani su i tijekom prijenosa i tijekom pohrane. Razgovori se nikada ne čitaju, ne pregledavaju niti dijele s bilo kim.",
     continueLabel: "Nastavi",
     beginLabel: "Počni",
   },
@@ -1815,6 +1900,8 @@ const ONBOARDING_STRINGS: Record<string, OnboardingCopy> = {
     beforeYouStartHint: "Prije nego što počneš",
     p6: "Danas nećeš stići tamo, i to je u redu. Niko ne počinje nigdje osim od početka. Gdje god da si zaista sada, tu će te i pronaći.",
     p7: "Još nešto: ponekad odgovor traje duže nego obično. To je namjerno — u tišini se nalaze najbolji odgovori.",
+    privacy1: "Tvoji razgovori se sigurno čuvaju kako bi aplikacija mogla pamtiti tebe između sesija — upravo to joj omogućava da s vremenom primijeti stvarne obrasce, umjesto da svaki put počinje ispočetka.",
+    privacy2: "Nikada se ne prodaju, nikada se ne koriste za treniranje AI modela, i šifrirani su i tokom prijenosa i tokom čuvanja. Razgovori se nikada ne čitaju, ne pregledaju niti dijele s bilo kim.",
     continueLabel: "Nastavi",
     beginLabel: "Počni",
   },
@@ -1841,6 +1928,8 @@ const ONBOARDING_STRINGS: Record<string, OnboardingCopy> = {
     beforeYouStartHint: "Преди да започнеш",
     p6: "Днес няма да стигнеш дотам, и това е нормално. Никой не започва отникъде другаде освен от началото. Където наистина си сега, там ще те намери.",
     p7: "Още нещо: понякога отговорът отнема повече време от обичайното. Това е нарочно — в тишината се крият най-верните отговори.",
+    privacy1: "Разговорите ти се съхраняват сигурно, за да може приложението да те помни между сесиите — именно това му позволява да забелязва реални модели с течение на времето, вместо да започва от нулата всеки път.",
+    privacy2: "Те никога не се продават, никога не се използват за обучение на AI модели и са криптирани както при пренос, така и при съхранение. Разговорите никога не се четат, преглеждат или споделят с никого.",
     continueLabel: "Напред",
     beginLabel: "Започни",
   },
@@ -1867,6 +1956,8 @@ const ONBOARDING_STRINGS: Record<string, OnboardingCopy> = {
     beforeYouStartHint: "Пред да започнеш",
     p6: "Денес нема да стигнеш таму, и тоа е во ред. Никој не почнува од друго место освен од почетокот. Каде и да си навистина сега, таму ќе те најде.",
     p7: "Уште нешто: понекогаш одговорот трае подолго од вообичаеното. Тоа е намерно — во тишината се наоѓаат најдлабоките одговори.",
+    privacy1: "Твоите разговори се чуваат безбедно за да може апликацијата да те памти помеѓу сесиите — токму тоа ѝ овозможува да забележи вистински обрасци со текот на времето, наместо секој пат да почнува од нула.",
+    privacy2: "Тие никогаш не се продаваат, никогаш не се користат за обучување на AI модели, и се криптирани и при пренос и при складирање. Разговорите никогаш не се читаат, прегледуваат или споделуваат со никого.",
     continueLabel: "Продолжи",
     beginLabel: "Започни",
   },
@@ -1893,6 +1984,8 @@ const ONBOARDING_STRINGS: Record<string, OnboardingCopy> = {
     beforeYouStartHint: "Înainte să începi",
     p6: "Nu vei ajunge acolo azi, și e în regulă. Nimeni nu începe altundeva decât la început. Oriunde ești cu adevărat acum, te va găsi acolo.",
     p7: "Încă un lucru: uneori un răspuns durează mai mult decât de obicei. E intenționat — în tăcere găsești cele mai adevărate răspunsuri.",
+    privacy1: "Conversațiile tale sunt stocate în siguranță, astfel încât aplicația să își poată aminti de tine între sesiuni — asta îi permite să observe tipare reale de-a lungul timpului, în loc să o ia de la zero de fiecare dată.",
+    privacy2: "Nu sunt niciodată vândute, niciodată folosite pentru a antrena modele de IA, și sunt criptate atât în tranzit, cât și la stocare. Conversațiile nu sunt niciodată citite, examinate sau partajate cu nimeni.",
     continueLabel: "Continuă",
     beginLabel: "Începe",
   },
@@ -1919,6 +2012,8 @@ const ONBOARDING_STRINGS: Record<string, OnboardingCopy> = {
     beforeYouStartHint: "Preden začneš",
     p6: "Danes ne boš prišel tja, in to je v redu. Nihče ne začne nikjer drugje kot na začetku. Kjerkoli dejansko zdaj si, te bo tam poiskalo.",
     p7: "Še nekaj: včasih odgovor traja dlje kot ponavadi. To je namerno — v tišini najdeš najboljše odgovore.",
+    privacy1: "Tvoji pogovori se varno shranjujejo, da si te aplikacija lahko zapomni med sejami — prav to ji omogoča, da sčasoma opazi resnične vzorce, namesto da vsakič začne znova.",
+    privacy2: "Nikoli se ne prodajajo, nikoli se ne uporabljajo za učenje AI modelov, in so šifrirani tako med prenosom kot v mirovanju. Pogovori nikoli niso brani, pregledani ali deljeni s komer koli.",
     continueLabel: "Nadaljuj",
     beginLabel: "Začni",
   },
@@ -1979,6 +2074,14 @@ function getOnboardingScreens(lang: string): { html: JSX.Element }[] {
           <p className="onb-hint">{o.beforeYouStartHint}</p>
           <p>{o.p6}</p>
           <p>{o.p7}</p>
+        </>
+      ),
+    },
+    {
+      html: (
+        <>
+          <p className="onb-privacy">{o.privacy1}</p>
+          <p className="onb-privacy">{o.privacy2}</p>
         </>
       ),
     },
@@ -2729,6 +2832,10 @@ export default function Home() {
               <button type="submit">{s.saveLabel}</button>
             </form>
           )}
+          <div className="settings-privacy">
+            <p>{s.privacyLong1}</p>
+            <p>{s.privacyLong2}</p>
+          </div>
         </div>
       )}
 
