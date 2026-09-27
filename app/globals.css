@@ -449,7 +449,32 @@ body {
   overflow-y: auto;
 }
 
+/* The corridor photo sits behind everything else in the overlay; the
+   scrim is a separate layer on top of it so the darkness level is a
+   one-line tweak later without touching the image itself. Both get an
+   explicit low z-index -- absolutely positioned elements paint above
+   plain in-flow siblings by default, so without this the photo would
+   cover the actual content instead of sitting behind it. */
+.tree-bg-image {
+  z-index: 0;
+  object-fit: cover;
+}
+
+.tree-bg-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  background: linear-gradient(
+    to bottom,
+    rgba(10, 9, 8, 0.82) 0%,
+    rgba(10, 9, 8, 0.7) 40%,
+    rgba(10, 9, 8, 0.85) 100%
+  );
+}
+
 .tree-eyebrow {
+  position: relative;
+  z-index: 2;
   font-family: var(--font-mono);
   font-size: 11px;
   letter-spacing: 0.08em;
@@ -459,6 +484,8 @@ body {
 }
 
 .tree-card {
+  position: relative;
+  z-index: 2;
   max-width: 420px;
   width: 100%;
 }
@@ -1385,6 +1412,31 @@ body {
   transition: opacity 1.2s ease;
 }
 
+/* Same halo/scrim approach as the Patterns screen -- image and scrim as
+   their own layers, dark level tunable in one place, everything else
+   in .app painting above them via the normal stacking order. */
+.opening-bg {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.opening-bg-image {
+  object-fit: cover;
+}
+
+.opening-bg-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(10, 9, 8, 0.55) 0%,
+    rgba(10, 9, 8, 0.35) 45%,
+    rgba(10, 9, 8, 0.75) 100%
+  );
+}
+
 .element-orb-canvas {
   width: 100%;
   height: 100%;
@@ -1436,7 +1488,7 @@ body {
 .app
   > *:not(.ambient-glow):not(.element-orb-wrap):not(.orb-intro):not(
     .avatar-reveal-overlay
-  ):not(.pattern-review-overlay):not(.tree-overlay):not(.patterns-tabs) {
+  ):not(.pattern-review-overlay):not(.tree-overlay):not(.patterns-tabs):not(.opening-bg) {
   position: relative;
   z-index: 1;
 }

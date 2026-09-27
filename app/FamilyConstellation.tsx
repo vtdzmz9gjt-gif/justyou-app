@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import type { SephirahTier } from "@/lib/tree";
 import {
   THEME_ORDER,
@@ -156,6 +157,15 @@ export default function FamilyConstellation({
 
   return (
     <div className="tree-overlay">
+      <Image
+        src="/backgrounds/archive-corridor.jpg"
+        alt=""
+        fill
+        priority
+        sizes="100vw"
+        className="tree-bg-image"
+      />
+      <div className="tree-bg-scrim" aria-hidden="true" />
       <div className="tree-eyebrow">{eyebrowLabel}</div>
       <div className="tree-card">
         <p className="tree-heading">Where it comes from</p>
