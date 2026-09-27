@@ -2243,6 +2243,8 @@ export default function Home() {
           state={treeState}
           tensionInsights={tensionInsights}
           daat={daat}
+          userId={userId}
+          lang={lang}
           eyebrowLabel={s.returnLabel}
           closeLabel="close"
           onClose={() => setShowTree(false)}
@@ -2252,6 +2254,8 @@ export default function Home() {
       {showTree && patternsTab === "family" && (
         <FamilyConstellation
           state={familyState}
+          userId={userId}
+          lang={lang}
           eyebrowLabel={s.returnLabel}
           closeLabel="close"
           onClose={() => setShowTree(false)}
