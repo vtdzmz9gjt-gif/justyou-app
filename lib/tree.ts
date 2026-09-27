@@ -18,6 +18,10 @@ export type SephirahKey =
 
 export type SephirahTier = "lightly_touched" | "returned_to" | "deeply_worked";
 
+// Same three-tier weight system used by both tag_sephirah and
+// tag_family_pattern -- one shared type so the two tools can't drift.
+export type SephirahWeight = "surface" | "substantive" | "confronted";
+
 // null/absent = genuinely unspoken -- that's information too, not a
 // placeholder or an error state.
 export type SephirahState = { tier: SephirahTier; groundedIn?: string };
@@ -94,6 +98,26 @@ export const TIER_RANK: Record<SephirahTier, number> = {
   returned_to: 1,
   deeply_worked: 2,
 };
+
+// The one tiering rule, shared by every append-only tag history in this
+// app (sephirah_tags, family_pattern_tags, and anything future) -- a
+// node/theme is never re-derived by AI judgment, always read fresh from
+// its own tag history: lightly touched needs only one tag; returned to
+// needs substantive-or-deeper tags on 2+ distinct calendar days (not 2+
+// mentions in one sitting -- the "talks-a-lot-looks-resolved" trap);
+// deeply worked additionally needs at least one "confronted" tag
+// anywhere in that history. Pulling this into one function means the
+// Tree and Family Constellation can never quietly drift apart on what
+// these words mean.
+export function deriveTier(tags: { weight: SephirahWeight; day: string }[]): SephirahTier {
+  const substantiveOrDeeper = tags.filter((t) => t.weight !== "surface");
+  const distinctDays = new Set(substantiveOrDeeper.map((t) => t.day));
+  const hasConfronted = tags.some((t) => t.weight === "confronted");
+  if (distinctDays.size >= 2) {
+    return hasConfronted ? "deeply_worked" : "returned_to";
+  }
+  return "lightly_touched";
+}
 
 // Da'at, the hidden eleventh point -- not a sephirah, not taggable, never
 // named in the UI. Positioned between Keter and Tiferet along the central
