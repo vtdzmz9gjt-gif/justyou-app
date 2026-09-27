@@ -13,12 +13,13 @@ import {
   getGroundedNotes,
   getStoredTensionInsight,
   saveTensionInsight,
+  getTreeState,
   type StoredMessage,
   type Stage,
   type Element,
   type SephirahWeight,
 } from "./db";
-import { NODES, TENSION_PAIRS, TIER_RANK, type SephirahKey, type TreeState } from "@/lib/tree";
+import { NODES, NODE_ORDER, TENSION_PAIRS, TIER_RANK, type SephirahKey, type TreeState } from "@/lib/tree";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
@@ -338,6 +339,33 @@ async function stageContext(userId: string): Promise<string> {
   } ${pctLine}`;
 }
 
+// Quiet awareness of the person's own Tree of Life so far -- gives the
+// model a real read of which parts are dark or barely touched, so it can
+// let a genuine opening steer toward one of those instead of only ever
+// reflecting back what's already been said. This is guidance, never a
+// checklist: the model decides if/when a natural opening exists, at most
+// once per conversation, and never names the mechanism ("Tree,"
+// "sephirah," a node's name) to the person -- same "recognition without
+// announcement" principle as everything else in the Tree of Life system.
+// Skipped entirely for a still-blank tree: with nothing touched yet,
+// there's no real pattern to react to, just an ordinary early
+// conversation.
+async function treeContext(userId: string): Promise<string> {
+  const state = await getTreeState(userId);
+  const touchedCount = NODE_ORDER.filter((n) => state[n]).length;
+  if (touchedCount === 0) return "";
+
+  const lines = NODE_ORDER.map((n) => {
+    const label = `${NODES[n].title} (${NODES[n].subtitle})`;
+    const s = state[n];
+    return `${label}: ${s ? s.tier.replace(/_/g, " ") : "unspoken"}`;
+  });
+
+  return `This person's Tree of Life so far -- their own private long-arc pattern, never named or listed back to them, never a checklist to march through:
+${lines.join("\n")}
+If a real opening comes up naturally, you can let an unspoken or barely-touched area inform which question you ask next -- but only when that's genuinely where the conversation is already headed, never forced, never more than once in a conversation, and never by naming the mechanism to the person.`;
+}
+
 function toApiMessages(history: StoredMessage[]): Anthropic.MessageParam[] {
   return history.map((m) => ({ role: m.role, content: m.content }));
 }
@@ -383,13 +411,14 @@ export async function runChat(
   const elementPromise = tagElement(userMessage);
   const sephirahPromise = resolveSephirahTag(userId, tagSephirah(userMessage));
 
-  const [openCommitment, stageInfo] = await Promise.all([
+  const [openCommitment, stageInfo, treeInfo] = await Promise.all([
     openCommitmentContext(userId),
     stageContext(userId),
+    treeContext(userId),
   ]);
   const system = `${BASE_SYSTEM_PROMPT}\n\n---\n\nCONTEXT (not visible to the person, never repeat it back verbatim):\n${todayContext()}\n${openCommitment}\n${depthContext(
     depth
-  )}\n${uiLanguageContext(uiLang)}\n${alivenessContext(alivenessAnswer)}\n${stageInfo}`;
+  )}\n${uiLanguageContext(uiLang)}\n${alivenessContext(alivenessAnswer)}\n${stageInfo}\n${treeInfo}`;
 
   const messages: Anthropic.MessageParam[] = [
     ...toApiMessages(history),
