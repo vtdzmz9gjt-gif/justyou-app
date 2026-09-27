@@ -98,6 +98,7 @@ export default function AvatarReveal({
   headline,
   reflection,
   closeLabel,
+  elementLabels,
   onClose,
 }: {
   tally: ElementTally;
@@ -105,6 +106,7 @@ export default function AvatarReveal({
   headline: string;
   reflection: string;
   closeLabel: string;
+  elementLabels: Record<Element, string>;
   onClose: () => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -258,7 +260,7 @@ export default function AvatarReveal({
                   className="avatar-reveal-legend-dot"
                   style={{ background: `#${ELEMENT_COLORS[item.key].toString(16).padStart(6, "0")}` }}
                 />
-                <span className="avatar-reveal-legend-label">{item.key}</span>
+                <span className="avatar-reveal-legend-label">{elementLabels[item.key]}</span>
                 <span className="avatar-reveal-legend-pct">{item.pct}%</span>
               </li>
             ))}

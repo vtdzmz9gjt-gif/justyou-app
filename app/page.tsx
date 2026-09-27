@@ -98,7 +98,15 @@ const STAGE_ORDER = ["mystery", "safety", "recognition", "courage", "return"] as
 // thing anyone reads, before onboarding or the opening question. Auto-
 // advances after a beat, or on tap/click/keypress for anyone who doesn't
 // want to wait it out.
-function ThresholdOverlay({ line, onDone }: { line: string; onDone: () => void }) {
+function ThresholdOverlay({
+  line,
+  ariaLabel,
+  onDone,
+}: {
+  line: string;
+  ariaLabel: string;
+  onDone: () => void;
+}) {
   const [closing, setClosing] = useState(false);
   const proceededRef = useRef(false);
 
@@ -121,7 +129,7 @@ function ThresholdOverlay({ line, onDone }: { line: string; onDone: () => void }
       onClick={proceed}
       role="button"
       tabIndex={0}
-      aria-label="Continue"
+      aria-label={ariaLabel}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") proceed();
       }}
@@ -198,6 +206,26 @@ type Strings = {
   // Not yet translated for every language -- falls back to English, see
   // CHECKIN_FALLBACK below.
   checkInPromptText?: string;
+  // Shared chrome text used across every overlay (Tree, Family, Avatar
+  // Reveal, Win, Weekly Recap) and a few standalone controls -- kept here
+  // rather than duplicated per-component since it's the same vocabulary
+  // everywhere it appears.
+  closeLabel: string;
+  continueLabel: string;
+  treeTabLabel: string;
+  familyTabLabel: string;
+  treeEntryLabel: string;
+  chooseTimeLabel: string;
+  chooseLanguageAriaLabel: string;
+  continueAriaLabel: string;
+  checkInSettingsAriaLabel: string;
+  sendAriaLabel: string;
+  // Nouns for the four elements, shown in the Avatar Reveal legend --
+  // distinct from `moods`, which are emotional states, not elements.
+  elementLabels: { fire: string; earth: string; air: string; water: string };
+  // Avatar Reveal headline template -- "{element}" and "{pct}" are
+  // substituted with the translated element noun and the percentage.
+  avatarHeadlineTemplate: string;
 };
 
 const ALIVENESS_FALLBACK = {
@@ -294,6 +322,20 @@ const STRINGS: Record<string, Strings> = {
     orbIntroLine: "Every true thing you say shapes this. By the end, you'll see the shape.",
     winHeadline: "You did it.",
     weeklyRecapHeadline: "This week.",
+    checkInPromptText:
+      "When's usually a good time for you? I'll check in warmly around then — never a hard rule, just less random than a stranger's guess.",
+    closeLabel: "close",
+    continueLabel: "continue",
+    treeTabLabel: "Your Tree",
+    familyTabLabel: "Your Family",
+    treeEntryLabel: "Your Tree",
+    chooseTimeLabel: "Choose a time",
+    chooseLanguageAriaLabel: "Choose language",
+    continueAriaLabel: "Continue",
+    checkInSettingsAriaLabel: "Check-in settings",
+    sendAriaLabel: "Send",
+    elementLabels: { fire: "Fire", earth: "Earth", air: "Air", water: "Water" },
+    avatarHeadlineTemplate: "{element} — {pct}% tonight.",
   },
   es: {
     brand: "Just You",
@@ -323,6 +365,20 @@ const STRINGS: Record<string, Strings> = {
     orbIntroLine: "Cada cosa verdadera que digas le da forma a esto. Al final, verás la forma.",
     winHeadline: "Lo lograste.",
     weeklyRecapHeadline: "Esta semana.",
+    checkInPromptText:
+      "¿Cuál suele ser un buen momento para ti? Te escribiré con calidez por esas fechas — nunca una regla fija, solo menos al azar que la suposición de un desconocido.",
+    closeLabel: "cerrar",
+    continueLabel: "continuar",
+    treeTabLabel: "Tu árbol",
+    familyTabLabel: "Tu familia",
+    treeEntryLabel: "Tu árbol",
+    chooseTimeLabel: "Elige una hora",
+    chooseLanguageAriaLabel: "Elegir idioma",
+    continueAriaLabel: "Continuar",
+    checkInSettingsAriaLabel: "Ajustes de seguimiento",
+    sendAriaLabel: "Enviar",
+    elementLabels: { fire: "Fuego", earth: "Tierra", air: "Aire", water: "Agua" },
+    avatarHeadlineTemplate: "{element} — {pct}% esta noche.",
   },
   fr: {
     brand: "Just You",
@@ -352,6 +408,20 @@ const STRINGS: Record<string, Strings> = {
     orbIntroLine: "Chaque chose vraie que tu dis façonne ceci. À la fin, tu verras la forme.",
     winHeadline: "Tu l'as fait.",
     weeklyRecapHeadline: "Cette semaine.",
+    checkInPromptText:
+      "Quel est généralement un bon moment pour toi ? Je prendrai des nouvelles avec douceur vers cette heure-là — jamais une règle stricte, juste moins aléatoire que la supposition d'un inconnu.",
+    closeLabel: "fermer",
+    continueLabel: "continuer",
+    treeTabLabel: "Ton arbre",
+    familyTabLabel: "Ta famille",
+    treeEntryLabel: "Ton arbre",
+    chooseTimeLabel: "Choisis une heure",
+    chooseLanguageAriaLabel: "Choisir la langue",
+    continueAriaLabel: "Continuer",
+    checkInSettingsAriaLabel: "Paramètres de suivi",
+    sendAriaLabel: "Envoyer",
+    elementLabels: { fire: "Feu", earth: "Terre", air: "Air", water: "Eau" },
+    avatarHeadlineTemplate: "{element} — {pct}% ce soir.",
   },
   de: {
     brand: "Just You",
@@ -381,6 +451,20 @@ const STRINGS: Record<string, Strings> = {
     orbIntroLine: "Jede wahre Sache, die du sagst, formt das hier. Am Ende siehst du die Form.",
     winHeadline: "Du hast es geschafft.",
     weeklyRecapHeadline: "Diese Woche.",
+    checkInPromptText:
+      "Wann passt es dir normalerweise am besten? Ich melde mich dann herzlich — nie eine feste Regel, nur weniger zufällig als die Vermutung eines Fremden.",
+    closeLabel: "schließen",
+    continueLabel: "weiter",
+    treeTabLabel: "Dein Baum",
+    familyTabLabel: "Deine Familie",
+    treeEntryLabel: "Dein Baum",
+    chooseTimeLabel: "Wähle eine Uhrzeit",
+    chooseLanguageAriaLabel: "Sprache wählen",
+    continueAriaLabel: "Weiter",
+    checkInSettingsAriaLabel: "Check-in-Einstellungen",
+    sendAriaLabel: "Senden",
+    elementLabels: { fire: "Feuer", earth: "Erde", air: "Luft", water: "Wasser" },
+    avatarHeadlineTemplate: "{element} — {pct}% heute Abend.",
   },
   pt: {
     brand: "Just You",
@@ -410,6 +494,20 @@ const STRINGS: Record<string, Strings> = {
     orbIntroLine: "Cada coisa verdadeira que você diz molda isso. No final, você verá a forma.",
     winHeadline: "Você conseguiu.",
     weeklyRecapHeadline: "Esta semana.",
+    checkInPromptText:
+      "Qual costuma ser um bom horário para você? Vou entrar em contato com carinho por essa hora — nunca uma regra fixa, só menos aleatório do que o palpite de um estranho.",
+    closeLabel: "fechar",
+    continueLabel: "continuar",
+    treeTabLabel: "Sua árvore",
+    familyTabLabel: "Sua família",
+    treeEntryLabel: "Sua árvore",
+    chooseTimeLabel: "Escolha um horário",
+    chooseLanguageAriaLabel: "Escolher idioma",
+    continueAriaLabel: "Continuar",
+    checkInSettingsAriaLabel: "Configurações de check-in",
+    sendAriaLabel: "Enviar",
+    elementLabels: { fire: "Fogo", earth: "Terra", air: "Ar", water: "Água" },
+    avatarHeadlineTemplate: "{element} — {pct}% esta noite.",
   },
   it: {
     brand: "Just You",
@@ -439,6 +537,20 @@ const STRINGS: Record<string, Strings> = {
     orbIntroLine: "Ogni cosa vera che dici dà forma a questo. Alla fine, vedrai la forma.",
     winHeadline: "Ce l'hai fatta.",
     weeklyRecapHeadline: "Questa settimana.",
+    checkInPromptText:
+      "Qual è di solito un buon momento per te? Ti scriverò con calore verso quell'ora — mai una regola fissa, solo meno casuale dell'ipotesi di uno sconosciuto.",
+    closeLabel: "chiudi",
+    continueLabel: "continua",
+    treeTabLabel: "Il tuo albero",
+    familyTabLabel: "La tua famiglia",
+    treeEntryLabel: "Il tuo albero",
+    chooseTimeLabel: "Scegli un orario",
+    chooseLanguageAriaLabel: "Scegli lingua",
+    continueAriaLabel: "Continua",
+    checkInSettingsAriaLabel: "Impostazioni check-in",
+    sendAriaLabel: "Invia",
+    elementLabels: { fire: "Fuoco", earth: "Terra", air: "Aria", water: "Acqua" },
+    avatarHeadlineTemplate: "{element} — {pct}% stasera.",
   },
   he: {
     brand: "Just You",
@@ -467,6 +579,20 @@ const STRINGS: Record<string, Strings> = {
     orbIntroLine: "כל דבר אמיתי שאתה אומר מעצב את זה. בסוף, תראה את הצורה.",
     winHeadline: "עשית את זה.",
     weeklyRecapHeadline: "השבוע.",
+    checkInPromptText:
+      "מתי בדרך כלל נוח לך? אתקשר אליך בחום בסביבות השעה הזו — לעולם לא כלל נוקשה, רק פחות אקראי מניחוש של זר.",
+    closeLabel: "סגור",
+    continueLabel: "המשך",
+    treeTabLabel: "העץ שלך",
+    familyTabLabel: "המשפחה שלך",
+    treeEntryLabel: "העץ שלך",
+    chooseTimeLabel: "בחר שעה",
+    chooseLanguageAriaLabel: "בחר שפה",
+    continueAriaLabel: "המשך",
+    checkInSettingsAriaLabel: "הגדרות בדיקה",
+    sendAriaLabel: "שלח",
+    elementLabels: { fire: "אש", earth: "אדמה", air: "אוויר", water: "מים" },
+    avatarHeadlineTemplate: "{element} — {pct}% הערב.",
   },
   ar: {
     brand: "Just You",
@@ -495,6 +621,20 @@ const STRINGS: Record<string, Strings> = {
     orbIntroLine: "كل شيء حقيقي تقوله يشكّل هذا. في النهاية، سترى الشكل.",
     winHeadline: "لقد فعلتها.",
     weeklyRecapHeadline: "هذا الأسبوع.",
+    checkInPromptText:
+      "متى يكون الوقت المناسب لك عادةً؟ سأتواصل معك بدفء في ذلك الوقت تقريبًا — ليست قاعدة صارمة أبدًا، فقط أقل عشوائية من تخمين شخص غريب.",
+    closeLabel: "إغلاق",
+    continueLabel: "متابعة",
+    treeTabLabel: "شجرتك",
+    familyTabLabel: "عائلتك",
+    treeEntryLabel: "شجرتك",
+    chooseTimeLabel: "اختر وقتًا",
+    chooseLanguageAriaLabel: "اختر اللغة",
+    continueAriaLabel: "متابعة",
+    checkInSettingsAriaLabel: "إعدادات المتابعة",
+    sendAriaLabel: "إرسال",
+    elementLabels: { fire: "نار", earth: "أرض", air: "هواء", water: "ماء" },
+    avatarHeadlineTemplate: "{element} — {pct}% الليلة.",
   },
   hi: {
     brand: "Just You",
@@ -524,6 +664,20 @@ const STRINGS: Record<string, Strings> = {
     orbIntroLine: "तुम जो भी सच कहते हो, वह इसे आकार देता है। अंत में, तुम आकार देख लोगे।",
     winHeadline: "तुमने कर दिखाया।",
     weeklyRecapHeadline: "इस हफ्ते।",
+    checkInPromptText:
+      "आमतौर पर तुम्हारे लिए कौन सा समय अच्छा रहता है? मैं उसी समय के आसपास प्यार से जांच करूँगा — कभी भी सख्त नियम नहीं, बस किसी अजनबी के अंदाज़े से कम अनियमित।",
+    closeLabel: "बंद करें",
+    continueLabel: "जारी रखें",
+    treeTabLabel: "तुम्हारा वृक्ष",
+    familyTabLabel: "तुम्हारा परिवार",
+    treeEntryLabel: "तुम्हारा वृक्ष",
+    chooseTimeLabel: "एक समय चुनें",
+    chooseLanguageAriaLabel: "भाषा चुनें",
+    continueAriaLabel: "जारी रखें",
+    checkInSettingsAriaLabel: "चेक-इन सेटिंग्स",
+    sendAriaLabel: "भेजें",
+    elementLabels: { fire: "अग्नि", earth: "पृथ्वी", air: "वायु", water: "जल" },
+    avatarHeadlineTemplate: "{element} — आज रात {pct}%.",
   },
   zh: {
     brand: "Just You",
@@ -552,6 +706,20 @@ const STRINGS: Record<string, Strings> = {
     orbIntroLine: "你说的每一句真话都在塑造这个。到最后，你会看到它的形状。",
     winHeadline: "你做到了。",
     weeklyRecapHeadline: "这一周。",
+    checkInPromptText:
+      "通常什么时间对你来说比较合适？我会在那个时候温暖地问候你——这从来不是硬性规定，只是比陌生人的猜测更靠谱一点。",
+    closeLabel: "关闭",
+    continueLabel: "继续",
+    treeTabLabel: "你的树",
+    familyTabLabel: "你的家庭",
+    treeEntryLabel: "你的树",
+    chooseTimeLabel: "选择一个时间",
+    chooseLanguageAriaLabel: "选择语言",
+    continueAriaLabel: "继续",
+    checkInSettingsAriaLabel: "签到设置",
+    sendAriaLabel: "发送",
+    elementLabels: { fire: "火", earth: "土", air: "风", water: "水" },
+    avatarHeadlineTemplate: "{element} — 今晚 {pct}%。",
   },
   ja: {
     brand: "Just You",
@@ -581,6 +749,20 @@ const STRINGS: Record<string, Strings> = {
     orbIntroLine: "あなたが語るすべての真実が、これを形作ります。最後には、その形が見えるでしょう。",
     winHeadline: "やり遂げた。",
     weeklyRecapHeadline: "今週。",
+    checkInPromptText:
+      "普段、都合がいい時間帯はいつですか？その時間帯に温かく様子を伺います — 厳密なルールではなく、見知らぬ人の当て推量よりはましというだけです。",
+    closeLabel: "閉じる",
+    continueLabel: "続ける",
+    treeTabLabel: "あなたの木",
+    familyTabLabel: "あなたの家族",
+    treeEntryLabel: "あなたの木",
+    chooseTimeLabel: "時間を選んでください",
+    chooseLanguageAriaLabel: "言語を選択",
+    continueAriaLabel: "続ける",
+    checkInSettingsAriaLabel: "チェックイン設定",
+    sendAriaLabel: "送信",
+    elementLabels: { fire: "火", earth: "地", air: "風", water: "水" },
+    avatarHeadlineTemplate: "{element} — 今夜 {pct}%。",
   },
   ru: {
     brand: "Just You",
@@ -610,6 +792,20 @@ const STRINGS: Record<string, Strings> = {
     orbIntroLine: "Каждая правда, которую ты говоришь, формирует это. В конце ты увидишь форму.",
     winHeadline: "Ты сделал это.",
     weeklyRecapHeadline: "На этой неделе.",
+    checkInPromptText:
+      "Когда тебе обычно удобно? Я тепло напишу примерно в это время — никогда не жёсткое правило, просто не так наугад, как у постороннего.",
+    closeLabel: "закрыть",
+    continueLabel: "продолжить",
+    treeTabLabel: "Твоё дерево",
+    familyTabLabel: "Твоя семья",
+    treeEntryLabel: "Твоё дерево",
+    chooseTimeLabel: "Выбери время",
+    chooseLanguageAriaLabel: "Выбрать язык",
+    continueAriaLabel: "Продолжить",
+    checkInSettingsAriaLabel: "Настройки напоминаний",
+    sendAriaLabel: "Отправить",
+    elementLabels: { fire: "Огонь", earth: "Земля", air: "Воздух", water: "Вода" },
+    avatarHeadlineTemplate: "{element} — {pct}% сегодня вечером.",
   },
   sq: {
     brand: "Just You",
@@ -638,6 +834,20 @@ const STRINGS: Record<string, Strings> = {
     orbIntroLine: "Çdo gjë e vërtetë që thua e formon këtë. Në fund, do ta shohësh formën.",
     winHeadline: "E bëre.",
     weeklyRecapHeadline: "Këtë javë.",
+    checkInPromptText:
+      "Cila është zakonisht një kohë e mirë për ty? Do të kontaktoj me ngrohtësi rreth asaj kohe — kurrë një rregull i ngurtë, thjesht më pak i rastësishëm se hamendja e një të huaji.",
+    closeLabel: "mbyll",
+    continueLabel: "vazhdo",
+    treeTabLabel: "Pema jote",
+    familyTabLabel: "Familja jote",
+    treeEntryLabel: "Pema jote",
+    chooseTimeLabel: "Zgjidh një orë",
+    chooseLanguageAriaLabel: "Zgjidh gjuhën",
+    continueAriaLabel: "Vazhdo",
+    checkInSettingsAriaLabel: "Cilësimet e kontaktit",
+    sendAriaLabel: "Dërgo",
+    elementLabels: { fire: "Zjarri", earth: "Toka", air: "Ajri", water: "Uji" },
+    avatarHeadlineTemplate: "{element} — {pct}% sonte.",
   },
   el: {
     brand: "Just You",
@@ -667,6 +877,20 @@ const STRINGS: Record<string, Strings> = {
     orbIntroLine: "Κάθε αληθινό πράγμα που λες, το διαμορφώνει αυτό. Στο τέλος, θα δεις τη μορφή.",
     winHeadline: "Το έκανες.",
     weeklyRecapHeadline: "Αυτή την εβδομάδα.",
+    checkInPromptText:
+      "Ποια ώρα σου βολεύει συνήθως; Θα επικοινωνήσω με ζεστασιά γύρω σε αυτή την ώρα — ποτέ αυστηρός κανόνας, απλώς λιγότερο τυχαίο από τη μαντεψιά ενός αγνώστου.",
+    closeLabel: "κλείσιμο",
+    continueLabel: "συνέχεια",
+    treeTabLabel: "Το δέντρο σου",
+    familyTabLabel: "Η οικογένειά σου",
+    treeEntryLabel: "Το δέντρο σου",
+    chooseTimeLabel: "Επίλεξε μια ώρα",
+    chooseLanguageAriaLabel: "Επιλογή γλώσσας",
+    continueAriaLabel: "Συνέχεια",
+    checkInSettingsAriaLabel: "Ρυθμίσεις επικοινωνίας",
+    sendAriaLabel: "Αποστολή",
+    elementLabels: { fire: "Φωτιά", earth: "Γη", air: "Αέρας", water: "Νερό" },
+    avatarHeadlineTemplate: "{element} — {pct}% απόψε.",
   },
   hy: {
     brand: "Just You",
@@ -696,6 +920,20 @@ const STRINGS: Record<string, Strings> = {
     orbIntroLine: "Ամեն ճշմարիտ բան, որ ասում ես, ձևավորում է սա։ Վերջում կտեսնես ձևը։",
     winHeadline: "Դու արեցիր դա։",
     weeklyRecapHeadline: "Այս շաբաթ։",
+    checkInPromptText:
+      "Սովորաբար ե՞րբ է քեզ հարմար։ Ես կդիմեմ քեզ ջերմությամբ մոտավորապես այդ ժամին — երբեք խիստ կանոն, պարզապես ավելի քիչ պատահական, քան անծանոթի կռահումը։",
+    closeLabel: "փակել",
+    continueLabel: "շարունակել",
+    treeTabLabel: "Քո ծառը",
+    familyTabLabel: "Քո ընտանիքը",
+    treeEntryLabel: "Քո ծառը",
+    chooseTimeLabel: "Ընտրիր ժամ",
+    chooseLanguageAriaLabel: "Ընտրել լեզուն",
+    continueAriaLabel: "Շարունակել",
+    checkInSettingsAriaLabel: "Ստուգման կարգավորումներ",
+    sendAriaLabel: "Ուղարկել",
+    elementLabels: { fire: "Կրակ", earth: "Հող", air: "Օդ", water: "Ջուր" },
+    avatarHeadlineTemplate: "{element} — {pct}% այս գիշեր։",
   },
   sr: {
     brand: "Just You",
@@ -725,6 +963,20 @@ const STRINGS: Record<string, Strings> = {
     orbIntroLine: "Svaka istinita stvar koju kažeš oblikuje ovo. Na kraju ćeš videti oblik.",
     winHeadline: "Uspeo si.",
     weeklyRecapHeadline: "Ove nedelje.",
+    checkInPromptText:
+      "Koje vreme ti obično odgovara? Javiću ti se toplo oko tog vremena — nikad strogo pravilo, samo manje nasumično od nagađanja stranca.",
+    closeLabel: "zatvori",
+    continueLabel: "nastavi",
+    treeTabLabel: "Tvoje drvo",
+    familyTabLabel: "Tvoja porodica",
+    treeEntryLabel: "Tvoje drvo",
+    chooseTimeLabel: "Izaberi vreme",
+    chooseLanguageAriaLabel: "Izaberi jezik",
+    continueAriaLabel: "Nastavi",
+    checkInSettingsAriaLabel: "Podešavanja javljanja",
+    sendAriaLabel: "Pošalji",
+    elementLabels: { fire: "Vatra", earth: "Zemlja", air: "Vazduh", water: "Voda" },
+    avatarHeadlineTemplate: "{element} — {pct}% večeras.",
   },
   hr: {
     brand: "Just You",
@@ -754,6 +1006,20 @@ const STRINGS: Record<string, Strings> = {
     orbIntroLine: "Svaka istinita stvar koju kažeš oblikuje ovo. Na kraju ćeš vidjeti oblik.",
     winHeadline: "Uspio si.",
     weeklyRecapHeadline: "Ovaj tjedan.",
+    checkInPromptText:
+      "Koje vrijeme ti obično odgovara? Javit ću ti se toplo otprilike u to vrijeme — nikad strogo pravilo, samo manje nasumično od nagađanja stranca.",
+    closeLabel: "zatvori",
+    continueLabel: "nastavi",
+    treeTabLabel: "Tvoje stablo",
+    familyTabLabel: "Tvoja obitelj",
+    treeEntryLabel: "Tvoje stablo",
+    chooseTimeLabel: "Odaberi vrijeme",
+    chooseLanguageAriaLabel: "Odaberi jezik",
+    continueAriaLabel: "Nastavi",
+    checkInSettingsAriaLabel: "Postavke javljanja",
+    sendAriaLabel: "Pošalji",
+    elementLabels: { fire: "Vatra", earth: "Zemlja", air: "Zrak", water: "Voda" },
+    avatarHeadlineTemplate: "{element} — {pct}% večeras.",
   },
   bs: {
     brand: "Just You",
@@ -783,6 +1049,20 @@ const STRINGS: Record<string, Strings> = {
     orbIntroLine: "Svaka istinita stvar koju kažeš oblikuje ovo. Na kraju ćeš vidjeti oblik.",
     winHeadline: "Uspio si.",
     weeklyRecapHeadline: "Ove sedmice.",
+    checkInPromptText:
+      "Koje vrijeme ti obično odgovara? Javiću ti se toplo otprilike u to vrijeme — nikad strogo pravilo, samo manje nasumično od nagađanja stranca.",
+    closeLabel: "zatvori",
+    continueLabel: "nastavi",
+    treeTabLabel: "Tvoje drvo",
+    familyTabLabel: "Tvoja porodica",
+    treeEntryLabel: "Tvoje drvo",
+    chooseTimeLabel: "Izaberi vrijeme",
+    chooseLanguageAriaLabel: "Izaberi jezik",
+    continueAriaLabel: "Nastavi",
+    checkInSettingsAriaLabel: "Podešavanja javljanja",
+    sendAriaLabel: "Pošalji",
+    elementLabels: { fire: "Vatra", earth: "Zemlja", air: "Zrak", water: "Voda" },
+    avatarHeadlineTemplate: "{element} — {pct}% večeras.",
   },
   bg: {
     brand: "Just You",
@@ -812,6 +1092,20 @@ const STRINGS: Record<string, Strings> = {
     orbIntroLine: "Всяко истинско нещо, което казваш, оформя това. В края ще видиш формата.",
     winHeadline: "Успя.",
     weeklyRecapHeadline: "Тази седмица.",
+    checkInPromptText:
+      "Кое време обикновено е удобно за теб? Ще се свържа топло с теб около това време — никога строго правило, само по-малко случайно от предположението на непознат.",
+    closeLabel: "затвори",
+    continueLabel: "продължи",
+    treeTabLabel: "Твоето дърво",
+    familyTabLabel: "Твоето семейство",
+    treeEntryLabel: "Твоето дърво",
+    chooseTimeLabel: "Избери час",
+    chooseLanguageAriaLabel: "Избери език",
+    continueAriaLabel: "Продължи",
+    checkInSettingsAriaLabel: "Настройки за връзка",
+    sendAriaLabel: "Изпрати",
+    elementLabels: { fire: "Огън", earth: "Земя", air: "Въздух", water: "Вода" },
+    avatarHeadlineTemplate: "{element} — {pct}% тази вечер.",
   },
   mk: {
     brand: "Just You",
@@ -841,6 +1135,20 @@ const STRINGS: Record<string, Strings> = {
     orbIntroLine: "Секое вистинско нешто што го кажуваш ја обликува ова. На крајот, ќе ја видиш формата.",
     winHeadline: "Успеа.",
     weeklyRecapHeadline: "Оваа недела.",
+    checkInPromptText:
+      "Кое време обично ти одговара? Ќе ти се јавам топло околу тоа време — никогаш строго правило, само помалку случајно од погодувањето на непознат.",
+    closeLabel: "затвори",
+    continueLabel: "продолжи",
+    treeTabLabel: "Твоето дрво",
+    familyTabLabel: "Твоето семејство",
+    treeEntryLabel: "Твоето дрво",
+    chooseTimeLabel: "Избери време",
+    chooseLanguageAriaLabel: "Избери јазик",
+    continueAriaLabel: "Продолжи",
+    checkInSettingsAriaLabel: "Поставки за јавување",
+    sendAriaLabel: "Испрати",
+    elementLabels: { fire: "Оган", earth: "Земја", air: "Воздух", water: "Вода" },
+    avatarHeadlineTemplate: "{element} — {pct}% вечерва.",
   },
   ro: {
     brand: "Just You",
@@ -870,6 +1178,20 @@ const STRINGS: Record<string, Strings> = {
     orbIntroLine: "Fiecare lucru adevărat pe care îl spui dă formă acestui lucru. La final, vei vedea forma.",
     winHeadline: "Ai reușit.",
     weeklyRecapHeadline: "Săptămâna aceasta.",
+    checkInPromptText:
+      "Care e de obicei un moment bun pentru tine? Te voi contacta cu căldură pe la ora aceea — niciodată o regulă strictă, doar mai puțin la întâmplare decât ghicitul unui străin.",
+    closeLabel: "închide",
+    continueLabel: "continuă",
+    treeTabLabel: "Copacul tău",
+    familyTabLabel: "Familia ta",
+    treeEntryLabel: "Copacul tău",
+    chooseTimeLabel: "Alege o oră",
+    chooseLanguageAriaLabel: "Alege limba",
+    continueAriaLabel: "Continuă",
+    checkInSettingsAriaLabel: "Setări de contact",
+    sendAriaLabel: "Trimite",
+    elementLabels: { fire: "Foc", earth: "Pământ", air: "Aer", water: "Apă" },
+    avatarHeadlineTemplate: "{element} — {pct}% în seara asta.",
   },
   sl: {
     brand: "Just You",
@@ -899,6 +1221,20 @@ const STRINGS: Record<string, Strings> = {
     orbIntroLine: "Vsaka resnična stvar, ki jo poveš, oblikuje to. Na koncu boš videl obliko.",
     winHeadline: "Uspelo ti je.",
     weeklyRecapHeadline: "Ta teden.",
+    checkInPromptText:
+      "Kdaj ti običajno najbolj ustreza? Takrat te bom toplo pozdravil — nikoli strogo pravilo, le manj naključno od ugibanja tujca.",
+    closeLabel: "zapri",
+    continueLabel: "nadaljuj",
+    treeTabLabel: "Tvoje drevo",
+    familyTabLabel: "Tvoja družina",
+    treeEntryLabel: "Tvoje drevo",
+    chooseTimeLabel: "Izberi čas",
+    chooseLanguageAriaLabel: "Izberi jezik",
+    continueAriaLabel: "Nadaljuj",
+    checkInSettingsAriaLabel: "Nastavitve javljanja",
+    sendAriaLabel: "Pošlji",
+    elementLabels: { fire: "Ogenj", earth: "Zemlja", air: "Zrak", water: "Voda" },
+    avatarHeadlineTemplate: "{element} — {pct}% nocoj.",
   },
 };
 
@@ -2131,6 +2467,7 @@ export default function Home() {
     return (
       <ThresholdOverlay
         line={s.thresholdLine || THRESHOLD_FALLBACK.thresholdLine}
+        ariaLabel={s.continueAriaLabel}
         onDone={() => setShowThreshold(false)}
       />
     );
@@ -2153,7 +2490,7 @@ export default function Home() {
             className="lang-select"
             value={lang}
             onChange={(e) => changeLang(e.target.value)}
-            aria-label="Choose language"
+            aria-label={s.chooseLanguageAriaLabel}
           >
             {SUPPORTED_LANGS.map((code) => (
               <option key={code} value={code}>
@@ -2223,9 +2560,12 @@ export default function Home() {
         <AvatarReveal
           tally={elementTally}
           eyebrowLabel={s.returnLabel}
-          headline={`${avatarReveal.dominant.charAt(0).toUpperCase()}${avatarReveal.dominant.slice(1)} carried tonight — ${avatarReveal.dominantPct}%.`}
+          headline={s.avatarHeadlineTemplate
+            .replace("{element}", s.elementLabels[avatarReveal.dominant])
+            .replace("{pct}", String(avatarReveal.dominantPct))}
           reflection={avatarReveal.reflection}
-          closeLabel="continue"
+          closeLabel={s.continueLabel}
+          elementLabels={s.elementLabels}
           onClose={() => {
             setAvatarReveal(null);
             openTree();
@@ -2242,7 +2582,7 @@ export default function Home() {
             className={patternsTab === "tree" ? "patterns-tab patterns-tab-active" : "patterns-tab"}
             onClick={() => setPatternsTab("tree")}
           >
-            Your Tree
+            {s.treeTabLabel}
           </button>
           <button
             type="button"
@@ -2251,7 +2591,7 @@ export default function Home() {
             className={patternsTab === "family" ? "patterns-tab patterns-tab-active" : "patterns-tab"}
             onClick={() => setPatternsTab("family")}
           >
-            Your Family
+            {s.familyTabLabel}
           </button>
         </div>
       )}
@@ -2264,7 +2604,7 @@ export default function Home() {
           userId={userId}
           lang={lang}
           eyebrowLabel={s.returnLabel}
-          closeLabel="close"
+          closeLabel={s.closeLabel}
           onClose={() => setShowTree(false)}
         />
       )}
@@ -2275,7 +2615,7 @@ export default function Home() {
           userId={userId}
           lang={lang}
           eyebrowLabel={s.returnLabel}
-          closeLabel="close"
+          closeLabel={s.closeLabel}
           onClose={() => setShowTree(false)}
         />
       )}
@@ -2287,7 +2627,7 @@ export default function Home() {
           eyebrowLabel={s.returnLabel}
           headline={s.winHeadline || WIN_FALLBACK.winHeadline}
           reflection={winCelebration.reflection}
-          closeLabel="continue"
+          closeLabel={s.continueLabel}
           onClose={() => setWinCelebration(null)}
         />
       )}
@@ -2298,7 +2638,7 @@ export default function Home() {
           headline={s.weeklyRecapHeadline || WEEKLY_RECAP_FALLBACK.weeklyRecapHeadline}
           summary={weeklyRecap.summary}
           wins={weeklyRecap.wins}
-          closeLabel="close"
+          closeLabel={s.closeLabel}
           onClose={() => setWeeklyRecap(null)}
         />
       )}
@@ -2310,7 +2650,7 @@ export default function Home() {
             className="lang-select"
             value={lang}
             onChange={(e) => changeLang(e.target.value)}
-            aria-label="Choose language"
+            aria-label={s.chooseLanguageAriaLabel}
           >
             {SUPPORTED_LANGS.map((code) => (
               <option key={code} value={code}>
@@ -2331,7 +2671,7 @@ export default function Home() {
             className="settings-toggle"
             onClick={() => setShowSettings((sVal) => !sVal)}
             aria-expanded={showSettings}
-            aria-label="Check-in settings"
+            aria-label={s.checkInSettingsAriaLabel}
           >
             ⋯
           </button>
@@ -2341,7 +2681,7 @@ export default function Home() {
       {showSettings && (
         <div className="settings-panel">
           <button type="button" className="tree-entry-btn" onClick={openTree}>
-            <span>Your Tree</span>
+            <span>{s.treeEntryLabel}</span>
             <span className="tree-entry-btn-arrow" aria-hidden="true">
               →
             </span>
@@ -2378,7 +2718,7 @@ export default function Home() {
                 required
               >
                 <option value="" disabled>
-                  Choose a time
+                  {s.chooseTimeLabel}
                 </option>
                 {CHECKIN_TIME_OPTIONS.map((opt) => (
                   <option key={opt.value} value={opt.value}>
@@ -2522,7 +2862,7 @@ export default function Home() {
               className="send-btn"
               onClick={() => send()}
               disabled={sending || !draft.trim()}
-              aria-label="Send"
+              aria-label={s.sendAriaLabel}
             >
               ↑
             </button>
@@ -2548,7 +2888,7 @@ export default function Home() {
               <p className="pattern-review-text">{patternReview}</p>
             )}
             <button type="button" className="pattern-review-close" onClick={closePatternReview}>
-              {!loadingPatternReview && pendingAvatarReveal ? "continue" : "close"}
+              {!loadingPatternReview && pendingAvatarReveal ? s.continueLabel : s.closeLabel}
             </button>
           </div>
         </div>
