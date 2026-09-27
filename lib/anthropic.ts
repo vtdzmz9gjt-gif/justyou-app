@@ -20,6 +20,8 @@ import {
   getFamilyTagCount,
   getStoredReflection,
   saveReflection,
+  recordCrossLink,
+  consumePendingCrossLinks,
   type StoredMessage,
   type Stage,
   type Element,
@@ -478,6 +480,21 @@ ${lines.join("\n")}
 If a real opening comes up naturally, you can let an unspoken or barely-touched area inform which question you ask next -- but only when that's genuinely where the conversation is already headed, never forced, never more than once in a conversation, and never by naming the mechanism to the person.`;
 }
 
+// A same-turn double-tag from the PREVIOUS message, queued for this reply
+// to name retroactively -- see the pending_cross_links table comment in
+// lib/db.ts for why this has to be a turn late rather than same-turn.
+// Consumed the moment this runs, regardless of whether the model actually
+// uses it -- same one-shot simplicity as everything else surfaced here.
+async function crossLinkContext(userId: string): Promise<string> {
+  const links = await consumePendingCrossLinks(userId);
+  if (links.length === 0) return "";
+  const lines = links.map(
+    (l) =>
+      `Their last message connected both "${NODES[l.sephirahNode].title} (${NODES[l.sephirahNode].subtitle})" from the Tree of Life and "${THEMES[l.familyTheme].title}" from Family Constellation -- the same underlying thing showing up in both.`
+  );
+  return `${lines.join("\n")}\nIf it fits naturally, you can name that connection now, retroactively, in your own words -- only if it's a genuine fit by the time you're replying, never forced, never more than once.`;
+}
+
 function toApiMessages(history: StoredMessage[]): Anthropic.MessageParam[] {
   return history.map((m) => ({ role: m.role, content: m.content }));
 }
@@ -526,6 +543,22 @@ async function resolveFamilyPatternTag(
   return tag.theme;
 }
 
+// Queues a same-turn double-tag for the NEXT reply to name retroactively
+// -- see crossLinkContext and the pending_cross_links table comment for
+// why this can't be handled in the same turn it happens.
+async function recordCrossLinkIfBoth(
+  userId: string,
+  sephirah: SephirahKey | undefined,
+  familyTheme: FamilyTheme | undefined
+) {
+  if (!sephirah || !familyTheme) return;
+  try {
+    await recordCrossLink(userId, sephirah, familyTheme);
+  } catch (err) {
+    console.error("recordCrossLink error", err);
+  }
+}
+
 export async function runChat(
   userId: string,
   history: StoredMessage[],
@@ -540,14 +573,15 @@ export async function runChat(
   const sephirahPromise = resolveSephirahTag(userId, tagSephirah(userMessage));
   const familyPromise = resolveFamilyPatternTag(userId, tagFamilyPattern(userMessage));
 
-  const [openCommitment, stageInfo, treeInfo] = await Promise.all([
+  const [openCommitment, stageInfo, treeInfo, crossLinkInfo] = await Promise.all([
     openCommitmentContext(userId),
     stageContext(userId),
     treeContext(userId),
+    crossLinkContext(userId),
   ]);
   const system = `${BASE_SYSTEM_PROMPT}\n\n---\n\nCONTEXT (not visible to the person, never repeat it back verbatim):\n${todayContext()}\n${openCommitment}\n${depthContext(
     depth
-  )}\n${uiLanguageContext(uiLang)}\n${alivenessContext(alivenessAnswer)}\n${stageInfo}\n${treeInfo}`;
+  )}\n${uiLanguageContext(uiLang)}\n${alivenessContext(alivenessAnswer)}\n${stageInfo}\n${treeInfo}\n${crossLinkInfo}`;
 
   const messages: Anthropic.MessageParam[] = [
     ...toApiMessages(history),
@@ -578,13 +612,16 @@ export async function runChat(
     );
 
     if (toolUses.length === 0) {
+      const sephirah = await sephirahPromise;
+      const familyTheme = await familyPromise;
+      await recordCrossLinkIfBoth(userId, sephirah, familyTheme);
       return {
         reply: textBlocks.map((b) => b.text).join("\n").trim(),
         stage: newStage,
         branches: newBranches,
         element: await elementPromise,
-        sephirah: await sephirahPromise,
-        familyTheme: await familyPromise,
+        sephirah,
+        familyTheme,
         committed,
         win: newWin,
       };
@@ -660,30 +697,39 @@ export async function runChat(
 
     if (response.stop_reason !== "tool_use") {
       const trailing = textBlocks.map((b) => b.text).join("\n").trim();
-      if (trailing)
+      if (trailing) {
+        const sephirah = await sephirahPromise;
+        const familyTheme = await familyPromise;
+        await recordCrossLinkIfBoth(userId, sephirah, familyTheme);
         return {
           reply: trailing,
           stage: newStage,
           branches: newBranches,
           element: await elementPromise,
-          sephirah: await sephirahPromise,
-          familyTheme: await familyPromise,
+          sephirah,
+          familyTheme,
           committed,
           win: newWin,
         };
+      }
     }
   }
 
-  return {
-    reply: "Something got tangled on my end — say that again?",
-    stage: newStage,
-    branches: newBranches,
-    element: await elementPromise,
-    sephirah: await sephirahPromise,
-    familyTheme: await familyPromise,
-    committed,
-    win: newWin,
-  };
+  {
+    const sephirah = await sephirahPromise;
+    const familyTheme = await familyPromise;
+    await recordCrossLinkIfBoth(userId, sephirah, familyTheme);
+    return {
+      reply: "Something got tangled on my end — say that again?",
+      stage: newStage,
+      branches: newBranches,
+      element: await elementPromise,
+      sephirah,
+      familyTheme,
+      committed,
+      win: newWin,
+    };
+  }
 }
 
 // --- Weekly mirror line ---

@@ -180,6 +180,23 @@ function ensureSchema(): Promise<void> {
           PRIMARY KEY (user_id, system, node)
         )
       `;
+      // A same-turn double-tag (one message that lit both a Tree node and
+      // a Family Constellation theme) queued for the NEXT reply to name
+      // retroactively -- since tag_sephirah/tag_family_pattern run in
+      // parallel with reply generation, the model has no way to know
+      // about a same-turn match while composing that same reply. Consumed
+      // (deleted) the moment the next turn reads it, whether or not the
+      // model actually chose to use it -- same "surfaced once" simplicity
+      // as sephirah_path_acks.
+      await sql`
+        CREATE TABLE IF NOT EXISTS pending_cross_links (
+          id SERIAL PRIMARY KEY,
+          user_id TEXT NOT NULL,
+          sephirah_node TEXT NOT NULL,
+          family_theme TEXT NOT NULL,
+          created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `;
       // A person's own chosen time to talk, most days, plus the timezone
       // their browser detected for them -- never asked as a hard rule, just
       // so a future check-in nudge can land at a time that's actually
@@ -655,6 +672,27 @@ export async function getFamilyState(userId: string): Promise<FamilyState> {
     state[theme] = { tier, groundedIn: latest.grounded_in, tracesTo: latest.traces_to };
   }
   return state;
+}
+
+export async function recordCrossLink(userId: string, sephirahNode: SephirahKey, familyTheme: FamilyTheme) {
+  await ensureUser(userId);
+  await sql`
+    INSERT INTO pending_cross_links (user_id, sephirah_node, family_theme)
+    VALUES (${userId}, ${sephirahNode}, ${familyTheme})
+  `;
+}
+
+// Fetches and deletes in one query -- surfaced to the very next turn's
+// context exactly once, whether or not the model chose to use it.
+export async function consumePendingCrossLinks(
+  userId: string
+): Promise<{ sephirahNode: SephirahKey; familyTheme: FamilyTheme }[]> {
+  await ensureSchema();
+  const rows = (await sql`
+    DELETE FROM pending_cross_links WHERE user_id = ${userId}
+    RETURNING sephirah_node, family_theme
+  `) as unknown as { sephirah_node: SephirahKey; family_theme: FamilyTheme }[];
+  return rows.map((r) => ({ sephirahNode: r.sephirah_node, familyTheme: r.family_theme }));
 }
 
 function edgeKey(a: SephirahKey, b: SephirahKey): string {
