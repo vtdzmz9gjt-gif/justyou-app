@@ -12,6 +12,7 @@ import dynamic from "next/dynamic";
 import WinCelebration from "./WinCelebration";
 import WeeklyRecap from "./WeeklyRecap";
 import TreeOfLife, { type TreeState } from "./TreeOfLife";
+import FamilyConstellation, { type FamilyState } from "./FamilyConstellation";
 import { NODES as TREE_NODES, type SephirahKey } from "@/lib/tree";
 
 // three.js needs a real canvas/WebGL context -- both client-only, no SSR.
@@ -1716,6 +1717,8 @@ export default function Home() {
     revealed: false,
     justNow: false,
   });
+  const [familyState, setFamilyState] = useState<FamilyState>({});
+  const [patternsTab, setPatternsTab] = useState<"tree" | "family">("tree");
   const [showPatternReview, setShowPatternReview] = useState(false);
   const [patternReview, setPatternReview] = useState<string | null>(null);
   const [loadingPatternReview, setLoadingPatternReview] = useState(false);
@@ -2205,10 +2208,42 @@ export default function Home() {
       )}
 
       {showTree && (
+        <div className="patterns-tabs" role="tablist">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={patternsTab === "tree"}
+            className={patternsTab === "tree" ? "patterns-tab patterns-tab-active" : "patterns-tab"}
+            onClick={() => setPatternsTab("tree")}
+          >
+            Your Tree
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={patternsTab === "family"}
+            className={patternsTab === "family" ? "patterns-tab patterns-tab-active" : "patterns-tab"}
+            onClick={() => setPatternsTab("family")}
+          >
+            Your Family
+          </button>
+        </div>
+      )}
+
+      {showTree && patternsTab === "tree" && (
         <TreeOfLife
           state={treeState}
           tensionInsights={tensionInsights}
           daat={daat}
+          eyebrowLabel={s.returnLabel}
+          closeLabel="close"
+          onClose={() => setShowTree(false)}
+        />
+      )}
+
+      {showTree && patternsTab === "family" && (
+        <FamilyConstellation
+          state={familyState}
           eyebrowLabel={s.returnLabel}
           closeLabel="close"
           onClose={() => setShowTree(false)}
