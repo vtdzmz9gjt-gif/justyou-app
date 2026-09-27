@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import Image from "next/image";
 import {
   NODE_ORDER,
   NODES,
@@ -215,6 +216,15 @@ export default function TreeOfLife({
 
   return (
     <div className="tree-overlay">
+      <Image
+        src="/backgrounds/archive-corridor.jpg"
+        alt=""
+        fill
+        priority
+        sizes="100vw"
+        className="tree-bg-image"
+      />
+      <div className="tree-bg-scrim" aria-hidden="true" />
       <div className="tree-eyebrow">{eyebrowLabel}</div>
       <div className="tree-card">
         <p className="tree-heading">The pattern, so far</p>
