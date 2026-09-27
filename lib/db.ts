@@ -162,6 +162,24 @@ function ensureSchema(): Promise<void> {
         )
       `;
       await sql`CREATE INDEX IF NOT EXISTS family_pattern_tags_user_idx ON family_pattern_tags (user_id)`;
+      // "Your pattern" -- a personal, AI-generated reflection shown in a
+      // node/theme's detail panel, grounded in the full accumulated tag
+      // history for it (shared shape for both the Tree and Family
+      // Constellation, keyed by which system + node). Not regenerated on
+      // every view -- tag_count_at_generation is compared against the
+      // node's current tag count so it only regenerates once there's
+      // actually something new to say.
+      await sql`
+        CREATE TABLE IF NOT EXISTS node_reflections (
+          user_id TEXT NOT NULL,
+          system TEXT NOT NULL CHECK (system IN ('tree','family')),
+          node TEXT NOT NULL,
+          reflection TEXT NOT NULL,
+          tag_count_at_generation INT NOT NULL,
+          generated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+          PRIMARY KEY (user_id, system, node)
+        )
+      `;
       // A person's own chosen time to talk, most days, plus the timezone
       // their browser detected for them -- never asked as a hard rule, just
       // so a future check-in nudge can land at a time that's actually
@@ -690,6 +708,73 @@ export async function getGroundedNotes(
     LIMIT ${limit}
   `) as unknown as { grounded_in: string }[];
   return rows.map((r) => r.grounded_in);
+}
+
+// Same shape as getGroundedNotes, for Family Constellation.
+export async function getFamilyGroundedNotes(
+  userId: string,
+  theme: FamilyTheme,
+  limit = 6
+): Promise<string[]> {
+  await ensureSchema();
+  const rows = (await sql`
+    SELECT grounded_in FROM family_pattern_tags
+    WHERE user_id = ${userId} AND theme = ${theme} AND weight != 'surface'
+    ORDER BY created_at DESC
+    LIMIT ${limit}
+  `) as unknown as { grounded_in: string }[];
+  return rows.map((r) => r.grounded_in);
+}
+
+export async function getSephirahTagCount(userId: string, node: SephirahKey): Promise<number> {
+  await ensureSchema();
+  const rows = await sql`
+    SELECT COUNT(*)::int as count FROM sephirah_tags WHERE user_id = ${userId} AND node = ${node}
+  `;
+  return (rows[0] as { count: number }).count;
+}
+
+export async function getFamilyTagCount(userId: string, theme: FamilyTheme): Promise<number> {
+  await ensureSchema();
+  const rows = await sql`
+    SELECT COUNT(*)::int as count FROM family_pattern_tags WHERE user_id = ${userId} AND theme = ${theme}
+  `;
+  return (rows[0] as { count: number }).count;
+}
+
+// "Your pattern" -- see the node_reflections table comment in
+// ensureSchema for the caching rule this is part of.
+export async function getStoredReflection(
+  userId: string,
+  system: "tree" | "family",
+  node: string
+): Promise<{ reflection: string; tagCountAtGeneration: number } | undefined> {
+  await ensureSchema();
+  const rows = await sql`
+    SELECT reflection, tag_count_at_generation FROM node_reflections
+    WHERE user_id = ${userId} AND system = ${system} AND node = ${node}
+  `;
+  const row = rows[0] as { reflection: string; tag_count_at_generation: number } | undefined;
+  return row ? { reflection: row.reflection, tagCountAtGeneration: row.tag_count_at_generation } : undefined;
+}
+
+export async function saveReflection(
+  userId: string,
+  system: "tree" | "family",
+  node: string,
+  reflection: string,
+  tagCount: number
+) {
+  await ensureUser(userId);
+  await sql`
+    INSERT INTO node_reflections (user_id, system, node, reflection, tag_count_at_generation)
+    VALUES (${userId}, ${system}, ${node}, ${reflection}, ${tagCount})
+    ON CONFLICT (user_id, system, node)
+    DO UPDATE SET
+      reflection = excluded.reflection,
+      tag_count_at_generation = excluded.tag_count_at_generation,
+      generated_at = now()
+  `;
 }
 
 export async function getStoredTensionInsight(

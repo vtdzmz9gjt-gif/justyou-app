@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { SephirahTier } from "@/lib/tree";
 import {
   THEME_ORDER,
@@ -66,15 +66,37 @@ const TIER_DEPTH: Record<SephirahTier, number> = {
 function ThemeDetail({
   theme,
   state,
+  userId,
+  lang,
   onClose,
   closeLabel,
 }: {
   theme: FamilyTheme;
   state: FamilyPatternState;
+  userId: string | null;
+  lang: string;
   onClose: () => void;
   closeLabel: string;
 }) {
   const wisdom = PATTERN_WISDOM[theme];
+  const [reflection, setReflection] = useState<string | null>(null);
+  const [loadingReflection, setLoadingReflection] = useState(true);
+
+  useEffect(() => {
+    if (!userId) {
+      setLoadingReflection(false);
+      return;
+    }
+    setLoadingReflection(true);
+    fetch(
+      `/api/reflection?userId=${encodeURIComponent(userId)}&system=family&node=${theme}&lang=${encodeURIComponent(lang)}`
+    )
+      .then((r) => r.json())
+      .then((data) => setReflection(typeof data.reflection === "string" ? data.reflection : null))
+      .catch(() => setReflection(null))
+      .finally(() => setLoadingReflection(false));
+  }, [userId, theme, lang]);
+
   return (
     <div className="tree-detail-overlay" onClick={onClose}>
       <div className="tree-detail-card" onClick={(e) => e.stopPropagation()}>
@@ -92,6 +114,14 @@ function ThemeDetail({
           <p className="tree-detail-label">Yours to decide</p>
           <p className="tree-detail-text">{wisdom.choice}</p>
         </div>
+        {(loadingReflection || reflection) && (
+          <div className="tree-detail-block">
+            <p className="tree-detail-label">Your pattern</p>
+            <p className="tree-detail-text tree-detail-reflection">
+              {loadingReflection ? "···" : reflection}
+            </p>
+          </div>
+        )}
         <button type="button" className="tree-detail-close" onClick={onClose}>
           {closeLabel}
         </button>
@@ -109,11 +139,15 @@ function ThemeDetail({
 // ancestral line the AI judged it traces to -- never a fixed lookup.
 export default function FamilyConstellation({
   state,
+  userId,
+  lang,
   eyebrowLabel,
   closeLabel,
   onClose,
 }: {
   state: FamilyState;
+  userId: string | null;
+  lang: string;
   eyebrowLabel: string;
   closeLabel: string;
   onClose: () => void;
@@ -251,6 +285,8 @@ export default function FamilyConstellation({
         <ThemeDetail
           theme={openTheme}
           state={state[openTheme]!}
+          userId={userId}
+          lang={lang}
           onClose={() => setOpenTheme(null)}
           closeLabel={closeLabel}
         />

@@ -15,13 +15,18 @@ import {
   saveTensionInsight,
   getTreeState,
   recordFamilyPatternTag,
+  getFamilyGroundedNotes,
+  getSephirahTagCount,
+  getFamilyTagCount,
+  getStoredReflection,
+  saveReflection,
   type StoredMessage,
   type Stage,
   type Element,
   type SephirahWeight,
 } from "./db";
 import { NODES, NODE_ORDER, TENSION_PAIRS, TIER_RANK, type SephirahKey, type TreeState } from "@/lib/tree";
-import type { FamilyTheme, FamilyLine } from "@/lib/family";
+import { THEMES, type FamilyTheme, type FamilyLine } from "@/lib/family";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
@@ -996,4 +1001,92 @@ export async function getTensionInsights(
     }
   }
   return results;
+}
+
+// "Your pattern" -- a personal reflection for one node/theme's detail
+// panel, grounded in the accumulated real disclosures for it (capped at
+// the most recent 10 -- see getNodeReflection below for why that bound
+// doesn't need to be smarter than that yet). Explicit specificity rule:
+// every sentence must tie to something actually said, never a
+// restatement of the static archetype text in different words and never
+// generic language that could apply to any user of this node -- if
+// there's nothing specific enough to ground a sentence in, leave it out.
+// One real sentence beats three padded ones.
+async function generateNodeReflection(
+  label: string,
+  groundedNotes: string[],
+  uiLang?: string | null
+): Promise<string> {
+  const notes = groundedNotes.map((n) => `- ${n}`).join("\n");
+  const langLine =
+    uiLang && uiLang !== "en"
+      ? `Reply in the language this person has been using (UI language: "${uiLang}").`
+      : "Reply in English.";
+
+  const system = `You are the voice of Just You. Across real conversations, this person has said the following about "${label}", most recent first:
+${notes}
+
+Write a short, private reflection on THEIR OWN specific pattern here -- not a restatement of what this theme generally means, and not generic language that could apply to anyone. Every sentence must reference or closely paraphrase something they actually said above; if you can't ground a sentence in something real from the notes, leave it out rather than padding with generic phrasing -- a single sentence tied to something real is better than three vague ones. If the notes show they've returned to this more than once, let that recurrence show -- whether it's deepened, shifted, or simply repeated -- rather than just restating one note. Match the voice already established: direct, warm, a close friend who sees clearly -- never therapy language, no exclamation points.
+
+${langLine}`;
+
+  const response = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 200,
+    system,
+    messages: [{ role: "user", content: "Reflect it back." }],
+  });
+
+  return response.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join(" ")
+    .trim();
+}
+
+// Regenerates only when the node's tag count has actually grown since
+// the last generation -- an unchanged count serves the cached reflection
+// instantly, no model call. Capped at the 10 most recent grounded notes
+// regardless of total history length, which bounds cost/context
+// indefinitely; if a real user's history ever outgrows what that recency
+// window can represent well, the next step would be periodic
+// summarization, not attempted here since it isn't a real problem yet.
+export async function getNodeReflection(
+  userId: string,
+  system: "tree" | "family",
+  node: string,
+  uiLang?: string | null
+): Promise<string> {
+  const currentCount =
+    system === "tree"
+      ? await getSephirahTagCount(userId, node as SephirahKey)
+      : await getFamilyTagCount(userId, node as FamilyTheme);
+
+  if (currentCount === 0) return "";
+
+  const stored = await getStoredReflection(userId, system, node);
+  if (stored && stored.tagCountAtGeneration === currentCount) {
+    return stored.reflection;
+  }
+
+  const notes =
+    system === "tree"
+      ? await getGroundedNotes(userId, node as SephirahKey, 10)
+      : await getFamilyGroundedNotes(userId, node as FamilyTheme, 10);
+  if (notes.length === 0) return "";
+
+  const label =
+    system === "tree"
+      ? `${NODES[node as SephirahKey].title} (${NODES[node as SephirahKey].subtitle})`
+      : THEMES[node as FamilyTheme].title;
+
+  try {
+    const reflection = await generateNodeReflection(label, notes, uiLang);
+    if (!reflection) return "";
+    await saveReflection(userId, system, node, reflection, currentCount);
+    return reflection;
+  } catch (err) {
+    console.error("generateNodeReflection error", err);
+    return stored?.reflection ?? "";
+  }
 }

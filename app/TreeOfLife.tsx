@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   NODE_ORDER,
   NODES,
@@ -119,16 +119,38 @@ function DaatDetail({ onClose, closeLabel }: { onClose: () => void; closeLabel: 
 function NodeDetail({
   sephirah,
   state,
+  userId,
+  lang,
   onClose,
   closeLabel,
 }: {
   sephirah: SephirahKey;
   state: SephirahState;
+  userId: string | null;
+  lang: string;
   onClose: () => void;
   closeLabel: string;
 }) {
   const node = NODES[sephirah];
   const wisdom = WISDOM[sephirah];
+  const [reflection, setReflection] = useState<string | null>(null);
+  const [loadingReflection, setLoadingReflection] = useState(true);
+
+  useEffect(() => {
+    if (!userId) {
+      setLoadingReflection(false);
+      return;
+    }
+    setLoadingReflection(true);
+    fetch(
+      `/api/reflection?userId=${encodeURIComponent(userId)}&system=tree&node=${sephirah}&lang=${encodeURIComponent(lang)}`
+    )
+      .then((r) => r.json())
+      .then((data) => setReflection(typeof data.reflection === "string" ? data.reflection : null))
+      .catch(() => setReflection(null))
+      .finally(() => setLoadingReflection(false));
+  }, [userId, sephirah, lang]);
+
   return (
     <div className="tree-detail-overlay" onClick={onClose}>
       <div className="tree-detail-card" onClick={(e) => e.stopPropagation()}>
@@ -147,6 +169,14 @@ function NodeDetail({
           <p className="tree-detail-label">Next step</p>
           <p className="tree-detail-text">{wisdom.next}</p>
         </div>
+        {(loadingReflection || reflection) && (
+          <div className="tree-detail-block">
+            <p className="tree-detail-label">Your pattern</p>
+            <p className="tree-detail-text tree-detail-reflection">
+              {loadingReflection ? "···" : reflection}
+            </p>
+          </div>
+        )}
         <button type="button" className="tree-detail-close" onClick={onClose}>
           {closeLabel}
         </button>
@@ -165,6 +195,8 @@ export default function TreeOfLife({
   state,
   tensionInsights,
   daat,
+  userId,
+  lang,
   eyebrowLabel,
   closeLabel,
   onClose,
@@ -172,6 +204,8 @@ export default function TreeOfLife({
   state: TreeState;
   tensionInsights?: { pair: string; insight: string }[];
   daat?: { revealed: boolean; justNow: boolean };
+  userId: string | null;
+  lang: string;
   eyebrowLabel: string;
   closeLabel: string;
   onClose: () => void;
@@ -285,6 +319,8 @@ export default function TreeOfLife({
         <NodeDetail
           sephirah={openNode}
           state={state[openNode]!}
+          userId={userId}
+          lang={lang}
           onClose={() => setOpenNode(null)}
           closeLabel={closeLabel}
         />
