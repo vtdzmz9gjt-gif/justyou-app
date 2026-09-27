@@ -14,12 +14,14 @@ import {
   getStoredTensionInsight,
   saveTensionInsight,
   getTreeState,
+  recordFamilyPatternTag,
   type StoredMessage,
   type Stage,
   type Element,
   type SephirahWeight,
 } from "./db";
 import { NODES, NODE_ORDER, TENSION_PAIRS, TIER_RANK, type SephirahKey, type TreeState } from "@/lib/tree";
+import type { FamilyTheme, FamilyLine } from "@/lib/family";
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
@@ -234,6 +236,69 @@ A comfortable, well-worn self-label ("that's just classic me") is a signal AGAIN
 
 Call tag_sephirah with your single best answer. When node is "none", you can omit weight and grounded_in.`;
 
+// Same forced, single-purpose, parallel shape as SEPHIRAH_TAG_TOOL. Judges
+// which life theme a disclosure belongs to, which parent it traces to, and
+// how substantial it is -- tier is derived later, same as the Tree, from
+// the whole history in lib/db.ts's getFamilyState.
+const FAMILY_TAG_TOOL: Anthropic.Tool = {
+  name: "tag_family_pattern",
+  description:
+    "Classify whether this message reveals a specific inherited pattern that clearly traces to one parent -- which life theme it belongs to, which ancestral line it traces to, and how substantial this one disclosure is.",
+  input_schema: {
+    type: "object",
+    properties: {
+      theme: {
+        type: "string",
+        enum: ["money", "love", "work_life", "body", "none"],
+      },
+      traces_to: {
+        type: "string",
+        enum: ["father", "mother"],
+        description:
+          "Which parent this pattern traces to, per what was actually said -- never guessed or assumed. Ignored when theme is \"none\".",
+      },
+      weight: {
+        type: "string",
+        enum: ["surface", "substantive", "confronted"],
+        description: "Ignored when theme is \"none\".",
+      },
+      grounded_in: {
+        type: "string",
+        description:
+          "One short sentence paraphrasing exactly what in the message justifies this theme, trace, and weight. Ignored when theme is \"none\".",
+      },
+    },
+    required: ["theme"],
+  },
+};
+
+const FAMILY_TAG_SYSTEM = `You're judging a single message from someone in a reflective conversation app against the Family Constellation system -- four life themes (money, love, work_life, body), each one either untouched or traced to a specific parent (father or mother). Most messages reveal nothing here -- use "none" freely; this should be your answer on most turns.
+
+Only pick a theme when BOTH of these are true from what was actually said:
+1. The message discloses a real, specific pattern in one of the four themes -- not a topic merely mentioned.
+2. That pattern is actually connected, in the person's own words, to a specific parent -- something they modeled, taught, or passed down, stated or clearly implied by what's actually said.
+
+If a real pattern is disclosed but nothing connects it to a specific parent, do NOT guess which line it's from -- use "none". A pattern with no stated ancestral connection isn't this system's material, even if it's genuinely something real about the person (it may belong to a different part of this app instead -- not your concern here).
+
+The four themes:
+- money: their relationship to money -- scarcity, safety, proof, what it means to have or not have it.
+- love: the shape love took in the home they grew up in, and what shape they now look for or run from.
+- work_life: how they learned to treat rest, ambition, and their own worth through work.
+- body: what they learned about listening to pain, rest, and their own physical limits.
+
+If more than one theme seems to fit, pick the single best one -- never tag more than one theme per message.
+
+Once you've picked a theme (not "none"), judge how substantial this ONE disclosure is, on its own -- same three tiers, same rules, as everywhere else in this app:
+- surface: stated as fact, no visible cost to saying it -- could have been said to a stranger. A purely parent-focused observation with no stated effect on the person yet is still surface, not "none" -- the trace itself is real content.
+- substantive: specific and personal, real stakes or vulnerability, genuine new information about how they operate.
+- confronted: the language itself shows resistance or a shift while saying it -- hedging then pushing through, retracting or reframing their own prior self-description, catching themselves mid-thought. This is about friction visible IN THE WORDS, not about how the message is delivered.
+
+Tone is not a signal. Humor, self-deprecation, and casualness are common, ordinary ways real friction gets voiced -- plenty of people confront something true about themselves while laughing, not just while being solemn. Do not downgrade a message to "surface" or "substantive" just because it's delivered lightly, and do not treat a joke as automatic evidence of "confronted" either. Judge weight only by what's actually admitted and whether the sentence itself contains resistance, retraction, or reframing -- never by how heavy or light it sounds.
+
+A comfortable, well-worn self-label ("that's just classic me") is a signal AGAINST "confronted" even when what's being named is real and specific -- it reads as an already-settled story, not a live realization. Reserve "confronted" for a visible pivot: catching an excuse, contradicting how they'd usually put it, admitting something that undercuts their own prior framing.
+
+Call tag_family_pattern with your single best answer. When theme is "none", you can omit traces_to, weight, and grounded_in.`;
+
 // Same parallel, non-blocking shape as tagElement -- fired alongside the
 // whole conversational loop, awaited only at the return points.
 async function tagSephirah(
@@ -280,6 +345,48 @@ async function tagSephirah(
     return undefined;
   } catch (err) {
     console.error("tagSephirah error", err);
+    return undefined;
+  }
+}
+
+// Same shape as tagSephirah.
+async function tagFamilyPattern(
+  userMessage: string
+): Promise<
+  { theme: FamilyTheme; tracesTo: FamilyLine; weight: SephirahWeight; groundedIn: string } | undefined
+> {
+  try {
+    const response = await anthropic.messages.create({
+      model: MODEL,
+      max_tokens: 200,
+      system: FAMILY_TAG_SYSTEM,
+      tools: [FAMILY_TAG_TOOL],
+      tool_choice: { type: "tool", name: "tag_family_pattern" },
+      messages: [{ role: "user", content: `Judge this message:\n\n"${userMessage}"` }],
+    });
+    const call = response.content.find(
+      (b): b is Anthropic.ToolUseBlock => b.type === "tool_use" && b.name === "tag_family_pattern"
+    );
+    const input = call?.input as
+      | { theme?: string; traces_to?: string; weight?: string; grounded_in?: string }
+      | undefined;
+    const theme = input?.theme;
+    if (theme === "money" || theme === "love" || theme === "work_life" || theme === "body") {
+      const tracesTo = input?.traces_to;
+      const weight = input?.weight;
+      const groundedIn = input?.grounded_in;
+      if (
+        (tracesTo === "father" || tracesTo === "mother") &&
+        (weight === "surface" || weight === "substantive" || weight === "confronted") &&
+        typeof groundedIn === "string" &&
+        groundedIn.trim()
+      ) {
+        return { theme, tracesTo, weight, groundedIn: groundedIn.trim() };
+      }
+    }
+    return undefined;
+  } catch (err) {
+    console.error("tagFamilyPattern error", err);
     return undefined;
   }
 }
@@ -376,6 +483,7 @@ export interface ChatResult {
   branches?: string[];
   element?: Element;
   sephirah?: SephirahKey;
+  familyTheme?: FamilyTheme;
   committed?: boolean;
   win?: { action: string; reflection: string };
 }
@@ -398,6 +506,21 @@ async function resolveSephirahTag(
   return tag.node;
 }
 
+// Same shape as resolveSephirahTag.
+async function resolveFamilyPatternTag(
+  userId: string,
+  promise: ReturnType<typeof tagFamilyPattern>
+): Promise<FamilyTheme | undefined> {
+  const tag = await promise;
+  if (!tag) return undefined;
+  try {
+    await recordFamilyPatternTag(userId, tag.theme, tag.weight, tag.tracesTo, tag.groundedIn);
+  } catch (err) {
+    console.error("recordFamilyPatternTag error", err);
+  }
+  return tag.theme;
+}
+
 export async function runChat(
   userId: string,
   history: StoredMessage[],
@@ -410,6 +533,7 @@ export async function runChat(
   // loop below rather than adding its own sequential round-trip.
   const elementPromise = tagElement(userMessage);
   const sephirahPromise = resolveSephirahTag(userId, tagSephirah(userMessage));
+  const familyPromise = resolveFamilyPatternTag(userId, tagFamilyPattern(userMessage));
 
   const [openCommitment, stageInfo, treeInfo] = await Promise.all([
     openCommitmentContext(userId),
@@ -455,6 +579,7 @@ export async function runChat(
         branches: newBranches,
         element: await elementPromise,
         sephirah: await sephirahPromise,
+        familyTheme: await familyPromise,
         committed,
         win: newWin,
       };
@@ -537,6 +662,7 @@ export async function runChat(
           branches: newBranches,
           element: await elementPromise,
           sephirah: await sephirahPromise,
+          familyTheme: await familyPromise,
           committed,
           win: newWin,
         };
@@ -549,6 +675,7 @@ export async function runChat(
     branches: newBranches,
     element: await elementPromise,
     sephirah: await sephirahPromise,
+    familyTheme: await familyPromise,
     committed,
     win: newWin,
   };
