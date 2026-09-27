@@ -191,6 +191,11 @@ type Strings = {
   orbIntroLine?: string;
   winHeadline?: string;
   weeklyRecapHeadline?: string;
+  // A person's own chosen time to talk, most days -- never a hard rule,
+  // just so a future check-in can land somewhere that's actually theirs.
+  // Not yet translated for every language -- falls back to English, see
+  // CHECKIN_FALLBACK below.
+  checkInPromptText?: string;
 };
 
 const ALIVENESS_FALLBACK = {
@@ -230,6 +235,11 @@ const WIN_FALLBACK = {
 
 const WEEKLY_RECAP_FALLBACK = {
   weeklyRecapHeadline: "This week.",
+};
+
+const CHECKIN_FALLBACK = {
+  checkInPromptText:
+    "When's usually a good time for you? I'll check in warmly around then — never a hard rule, just less random than a stranger's guess.",
 };
 
 const STRINGS: Record<string, Strings> = {
@@ -1658,6 +1668,8 @@ export default function Home() {
   const [showSettings, setShowSettings] = useState(false);
   const [email, setEmail] = useState("");
   const [emailSaved, setEmailSaved] = useState(false);
+  const [checkInTime, setCheckInTime] = useState("");
+  const [checkInSaved, setCheckInSaved] = useState(false);
   const [openingQuestion, setOpeningQuestion] = useState("");
   const [visibleFromId, setVisibleFromId] = useState(0);
   const [elementTally, setElementTally] = useState<ElementTally>(EMPTY_TALLY);
@@ -1994,6 +2006,27 @@ export default function Home() {
     }
   }
 
+  async function saveCheckIn(e: FormEvent) {
+    e.preventDefault();
+    if (!userId || !checkInTime) return;
+    let timezone = "UTC";
+    try {
+      timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+    } catch {
+      /* fall back to UTC */
+    }
+    try {
+      const res = await fetch("/api/user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, preferredTime: checkInTime, timezone }),
+      });
+      if (res.ok) setCheckInSaved(true);
+    } catch {
+      /* silent — this is a nice-to-have */
+    }
+  }
+
   // Opens right away with whatever's already in state, then refreshes in
   // the background -- same pattern as the element tally, not a blocking
   // loading screen for a page that's mostly meant to be sat with quietly.
@@ -2249,6 +2282,20 @@ export default function Home() {
                 placeholder={s.emailPlaceholder}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+              <button type="submit">{s.saveLabel}</button>
+            </form>
+          )}
+          <p>{s.checkInPromptText || CHECKIN_FALLBACK.checkInPromptText}</p>
+          {checkInSaved ? (
+            <span className="settings-status">{s.savedLabel}</span>
+          ) : (
+            <form onSubmit={saveCheckIn}>
+              <input
+                type="time"
+                value={checkInTime}
+                onChange={(e) => setCheckInTime(e.target.value)}
                 required
               />
               <button type="submit">{s.saveLabel}</button>
