@@ -581,6 +581,151 @@ export async function getSignals(): Promise<Signals> {
   };
 }
 
+// --- Admin dashboard (private, aggregate-only) -------------------------
+// Every field here is a count or a percentage of counts -- never message
+// content, grounded_in text, or anything traceable to one specific
+// person. See app/admin/page.tsx for the one place this is rendered,
+// gated by ADMIN_SECRET, never linked from the regular app UI.
+
+export interface AdminSignals {
+  totalUsers: number;
+  // "Real" = 2+ messages they actually typed (role='user'), not just the
+  // opening mood chip -- that alone already sends one user message and
+  // gets a reply, so a plain message-count>=1 threshold would count
+  // someone who never typed anything themselves.
+  usersWithRealConversation: number;
+  active7d: number;
+  active30d: number;
+  // Distinct-calendar-days-with-a-message cohort, same definition as
+  // Signals.returningUsers above (day 1 = everyone who ever showed up).
+  // Capped at a "5+" bucket -- with a small user base, deeper buckets
+  // are mostly single people and not worth a row each.
+  retention: { day: number | "5+"; users: number; pct: number }[];
+  commitments: {
+    landed: number;
+    tried: number;
+    notLanded: number;
+    pending: number;
+    // Percentages of resolved commitments (landed+tried+notLanded) --
+    // pending isn't an outcome yet, so it's excluded from the split.
+    landedPct: number;
+    triedPct: number;
+    notLandedPct: number;
+  };
+  nodeDepth: {
+    // Users with >=1 sephirah at "returned_to" or "deeply_worked".
+    treeUsers: number;
+    // Users with >=1 family theme at "returned_to" or "deeply_worked".
+    familyUsers: number;
+    // Union of the two above -- the headline "is the core mechanic
+    // actually working" number.
+    combinedUsers: number;
+  };
+}
+
+export async function getAdminSignals(): Promise<AdminSignals> {
+  await ensureSchema();
+
+  const totalUsers = Number(
+    ((await sql`SELECT COUNT(*) as count FROM users`) as unknown as { count: string | number }[])[0]
+      .count
+  );
+
+  const realConvoRows = (await sql`
+    SELECT COUNT(*) as count FROM (
+      SELECT user_id FROM messages WHERE role = 'user' GROUP BY user_id HAVING COUNT(*) >= 2
+    ) t
+  `) as unknown as { count: string | number }[];
+  const usersWithRealConversation = Number(realConvoRows[0].count);
+
+  const active7dRows = (await sql`
+    SELECT COUNT(DISTINCT user_id) as count FROM messages WHERE created_at >= now() - interval '7 days'
+  `) as unknown as { count: string | number }[];
+  const active30dRows = (await sql`
+    SELECT COUNT(DISTINCT user_id) as count FROM messages WHERE created_at >= now() - interval '30 days'
+  `) as unknown as { count: string | number }[];
+
+  // Retention cohort: distinct active days per user, bucketed.
+  const dayCountRows = (await sql`
+    SELECT COUNT(DISTINCT created_at::date) as days FROM messages GROUP BY user_id
+  `) as unknown as { days: string | number }[];
+  const dayCounts = dayCountRows.map((r) => Number(r.days));
+  const day1 = dayCounts.filter((d) => d >= 1).length;
+  const retention: AdminSignals["retention"] = [1, 2, 3, 4].map((n) => {
+    const users = dayCounts.filter((d) => d >= n).length;
+    return { day: n, users, pct: day1 > 0 ? (users / day1) * 100 : 0 };
+  });
+  const day5plus = dayCounts.filter((d) => d >= 5).length;
+  retention.push({ day: "5+", users: day5plus, pct: day1 > 0 ? (day5plus / day1) * 100 : 0 });
+
+  const outcomeRows = (await sql`
+    SELECT status, COUNT(*) as count FROM commitments GROUP BY status
+  `) as unknown as { status: string; count: string | number }[];
+  const outcomes = { landed: 0, tried: 0, not_landed: 0, pending: 0 };
+  for (const r of outcomeRows) {
+    if (r.status in outcomes) (outcomes as Record<string, number>)[r.status] = Number(r.count);
+  }
+  const resolvedTotal = outcomes.landed + outcomes.tried + outcomes.not_landed;
+  const commitments: AdminSignals["commitments"] = {
+    landed: outcomes.landed,
+    tried: outcomes.tried,
+    notLanded: outcomes.not_landed,
+    pending: outcomes.pending,
+    landedPct: resolvedTotal > 0 ? (outcomes.landed / resolvedTotal) * 100 : 0,
+    triedPct: resolvedTotal > 0 ? (outcomes.tried / resolvedTotal) * 100 : 0,
+    notLandedPct: resolvedTotal > 0 ? (outcomes.not_landed / resolvedTotal) * 100 : 0,
+  };
+
+  // Node depth: pull raw tags (small dataset -- one row per genuine
+  // disclosure, nothing per-message) and run the exact same deriveTier
+  // used everywhere else in the app, so this can never quietly drift
+  // from what a user's own Tree/Family screen actually shows them.
+  const sephirahRows = (await sql`
+    SELECT user_id, node, weight, created_at::date as day FROM sephirah_tags
+  `) as unknown as { user_id: string; node: SephirahKey; weight: SephirahWeight; day: string }[];
+  const familyRows = (await sql`
+    SELECT user_id, theme, weight, created_at::date as day FROM family_pattern_tags
+  `) as unknown as { user_id: string; theme: FamilyTheme; weight: SephirahWeight; day: string }[];
+
+  function usersWithDepth<R extends { user_id: string; weight: SephirahWeight; day: string }>(
+    rows: R[],
+    keyOf: (r: R) => string
+  ): Set<string> {
+    const grouped = new Map<string, { weight: SephirahWeight; day: string }[]>();
+    for (const r of rows) {
+      const key = `${r.user_id}::${keyOf(r)}`;
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key)!.push({ weight: r.weight, day: r.day });
+    }
+    const deep = new Set<string>();
+    for (const [key, tags] of grouped) {
+      const tier = deriveTier(tags);
+      if (tier === "returned_to" || tier === "deeply_worked") {
+        deep.add(key.split("::")[0]);
+      }
+    }
+    return deep;
+  }
+
+  const treeDeepUsers = usersWithDepth(sephirahRows, (r) => r.node);
+  const familyDeepUsers = usersWithDepth(familyRows, (r) => r.theme);
+  const combinedDeepUsers = new Set([...treeDeepUsers, ...familyDeepUsers]);
+
+  return {
+    totalUsers,
+    usersWithRealConversation,
+    active7d: Number(active7dRows[0].count),
+    active30d: Number(active30dRows[0].count),
+    retention,
+    commitments,
+    nodeDepth: {
+      treeUsers: treeDeepUsers.size,
+      familyUsers: familyDeepUsers.size,
+      combinedUsers: combinedDeepUsers.size,
+    },
+  };
+}
+
 // --- Tree of Life -----------------------------------------------------
 // Judged by tag_sephirah in lib/anthropic.ts, one row per genuine
 // disclosure. Never a quiz, never announced. See TreeOfLife.tsx for the
