@@ -2316,6 +2316,24 @@ export default function Home() {
                 content: m.content,
               }))
             );
+            // Every fresh open starts the visible transcript over, same as
+            // tapping "start fresh" manually -- the AI still gets the full
+            // history on every turn regardless (see getMessages in
+            // app/api/chat/route.ts), this only ever hides what's shown.
+            // Set together with setMessages above so React batches them:
+            // the full history and the new boundary land in the same
+            // render, so the old conversation never flashes on screen
+            // before disappearing again.
+            const latestId = data.messages.reduce(
+              (max: number, m: { id?: number }) => Math.max(max, m.id ?? 0),
+              0
+            );
+            setVisibleFromId(latestId);
+            try {
+              localStorage.setItem(VISIBLE_FROM_KEY, String(latestId));
+            } catch {
+              /* private browsing or storage disabled -- resets for this visit only */
+            }
           }
           if (data.elementTally) setElementTally(data.elementTally);
           if (typeof data.subscribed === "boolean") setSubscribed(data.subscribed);
