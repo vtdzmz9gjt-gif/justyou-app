@@ -439,6 +439,29 @@ function todayContext(): string {
   return `Today's date is ${today}.`;
 }
 
+// There's no session/day boundary in the schema (one continuous thread per
+// person, by design -- see the pattern-review route for the same note) so
+// "this sitting" is computed on the fly: walk the history backward from the
+// most recent message, and the first gap bigger than SESSION_GAP_MS marks
+// where the current, continuous back-and-forth actually started.
+const SESSION_GAP_MS = 30 * 60 * 1000;
+const PACING_THRESHOLD_MS = 40 * 60 * 1000;
+
+function pacingContext(history: StoredMessage[]): string {
+  if (history.length === 0) return "";
+  let sittingStart = new Date(history[history.length - 1].created_at).getTime();
+  for (let i = history.length - 1; i > 0; i--) {
+    const cur = new Date(history[i].created_at).getTime();
+    const prev = new Date(history[i - 1].created_at).getTime();
+    if (cur - prev > SESSION_GAP_MS) break;
+    sittingStart = prev;
+  }
+  const elapsedMs = Date.now() - sittingStart;
+  if (elapsedMs < PACING_THRESHOLD_MS) return "";
+  const minutes = Math.round(elapsedMs / 60000);
+  return `This sitting has been going for about ${minutes} minutes straight. Let your tone start naturally drifting toward finding a good closing point if the conversation allows it -- see "Pacing over a long sitting" above for how, and its limits.`;
+}
+
 async function openCommitmentContext(userId: string): Promise<string> {
   const open = await getOpenCommitment(userId);
   if (!open) return "There is no open commitment right now.";
@@ -629,7 +652,7 @@ export async function runChat(
   // notes below the tools array for why this split exists.
   const contextText = `CONTEXT (not visible to the person, never repeat it back verbatim):\n${todayContext()}\n${openCommitment}\n${depthContext(
     depth
-  )}\n${uiLanguageContext(uiLang)}\n${alivenessContext(alivenessAnswer)}\n${stageInfo}\n${treeInfo}\n${crossLinkInfo}`;
+  )}\n${uiLanguageContext(uiLang)}\n${alivenessContext(alivenessAnswer)}\n${pacingContext(history)}\n${stageInfo}\n${treeInfo}\n${crossLinkInfo}`;
 
   const system: Anthropic.TextBlockParam[] = [
     { type: "text", text: BASE_SYSTEM_PROMPT, cache_control: { type: "ephemeral", ttl: "1h" } },
