@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { SPARSE_SKY } from "@/lib/sparseSky";
 
 type Element = "fire" | "earth" | "air" | "water";
 type ElementTally = Record<Element, number>;
@@ -27,7 +28,6 @@ const ELEMENT_POLES: Record<Element, [number, number]> = {
 
 const ELEMENT_KEYS: Element[] = ["fire", "earth", "air", "water"];
 const NODE_COUNT = 55;
-const BG_IMAGE_SRC = "/backgrounds/milkyway-treeline.jpg";
 
 function rand(a: number, b: number) {
   return a + Math.random() * (b - a);
@@ -37,50 +37,62 @@ function lerp(a: number, b: number, t: number) {
 }
 
 type SceneLayout = {
-  treeBaseY: number;
-  waterTop: number;
+  // How far down the falling-snow layer is allowed to drift before
+  // wrapping back to the top -- the full screen, now that there's no
+  // horizon/treeline to clip it to.
+  snowFloor: number;
 };
 
-// Draws the Milky Way/treeline photo into the given context, cover-fit
-// (same behavior as CSS object-fit: cover), plus the same vignette the
-// procedural scene used to have. treeBaseY/waterTop are kept as a rough
-// fraction of height matching where the photo's own horizon sits, purely
-// so the falling-snow layer still has a sensible boundary to clip to.
-function drawBackgroundPhoto(
-  ctx: CanvasRenderingContext2D,
-  img: HTMLImageElement,
-  W: number,
-  H: number
-): SceneLayout {
-  const imgRatio = img.width / img.height;
-  const boxRatio = W / H;
-  let drawW: number, drawH: number, dx: number, dy: number;
-  if (imgRatio > boxRatio) {
-    drawH = H;
-    drawW = H * imgRatio;
-    dx = (W - drawW) / 2;
-    dy = 0;
-  } else {
-    drawW = W;
-    drawH = W / imgRatio;
-    dx = 0;
-    dy = (H - drawH) / 2;
-  }
-  ctx.drawImage(img, dx, dy, drawW, drawH);
-
-  const vign = ctx.createRadialGradient(W / 2, H * 0.4, H * 0.15, W / 2, H * 0.4, H * 0.9);
-  vign.addColorStop(0, "rgba(0,0,0,0)");
-  vign.addColorStop(1, "rgba(0,0,0,0.4)");
-  ctx.fillStyle = vign;
+// Draws the sparse, near-empty night sky: a deep near-black radial
+// gradient (no bright focal point) plus a faint, deliberately sparse
+// scattering of dim stars and a small handful of slightly brighter ones --
+// same tuning as the opening screen's SparseSky.tsx, so the two read as
+// one continuous world. Drawn once per mount/resize, not per frame: this
+// background stays still and unreactive on purpose, so the tally-reactive
+// nodes below remain the only thing that visibly responds to the
+// conversation -- deliberately not wired to tag_element/tag_sephirah/
+// tag_family_pattern firing.
+function drawSparseSky(ctx: CanvasRenderingContext2D, W: number, H: number): SceneLayout {
+  const grad = ctx.createRadialGradient(
+    W * 0.5,
+    H * 0.35,
+    0,
+    W * 0.5,
+    H * 0.35,
+    Math.max(W, H) * 0.8
+  );
+  grad.addColorStop(0, SPARSE_SKY.bgCenter);
+  grad.addColorStop(0.6, SPARSE_SKY.bgMid);
+  grad.addColorStop(1, SPARSE_SKY.bgEdge);
+  ctx.fillStyle = grad;
   ctx.fillRect(0, 0, W, H);
 
-  return { treeBaseY: H * 0.78, waterTop: H * 0.78 };
+  for (let i = 0; i < SPARSE_SKY.faintStarCount; i++) {
+    const x = rand(0, W);
+    const y = rand(0, H);
+    const r = rand(SPARSE_SKY.faintStarMinRadius, SPARSE_SKY.faintStarMaxRadius);
+    const opacity = rand(SPARSE_SKY.faintStarMinOpacity, SPARSE_SKY.faintStarMaxOpacity);
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,255,255,${opacity.toFixed(2)})`;
+    ctx.fill();
+  }
+  for (let i = 0; i < SPARSE_SKY.brightStarCount; i++) {
+    const x = rand(0, W);
+    const y = rand(0, H * 0.9);
+    ctx.beginPath();
+    ctx.arc(x, y, SPARSE_SKY.brightStarRadius, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,255,255,${SPARSE_SKY.brightStarOpacity})`;
+    ctx.fill();
+  }
+
+  return { snowFloor: H };
 }
 
-// The Milky Way/treeline photo as a background, with a small foreground of
+// The sparse night sky as a static background, with a small foreground of
 // element-colored nodes that drift toward whichever element(s) are
 // actually being tagged this session, plus falling snow -- both drawn
-// fresh every frame over the (otherwise static) photo.
+// fresh every frame over the (otherwise static) sky.
 export default function ElementOrb({ tally }: { tally: ElementTally }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const tallyRef = useRef(tally);
@@ -99,16 +111,8 @@ export default function ElementOrb({ tally }: { tally: ElementTally }) {
     const sceneCtx = sceneCanvas.getContext("2d");
     if (!sceneCtx) return;
 
-    let layout: SceneLayout = { treeBaseY: 0, waterTop: 0 };
+    let layout: SceneLayout = { snowFloor: 0 };
     let dpr = Math.min(window.devicePixelRatio || 1, 1.5);
-
-    const bgImage = new Image();
-    let bgLoaded = false;
-    bgImage.src = BG_IMAGE_SRC;
-    bgImage.onload = () => {
-      bgLoaded = true;
-      renderStaticScene();
-    };
 
     function renderStaticScene() {
       const W = window.innerWidth;
@@ -120,15 +124,7 @@ export default function ElementOrb({ tally }: { tally: ElementTally }) {
       sceneCanvas.width = W * dpr;
       sceneCanvas.height = H * dpr;
       sceneCtx!.setTransform(dpr, 0, 0, dpr, 0, 0);
-      if (bgLoaded) {
-        layout = drawBackgroundPhoto(sceneCtx!, bgImage, W, H);
-      } else {
-        // Before the photo loads, fall back to a plain dark fill rather
-        // than leaving the canvas blank/transparent.
-        sceneCtx!.fillStyle = "#0e0e1c";
-        sceneCtx!.fillRect(0, 0, W, H);
-        layout = { treeBaseY: H * 0.78, waterTop: H * 0.78 };
-      }
+      layout = drawSparseSky(sceneCtx!, W, H);
     }
     renderStaticScene();
 
@@ -197,12 +193,12 @@ export default function ElementOrb({ tally }: { tally: ElementTally }) {
       // snow
       ctx!.save();
       ctx!.beginPath();
-      ctx!.rect(0, 0, W, layout.waterTop);
+      ctx!.rect(0, 0, W, layout.snowFloor);
       ctx!.clip();
       for (const s of snow) {
         s.y += s.speed * dt;
         s.x += s.drift * dt;
-        if (s.y > layout.waterTop) {
+        if (s.y > layout.snowFloor) {
           s.y = -5;
           s.x = Math.random() * W;
         }

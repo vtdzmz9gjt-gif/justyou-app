@@ -9,7 +9,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import dynamic from "next/dynamic";
-import Image from "next/image";
+import SparseSky from "./SparseSky";
 import WinCelebration from "./WinCelebration";
 import WeeklyRecap from "./WeeklyRecap";
 import TreeOfLife, { type TreeState } from "./TreeOfLife";
@@ -2755,15 +2755,7 @@ export default function Home() {
           there's no visible space left behind it for this. */}
       {!hasStarted && (
         <div className="opening-bg" aria-hidden="true">
-          <Image
-            src="/backgrounds/milkyway-treeline.jpg"
-            alt=""
-            fill
-            priority
-            sizes="100vw"
-            className="opening-bg-image"
-          />
-          <div className="opening-bg-scrim" />
+          <SparseSky />
         </div>
       )}
 
