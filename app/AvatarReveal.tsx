@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
+import { ArrowIcon } from "./icons";
 
 type Element = "fire" | "earth" | "air" | "water";
 type ElementTally = Record<Element, number>;
@@ -266,7 +267,8 @@ export default function AvatarReveal({
             ))}
           </ul>
           <p className="avatar-reveal-reflection">{reflection}</p>
-          <button type="button" className="avatar-reveal-close" onClick={onClose}>
+          <button type="button" className="avatar-reveal-close key-action" onClick={onClose}>
+            <ArrowIcon />
             {closeLabel}
           </button>
         </div>
