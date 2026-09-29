@@ -1653,3 +1653,62 @@ body {
   padding: 1.1rem 1.5rem;
   z-index: 1;
 }
+
+/* ---------- key action buttons ---------- */
+/* Accessibility pass, not a redesign: a single consistent treatment for
+   the "notice and act on this" button in a given moment -- See the
+   pattern, Continue after a milestone, Subscribe when blocked -- so it's
+   never distinguished from a secondary button (start fresh, close) by
+   color alone. Pill shape, a solid dark ring, and a leading icon all
+   carry that signal independently.
+
+   Checked against every real background this app puts a key action
+   button against (the --bg/--surface overlays, and the sparse night sky
+   behind the composer): fill vs background is 8.2-10.4:1, and the
+   near-black text/icon against the fill is 9.35:1 -- both well past the
+   WCAG AA minimums of 3:1 and 4.5:1. Layered on top of each button's own
+   existing class (e.g. className="win-close key-action"), placed last in
+   this file so it wins the cascade -- hover/focus explicitly restate
+   color and border-color too, so an older per-button hover rule earlier
+   in this file can never sneak light text onto a light fill. */
+.key-action {
+  /* flex, not inline-flex -- several of these buttons (pattern-review-trigger
+     among them) center themselves within a block parent via margin: 0 auto,
+     which only works on a block-level box. */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  background: var(--accent-strong);
+  color: #1a1109;
+  border: 2px solid #1a1109;
+  border-radius: 999px;
+  padding: 0.6rem 1.3rem;
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.key-action:hover:not(:disabled),
+.key-action:focus-visible {
+  background: #e8bd85;
+  color: #1a1109;
+  border-color: #1a1109;
+}
+
+.key-action:focus-visible {
+  outline: 2px solid #ede8de;
+  outline-offset: 2px;
+}
+
+.key-action:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.key-action-icon {
+  flex-shrink: 0;
+  display: block;
+}

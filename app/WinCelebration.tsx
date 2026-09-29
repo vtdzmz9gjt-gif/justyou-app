@@ -1,5 +1,7 @@
 "use client";
 
+import { ArrowIcon } from "./icons";
+
 // The moment a real commitment actually lands -- resolve_open_commitment
 // fired with outcome "landed". No three.js here on purpose: unlike the
 // elemental avatar (which resolves out of an ongoing visual), this is a
@@ -33,7 +35,8 @@ export default function WinCelebration({
       </div>
       <h2 className="win-headline">{headline}</h2>
       <p className="win-reflection">{reflection}</p>
-      <button type="button" className="win-close" onClick={onClose}>
+      <button type="button" className="win-close key-action" onClick={onClose}>
+        <ArrowIcon />
         {closeLabel}
       </button>
     </div>

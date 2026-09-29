@@ -10,6 +10,7 @@ import {
 } from "react";
 import dynamic from "next/dynamic";
 import SparseSky from "./SparseSky";
+import { ArrowIcon, EyeIcon, UnlockIcon } from "./icons";
 import WinCelebration from "./WinCelebration";
 import WeeklyRecap from "./WeeklyRecap";
 import TreeOfLife, { type TreeState } from "./TreeOfLife";
@@ -2747,9 +2748,10 @@ export default function Home() {
         <div className="onboarding-content">
           {screens[onboardingIndex].html}
           <button
-            className="mood-chip onboarding-next"
+            className="mood-chip onboarding-next key-action"
             onClick={() => (isLast ? finishOnboarding() : setOnboardingIndex((i) => i + 1))}
           >
+            <ArrowIcon />
             {isLast ? o.beginLabel : o.continueLabel}
           </button>
         </div>
@@ -3105,7 +3107,8 @@ export default function Home() {
         <div className="composer">
           <div className="limit-card">
             <p>{subscriptionLimit}</p>
-            <button type="button" onClick={startCheckout} disabled={checkoutLoading}>
+            <button type="button" className="key-action" onClick={startCheckout} disabled={checkoutLoading}>
+              <UnlockIcon />
               {SUBSCRIPTION_FALLBACK.subscribeLabel}
             </button>
           </div>
@@ -3115,10 +3118,11 @@ export default function Home() {
           {hasStarted && visibleMessages.length > 1 && (
             <button
               type="button"
-              className="pattern-review-trigger"
+              className="pattern-review-trigger key-action"
               onClick={handlePatternReview}
               disabled={loadingPatternReview}
             >
+              <EyeIcon />
               {s.patternReviewLabel || PATTERN_REVIEW_FALLBACK.patternReviewLabel}
             </button>
           )}
@@ -3162,7 +3166,16 @@ export default function Home() {
             ) : (
               <p className="pattern-review-text">{patternReview}</p>
             )}
-            <button type="button" className="pattern-review-close" onClick={closePatternReview}>
+            <button
+              type="button"
+              className={
+                !loadingPatternReview && pendingAvatarReveal
+                  ? "pattern-review-close key-action"
+                  : "pattern-review-close"
+              }
+              onClick={closePatternReview}
+            >
+              {!loadingPatternReview && pendingAvatarReveal && <ArrowIcon />}
               {!loadingPatternReview && pendingAvatarReveal ? s.continueLabel : s.closeLabel}
             </button>
           </div>
