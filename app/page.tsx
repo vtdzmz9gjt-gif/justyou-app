@@ -2417,11 +2417,12 @@ export default function Home() {
     const text = (overrideText ?? draft).trim();
     if (!text || !userId || sending) return;
 
-    // The full lifetime history, not the visible slice -- the aliveness
-    // answer is context for a person's genuine first-ever message, not
-    // just the first one visible after a transcript reset (see isNewUser
-    // above for the same distinction on the opening screen).
-    const isFirstMessage = messages.length === 0;
+    // The aliveness question now shows on every open, for everyone (see
+    // the opening-screen block below) -- so whatever fresh answer someone
+    // gives attaches to the first message of THIS visit, same as before
+    // PR #39. The AI's real history is unaffected either way; this only
+    // governs whether an answer just given gets forwarded as context.
+    const isFirstMessage = visibleMessages.length === 0;
     const alivenessAnswer = isFirstMessage ? alivenessInput.trim() || undefined : undefined;
 
     setDraft("");
@@ -2708,15 +2709,6 @@ export default function Home() {
 
   const hasStarted = visibleMessages.length > 0;
   const awaitingDepth = selectedMood !== null && !hasStarted;
-  // Whether this person has ever sent/received a real message, ever --
-  // deliberately the full history (`messages`), not the visible slice
-  // (`visibleMessages`), which now resets to empty on every fresh open
-  // (see "start fresh" / auto-reset above). Without this distinction, a
-  // returning person's cleared-for-today transcript would look identical
-  // to someone brand new, and they'd be shown the mood picker and
-  // aliveness question again on every single visit instead of exactly
-  // once, ever.
-  const isNewUser = messages.length === 0;
 
   const activeColors = stage
     ? STAGE_COLORS[stage]
@@ -3015,70 +3007,67 @@ export default function Home() {
         </div>
       )}
 
-      {showLastCommitment && lastCommitment && (
-        <button
-          type="button"
-          className="last-commitment"
-          onClick={() => setShowLastCommitment(false)}
-        >
-          {(lastCommitment.status === "landed"
-            ? s.lastCommitmentLandedLabel || LAST_COMMITMENT_FALLBACK.lastCommitmentLandedLabel
-            : s.lastCommitmentLabel || LAST_COMMITMENT_FALLBACK.lastCommitmentLabel
-          ).replace("{action}", lastCommitment.action)}
-        </button>
-      )}
-
       {!hasStarted && !awaitingDepth ? (
-        isNewUser ? (
-          <div className="opening">
-            <p className="opening-question">{openingQuestion}</p>
-            <p className="mood-caption">{s.moodCaption}</p>
-            <div className="mood-row">
-              {s.moods.map((mood, i) => (
-                <button
-                  key={mood}
-                  className="mood-chip"
-                  onClick={() => pickMood(i)}
-                  disabled={sending}
-                >
-                  {mood}
-                </button>
-              ))}
-            </div>
-            <div className="aliveness-field">
-              <label htmlFor="aliveness">
-                {s.alivenessQuestion || ALIVENESS_FALLBACK.alivenessQuestion}{" "}
-                <span className="aliveness-optional">
-                  ({s.alivenessOptional || ALIVENESS_FALLBACK.alivenessOptional})
-                </span>
-              </label>
-              <input
-                id="aliveness"
-                type="text"
-                value={alivenessInput}
-                onChange={(e) => setAlivenessInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    textareaRef.current?.focus();
-                  }
-                }}
+        <div className="opening">
+          <p className="opening-question">{openingQuestion}</p>
+          {showLastCommitment && lastCommitment && (
+            <button
+              type="button"
+              className="last-commitment"
+              onClick={() => setShowLastCommitment(false)}
+            >
+              {(lastCommitment.status === "landed"
+                ? s.lastCommitmentLandedLabel || LAST_COMMITMENT_FALLBACK.lastCommitmentLandedLabel
+                : s.lastCommitmentLabel || LAST_COMMITMENT_FALLBACK.lastCommitmentLabel
+              ).replace("{action}", lastCommitment.action)}
+            </button>
+          )}
+          <p className="mood-caption">{s.moodCaption}</p>
+          <div className="mood-row">
+            {s.moods.map((mood, i) => (
+              <button
+                key={mood}
+                className="mood-chip"
+                onClick={() => pickMood(i)}
                 disabled={sending}
-              />
-              {alivenessInput.trim() && (
-                <button
-                  type="button"
-                  className="aliveness-continue key-action"
-                  onClick={() => textareaRef.current?.focus()}
-                  disabled={sending}
-                >
-                  <ArrowIcon />
-                  {s.alivenessContinueLabel || ALIVENESS_FALLBACK.alivenessContinueLabel}
-                </button>
-              )}
-            </div>
+              >
+                {mood}
+              </button>
+            ))}
           </div>
-        ) : null
+          <div className="aliveness-field">
+            <label htmlFor="aliveness">
+              {s.alivenessQuestion || ALIVENESS_FALLBACK.alivenessQuestion}{" "}
+              <span className="aliveness-optional">
+                ({s.alivenessOptional || ALIVENESS_FALLBACK.alivenessOptional})
+              </span>
+            </label>
+            <input
+              id="aliveness"
+              type="text"
+              value={alivenessInput}
+              onChange={(e) => setAlivenessInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  textareaRef.current?.focus();
+                }
+              }}
+              disabled={sending}
+            />
+            {alivenessInput.trim() && (
+              <button
+                type="button"
+                className="aliveness-continue key-action"
+                onClick={() => textareaRef.current?.focus()}
+                disabled={sending}
+              >
+                <ArrowIcon />
+                {s.alivenessContinueLabel || ALIVENESS_FALLBACK.alivenessContinueLabel}
+              </button>
+            )}
+          </div>
+        </div>
       ) : awaitingDepth ? (
         <div className="opening">
           <p className="mood-caption">{s.depthQuestion}</p>
