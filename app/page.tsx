@@ -277,6 +277,20 @@ const CHECKIN_FALLBACK = {
     "When's usually a good time for you? I'll check in warmly around then — never a hard rule, just less random than a stranger's guess.",
 };
 
+// English-only for now, unlike the rest of this file's fully translated
+// strings -- subscriptions are new enough that translating all 22
+// languages up front isn't worth blocking this on.
+const SUBSCRIPTION_FALLBACK = {
+  limitMessage:
+    "You've used your 3 free conversations this month. Subscribe for unlimited, or come back next month.",
+  subscribeLabel: "Subscribe — $9.99/month",
+  manageLabel: "Manage subscription",
+  restoreLabel: "Restore my subscription",
+  restorePlaceholder: "Your billing email",
+  restoreSentLabel: "If that email has an active subscription, we've sent a link to restore it.",
+  checkoutErrorLabel: "Couldn't start checkout. Try again in a moment.",
+};
+
 // A plain dropdown list of half-hour slots, rather than a native <input
 // type="time"> -- that native picker is unreliable across browsers (some
 // show a value while still failing the browser's own "field is empty"
@@ -2126,6 +2140,11 @@ export default function Home() {
   const [emailSaved, setEmailSaved] = useState(false);
   const [checkInTime, setCheckInTime] = useState("");
   const [checkInSaved, setCheckInSaved] = useState(false);
+  const [subscribed, setSubscribed] = useState(false);
+  const [subscriptionLimit, setSubscriptionLimit] = useState<string | null>(null);
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
+  const [restoreEmail, setRestoreEmail] = useState("");
+  const [restoreSent, setRestoreSent] = useState(false);
   const [openingQuestion, setOpeningQuestion] = useState("");
   const [visibleFromId, setVisibleFromId] = useState(0);
   const [elementTally, setElementTally] = useState<ElementTally>(EMPTY_TALLY);
@@ -2299,6 +2318,7 @@ export default function Home() {
             );
           }
           if (data.elementTally) setElementTally(data.elementTally);
+          if (typeof data.subscribed === "boolean") setSubscribed(data.subscribed);
           if (data.lastCommitment) {
             setLastCommitment(data.lastCommitment);
             let alreadySeenThisSession = true;
@@ -2382,6 +2402,7 @@ export default function Home() {
     setDraft("");
     setAlivenessInput("");
     setError(null);
+    setSubscriptionLimit(null);
     setBranches([]);
     setShowLastCommitment(false);
     setMessages((m) => [...m, { role: "user", content: text }]);
@@ -2402,6 +2423,24 @@ export default function Home() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong.");
+      if (data.blocked) {
+        // Nothing was actually sent or persisted -- drop the optimistic
+        // user message rather than leaving it stranded in the transcript,
+        // and show the plain limit card instead of treating this as an
+        // error.
+        setMessages((m) => {
+          const next = [...m];
+          for (let i = next.length - 1; i >= 0; i--) {
+            if (next[i].role === "user" && next[i].id === undefined) {
+              next.splice(i, 1);
+              break;
+            }
+          }
+          return next;
+        });
+        setSubscriptionLimit(data.message || SUBSCRIPTION_FALLBACK.limitMessage);
+        return;
+      }
       setMessages((m) => {
         // The user message was appended optimistically above with no real
         // id yet -- back-fill it now that the server has one, so the
@@ -2516,6 +2555,58 @@ export default function Home() {
     } catch {
       /* silent — this is a nice-to-have */
     }
+  }
+
+  async function startCheckout() {
+    if (!userId || checkoutLoading) return;
+    setCheckoutLoading(true);
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.url) throw new Error(data.error || "Could not start checkout.");
+      window.location.href = data.url;
+    } catch {
+      setError(SUBSCRIPTION_FALLBACK.checkoutErrorLabel);
+      setCheckoutLoading(false);
+    }
+  }
+
+  async function openPortal() {
+    if (!userId || checkoutLoading) return;
+    setCheckoutLoading(true);
+    try {
+      const res = await fetch("/api/portal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.url) throw new Error(data.error || "Could not open billing portal.");
+      window.location.href = data.url;
+    } catch {
+      setError(SUBSCRIPTION_FALLBACK.checkoutErrorLabel);
+      setCheckoutLoading(false);
+    }
+  }
+
+  async function requestRestore(e: FormEvent) {
+    e.preventDefault();
+    if (!restoreEmail.trim()) return;
+    try {
+      await fetch("/api/restore", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: restoreEmail.trim() }),
+      });
+    } catch {
+      /* falls through to the same generic confirmation either way, matching
+         /api/restore's own generic response */
+    }
+    setRestoreSent(true);
   }
 
   // Opens right away with whatever's already in state, then refreshes in
@@ -2865,6 +2956,31 @@ export default function Home() {
               <button type="submit">{s.saveLabel}</button>
             </form>
           )}
+          <div className="settings-subscription">
+            {subscribed ? (
+              <button type="button" onClick={openPortal} disabled={checkoutLoading}>
+                {SUBSCRIPTION_FALLBACK.manageLabel}
+              </button>
+            ) : (
+              <button type="button" onClick={startCheckout} disabled={checkoutLoading}>
+                {SUBSCRIPTION_FALLBACK.subscribeLabel}
+              </button>
+            )}
+            {restoreSent ? (
+              <span className="settings-status">{SUBSCRIPTION_FALLBACK.restoreSentLabel}</span>
+            ) : (
+              <form onSubmit={requestRestore}>
+                <input
+                  type="email"
+                  placeholder={SUBSCRIPTION_FALLBACK.restorePlaceholder}
+                  value={restoreEmail}
+                  onChange={(e) => setRestoreEmail(e.target.value)}
+                  required
+                />
+                <button type="submit">{SUBSCRIPTION_FALLBACK.restoreLabel}</button>
+              </form>
+            )}
+          </div>
           <div className="settings-privacy">
             <p>{s.privacyLong1}</p>
             <p>{s.privacyLong2}</p>
@@ -2975,7 +3091,16 @@ export default function Home() {
         </div>
       )}
 
-      {!awaitingDepth && (
+      {!awaitingDepth && (subscriptionLimit ? (
+        <div className="composer">
+          <div className="limit-card">
+            <p>{subscriptionLimit}</p>
+            <button type="button" onClick={startCheckout} disabled={checkoutLoading}>
+              {SUBSCRIPTION_FALLBACK.subscribeLabel}
+            </button>
+          </div>
+        </div>
+      ) : (
         <div className="composer">
           {hasStarted && visibleMessages.length > 1 && (
             <button
@@ -3008,7 +3133,7 @@ export default function Home() {
             </button>
           </div>
         </div>
-      )}
+      ))}
 
       {showPatternReview && (
         <div className="pattern-review-overlay" onClick={closePatternReview}>
