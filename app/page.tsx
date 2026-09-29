@@ -170,6 +170,7 @@ type Strings = {
   // to English, see ALIVENESS_FALLBACK below.
   alivenessQuestion?: string;
   alivenessOptional?: string;
+  alivenessHint?: string;
   // The fixed line shown once during the threshold moment (a few seconds
   // of near-black stillness on every app open, before anything else --
   // spec section 12/13). Only composed fresh for the launch languages
@@ -237,6 +238,7 @@ type Strings = {
 const ALIVENESS_FALLBACK = {
   alivenessQuestion: "Where did you feel most alive this week?",
   alivenessOptional: "optional",
+  alivenessHint: "No need to submit this separately — just pick a mood or start typing below.",
 };
 
 const THRESHOLD_FALLBACK = {
@@ -3043,6 +3045,11 @@ export default function Home() {
               onChange={(e) => setAlivenessInput(e.target.value)}
               disabled={sending}
             />
+            {alivenessInput.trim() && (
+              <p className="aliveness-hint">
+                {s.alivenessHint || ALIVENESS_FALLBACK.alivenessHint}
+              </p>
+            )}
           </div>
         </div>
       ) : awaitingDepth ? (
