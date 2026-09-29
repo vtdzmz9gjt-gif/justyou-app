@@ -983,13 +983,8 @@ body {
   border-color: var(--accent);
 }
 
-.aliveness-hint {
-  margin: 0.2rem 0 0;
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  color: var(--text-faint);
-  text-align: center;
-  max-width: 260px;
+.aliveness-continue {
+  margin-top: 0.5rem;
 }
 
 /* ---------- transcript ---------- */
