@@ -227,6 +227,32 @@ function ensureSchema(): Promise<void> {
       );
       await sql`CREATE INDEX IF NOT EXISTS idx_messages_user ON messages(user_id, id)`;
       await sql`CREATE INDEX IF NOT EXISTS idx_commitments_user ON commitments(user_id, status)`;
+      // Subscription -- subscribed_until is the single source of truth for
+      // access (compare against now(), never a separate status enum), kept
+      // in sync from Stripe's current_period_end by the webhook. billing_email
+      // is the address Stripe Checkout collected, kept separate from the
+      // existing (unrelated, check-in-reminder) email column so a
+      // subscription can never silently start emailing someone who only
+      // ever gave an email for reminders.
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_customer_id TEXT`;
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS stripe_subscription_id TEXT`;
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS subscribed_until TIMESTAMPTZ`;
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS billing_email TEXT`;
+      // Restore-my-subscription -- a single-use, short-lived token proving
+      // possession of the billing inbox, swapped in client-side for the
+      // real userId. One column pair, not a separate token table: only one
+      // restore can ever be in flight for a given person at a time, same
+      // "one active thing" simplicity as the rest of this schema.
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS restore_token TEXT`;
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS restore_token_expires_at TIMESTAMPTZ`;
+      // Free-tier conversation frequency gate (Stage 3) -- conversation_period
+      // is the calendar key (currently a UTC date string) the count below is
+      // scoped to, so it can be widened later (e.g. to a rolling week)
+      // without a second migration touching the counter itself.
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS conversation_period TEXT`;
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS conversations_this_period INTEGER NOT NULL DEFAULT 0`;
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_conversation_date TEXT`;
+      await sql`CREATE INDEX IF NOT EXISTS idx_users_restore_token ON users(restore_token)`;
     })();
     // If schema setup itself fails (not one of the non-fatal steps above,
     // but a real CREATE TABLE/INDEX failure), don't leave every future call
@@ -278,11 +304,91 @@ export async function setUserSchedule(userId: string, preferredTime: string, tim
   await sql`UPDATE users SET preferred_time = ${preferredTime}, timezone = ${timezone} WHERE id = ${userId}`;
 }
 
+// Called once, right after Stripe Checkout confirms the subscription
+// (checkout.session.completed) -- the first time this user's stripe_* /
+// subscribed_until columns are ever populated.
+export async function setStripeSubscription(
+  userId: string,
+  stripeCustomerId: string,
+  stripeSubscriptionId: string,
+  billingEmail: string,
+  subscribedUntil: Date
+) {
+  await ensureUser(userId);
+  await sql`
+    UPDATE users
+    SET stripe_customer_id = ${stripeCustomerId},
+        stripe_subscription_id = ${stripeSubscriptionId},
+        billing_email = ${billingEmail},
+        subscribed_until = ${subscribedUntil.toISOString()}
+    WHERE id = ${userId}
+  `;
+}
+
+// Called on every customer.subscription.updated webhook (a renewal, a plan
+// change, Stripe's own dunning retries) to keep subscribed_until in sync
+// with Stripe's current_period_end -- the single source of truth for
+// access. Looked up by stripe_subscription_id since the webhook payload
+// carries Stripe's ids, not this app's userId.
+export async function updateSubscriptionPeriod(stripeSubscriptionId: string, subscribedUntil: Date) {
+  await sql`
+    UPDATE users
+    SET subscribed_until = ${subscribedUntil.toISOString()}
+    WHERE stripe_subscription_id = ${stripeSubscriptionId}
+  `;
+}
+
+// Generates and stores a fresh single-use restore token for whichever
+// subscriber (if any) owns this billing email -- overwrites any token
+// already pending for them, so only the most recently requested link ever
+// works. Returns null (and stores nothing) if no subscriber matches, so the
+// caller can still send the same generic "if that email..." response
+// either way without leaking which emails are real subscribers.
+export async function issueRestoreToken(
+  billingEmail: string,
+  token: string,
+  expiresAt: Date
+): Promise<{ userId: string } | null> {
+  await ensureSchema();
+  const rows = await sql`
+    UPDATE users
+    SET restore_token = ${token}, restore_token_expires_at = ${expiresAt.toISOString()}
+    WHERE billing_email = ${billingEmail} AND subscribed_until > now()
+    RETURNING id
+  `;
+  const row = rows[0] as { id: string } | undefined;
+  return row ? { userId: row.id } : null;
+}
+
+// Consumes a restore token -- one-shot: a matching, unexpired token is
+// cleared in the same statement that reads it, so the link in the email
+// can never be replayed even if the user's browser caches or refetches it.
+export async function consumeRestoreToken(token: string): Promise<{ userId: string } | null> {
+  await ensureSchema();
+  const rows = await sql`
+    UPDATE users
+    SET restore_token = NULL, restore_token_expires_at = NULL
+    WHERE restore_token = ${token} AND restore_token_expires_at > now()
+    RETURNING id
+  `;
+  const row = rows[0] as { id: string } | undefined;
+  return row ? { userId: row.id } : null;
+}
+
 export async function getUser(userId: string) {
   await ensureSchema();
   const rows = await sql`SELECT * FROM users WHERE id = ${userId}`;
   return rows[0] as
-    | { id: string; email: string | null; preferred_time: string | null; timezone: string | null }
+    | {
+        id: string;
+        email: string | null;
+        preferred_time: string | null;
+        timezone: string | null;
+        stripe_customer_id: string | null;
+        stripe_subscription_id: string | null;
+        subscribed_until: string | null;
+        billing_email: string | null;
+      }
     | undefined;
 }
 

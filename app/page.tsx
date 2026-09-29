@@ -2228,86 +2228,119 @@ export default function Home() {
       /* private browsing or storage disabled -- just shows full history */
     }
 
-    const id = getUserId();
-    setUserId(id);
-
-    try {
-      const recapBoundary = lastWeeklyRecapBoundary(new Date());
-      if (localStorage.getItem(WEEKLY_RECAP_SHOWN_KEY) !== recapBoundary.toISOString()) {
-        const since = new Date(recapBoundary);
-        since.setDate(since.getDate() - 7);
-        fetch(
-          `/api/weekly-recap?userId=${encodeURIComponent(id)}&since=${encodeURIComponent(
-            since.toISOString()
-          )}&lang=${encodeURIComponent(detected)}`
-        )
-          .then((r) => r.json())
-          .then((data) => {
-            if (Array.isArray(data.wins) && data.wins.length > 0) {
-              setWeeklyRecap({ wins: data.wins, summary: data.summary ?? null });
-            }
-            localStorage.setItem(WEEKLY_RECAP_SHOWN_KEY, recapBoundary.toISOString());
-          })
-          .catch(() => {
-            /* fine — retries next time they open the app */
-          });
+    // A ?restore_token= link (sent by /api/restore to a subscriber's
+    // billing email) proves they own that inbox -- consuming it here, before
+    // getUserId() ever runs, swaps in their real account instead of minting
+    // a fresh local one. Failure just falls through to the normal
+    // new-or-existing local id, same as if the link were never clicked.
+    async function resolveRestoreToken() {
+      const params = new URLSearchParams(window.location.search);
+      const restoreToken = params.get("restore_token");
+      if (!restoreToken) return;
+      try {
+        const res = await fetch("/api/restore/verify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ token: restoreToken }),
+        });
+        const data = await res.json();
+        if (data.userId) {
+          localStorage.setItem(USER_ID_KEY, data.userId);
+        }
+      } catch {
+        /* restore failed silently -- falls back to the existing/new local id */
       }
-    } catch {
-      /* private browsing or storage disabled -- weekly recap just won't show */
+      params.delete("restore_token");
+      const query = params.toString();
+      window.history.replaceState({}, "", window.location.pathname + (query ? `?${query}` : ""));
     }
 
-    fetch(`/api/chat?userId=${encodeURIComponent(id)}&sinceMessageId=${boundary}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data.messages)) {
-          setMessages(
-            data.messages.map((m: { id?: number; role: "user" | "assistant"; content: string }) => ({
-              id: m.id,
-              role: m.role,
-              content: m.content,
-            }))
-          );
+    async function init() {
+      await resolveRestoreToken();
+
+      const id = getUserId();
+      setUserId(id);
+
+      try {
+        const recapBoundary = lastWeeklyRecapBoundary(new Date());
+        if (localStorage.getItem(WEEKLY_RECAP_SHOWN_KEY) !== recapBoundary.toISOString()) {
+          const since = new Date(recapBoundary);
+          since.setDate(since.getDate() - 7);
+          fetch(
+            `/api/weekly-recap?userId=${encodeURIComponent(id)}&since=${encodeURIComponent(
+              since.toISOString()
+            )}&lang=${encodeURIComponent(detected)}`
+          )
+            .then((r) => r.json())
+            .then((data) => {
+              if (Array.isArray(data.wins) && data.wins.length > 0) {
+                setWeeklyRecap({ wins: data.wins, summary: data.summary ?? null });
+              }
+              localStorage.setItem(WEEKLY_RECAP_SHOWN_KEY, recapBoundary.toISOString());
+            })
+            .catch(() => {
+              /* fine — retries next time they open the app */
+            });
         }
-        if (data.elementTally) setElementTally(data.elementTally);
-        if (data.lastCommitment) {
-          setLastCommitment(data.lastCommitment);
-          let alreadySeenThisSession = true;
-          try {
-            alreadySeenThisSession = !!sessionStorage.getItem(LAST_COMMITMENT_SEEN_KEY);
-            if (!alreadySeenThisSession) {
-              sessionStorage.setItem(LAST_COMMITMENT_SEEN_KEY, "1");
-            }
-          } catch {
-            /* private browsing or storage disabled -- default to not showing
-               rather than risk showing it every single load */
+      } catch {
+        /* private browsing or storage disabled -- weekly recap just won't show */
+      }
+
+      fetch(`/api/chat?userId=${encodeURIComponent(id)}&sinceMessageId=${boundary}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (Array.isArray(data.messages)) {
+            setMessages(
+              data.messages.map((m: { id?: number; role: "user" | "assistant"; content: string }) => ({
+                id: m.id,
+                role: m.role,
+                content: m.content,
+              }))
+            );
           }
-          if (!alreadySeenThisSession) setShowLastCommitment(true);
-        }
-      })
-      .catch(() => {
-        /* fine — they'll just start fresh */
-      });
+          if (data.elementTally) setElementTally(data.elementTally);
+          if (data.lastCommitment) {
+            setLastCommitment(data.lastCommitment);
+            let alreadySeenThisSession = true;
+            try {
+              alreadySeenThisSession = !!sessionStorage.getItem(LAST_COMMITMENT_SEEN_KEY);
+              if (!alreadySeenThisSession) {
+                sessionStorage.setItem(LAST_COMMITMENT_SEEN_KEY, "1");
+              }
+            } catch {
+              /* private browsing or storage disabled -- default to not showing
+                 rather than risk showing it every single load */
+            }
+            if (!alreadySeenThisSession) setShowLastCommitment(true);
+          }
+        })
+        .catch(() => {
+          /* fine — they'll just start fresh */
+        });
 
-    fetch(`/api/mirror?userId=${encodeURIComponent(id)}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.line) setMirrorLine(data.line);
-      })
-      .catch(() => {
-        /* quiet failure — the mirror line is a nice-to-have, not core */
-      });
+      fetch(`/api/mirror?userId=${encodeURIComponent(id)}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.line) setMirrorLine(data.line);
+        })
+        .catch(() => {
+          /* quiet failure — the mirror line is a nice-to-have, not core */
+        });
 
-    // Restores the ambient stage color on a fresh load, since signal_depth
-    // only fires once per stage and won't repeat itself on a later visit
-    // to re-tell the client.
-    fetch(`/api/shape?userId=${encodeURIComponent(id)}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.stage) setStage(data.stage);
-      })
-      .catch(() => {
-        /* quiet failure — the ambient state just starts fresh this visit */
-      });
+      // Restores the ambient stage color on a fresh load, since signal_depth
+      // only fires once per stage and won't repeat itself on a later visit
+      // to re-tell the client.
+      fetch(`/api/shape?userId=${encodeURIComponent(id)}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.stage) setStage(data.stage);
+        })
+        .catch(() => {
+          /* quiet failure — the ambient state just starts fresh this visit */
+        });
+    }
+
+    init();
   }, []);
 
   useEffect(() => {
