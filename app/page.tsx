@@ -171,6 +171,7 @@ type Strings = {
   alivenessQuestion?: string;
   alivenessOptional?: string;
   alivenessContinueLabel?: string;
+  alivenessSavedLabel?: string;
   // The fixed line shown once during the threshold moment (a few seconds
   // of near-black stillness on every app open, before anything else --
   // spec section 12/13). Only composed fresh for the launch languages
@@ -239,6 +240,7 @@ const ALIVENESS_FALLBACK = {
   alivenessQuestion: "Where did you feel most alive this week?",
   alivenessOptional: "optional",
   alivenessContinueLabel: "Continue",
+  alivenessSavedLabel: "Noted.",
 };
 
 const THRESHOLD_FALLBACK = {
@@ -2169,6 +2171,7 @@ export default function Home() {
   const [depth, setDepth] = useState<Depth | null>(null);
   const [stage, setStage] = useState<string | null>(null);
   const [alivenessInput, setAlivenessInput] = useState("");
+  const [alivenessSaved, setAlivenessSaved] = useState(false);
   const [mirrorLine, setMirrorLine] = useState<string | null>(null);
   const [branches, setBranches] = useState<string[]>([]);
   const [showTree, setShowTree] = useState(false);
@@ -2427,6 +2430,7 @@ export default function Home() {
 
     setDraft("");
     setAlivenessInput("");
+    setAlivenessSaved(false);
     setError(null);
     setSubscriptionLimit(null);
     setBranches([]);
@@ -2529,6 +2533,7 @@ export default function Home() {
     setError(null);
     setDraft("");
     setAlivenessInput("");
+    setAlivenessSaved(false);
     setShowLastCommitment(false);
     setElementTally(EMPTY_TALLY);
     setAvatarReveal(null);
@@ -3042,29 +3047,41 @@ export default function Home() {
                 ({s.alivenessOptional || ALIVENESS_FALLBACK.alivenessOptional})
               </span>
             </label>
-            <input
-              id="aliveness"
-              type="text"
-              value={alivenessInput}
-              onChange={(e) => setAlivenessInput(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  textareaRef.current?.focus();
-                }
-              }}
-              disabled={sending}
-            />
-            {alivenessInput.trim() && (
-              <button
-                type="button"
-                className="aliveness-continue key-action"
-                onClick={() => textareaRef.current?.focus()}
-                disabled={sending}
-              >
-                <ArrowIcon />
-                {s.alivenessContinueLabel || ALIVENESS_FALLBACK.alivenessContinueLabel}
-              </button>
+            {alivenessSaved ? (
+              <span className="settings-status">
+                {s.alivenessSavedLabel || ALIVENESS_FALLBACK.alivenessSavedLabel}
+              </span>
+            ) : (
+              <>
+                <input
+                  id="aliveness"
+                  type="text"
+                  value={alivenessInput}
+                  onChange={(e) => setAlivenessInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      setAlivenessSaved(true);
+                      textareaRef.current?.focus();
+                    }
+                  }}
+                  disabled={sending}
+                />
+                {alivenessInput.trim() && (
+                  <button
+                    type="button"
+                    className="aliveness-continue key-action"
+                    onClick={() => {
+                      setAlivenessSaved(true);
+                      textareaRef.current?.focus();
+                    }}
+                    disabled={sending}
+                  >
+                    <ArrowIcon />
+                    {s.alivenessContinueLabel || ALIVENESS_FALLBACK.alivenessContinueLabel}
+                  </button>
+                )}
+              </>
             )}
           </div>
         </div>
