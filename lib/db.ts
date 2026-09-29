@@ -246,9 +246,9 @@ function ensureSchema(): Promise<void> {
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS restore_token TEXT`;
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS restore_token_expires_at TIMESTAMPTZ`;
       // Free-tier conversation frequency gate (Stage 3) -- conversation_period
-      // is the calendar key (currently a UTC date string) the count below is
-      // scoped to, so it can be widened later (e.g. to a rolling week)
-      // without a second migration touching the counter itself.
+      // is the calendar month (UTC, "YYYY-MM") the count below is scoped to;
+      // kept as a separate column rather than derived from last_conversation_date
+      // so the count and its window can be widened independently later.
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS conversation_period TEXT`;
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS conversations_this_period INTEGER NOT NULL DEFAULT 0`;
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_conversation_date TEXT`;
@@ -373,6 +373,51 @@ export async function consumeRestoreToken(token: string): Promise<{ userId: stri
   `;
   const row = rows[0] as { id: string } | undefined;
   return row ? { userId: row.id } : null;
+}
+
+// The free-tier frequency gate -- unlimited for an active subscriber,
+// otherwise up to 3 separate UTC calendar days of conversation per UTC
+// calendar month. Continuing the same day never counts twice (checked
+// before the count), and the count itself resets the first time someone
+// talks in a new month. A tiny race between two near-simultaneous requests
+// from the same person could let one extra day through -- not worth a
+// transaction for how rarely that could even happen.
+export async function checkConversationGate(userId: string): Promise<{ allowed: boolean }> {
+  await ensureUser(userId);
+  const rows = await sql`
+    SELECT subscribed_until, conversation_period, conversations_this_period, last_conversation_date
+    FROM users WHERE id = ${userId}
+  `;
+  const row = rows[0] as {
+    subscribed_until: string | null;
+    conversation_period: string | null;
+    conversations_this_period: number;
+    last_conversation_date: string | null;
+  };
+
+  if (row.subscribed_until && new Date(row.subscribed_until) > new Date()) {
+    return { allowed: true };
+  }
+
+  const today = new Date().toISOString().slice(0, 10); // UTC, "YYYY-MM-DD"
+  if (row.last_conversation_date === today) {
+    return { allowed: true };
+  }
+
+  const month = today.slice(0, 7); // UTC, "YYYY-MM"
+  const countThisMonth = row.conversation_period === month ? row.conversations_this_period : 0;
+  if (countThisMonth >= 3) {
+    return { allowed: false };
+  }
+
+  await sql`
+    UPDATE users
+    SET conversation_period = ${month},
+        conversations_this_period = ${countThisMonth + 1},
+        last_conversation_date = ${today}
+    WHERE id = ${userId}
+  `;
+  return { allowed: true };
 }
 
 export async function getUser(userId: string) {

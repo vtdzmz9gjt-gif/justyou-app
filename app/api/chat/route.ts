@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   addMessage,
+  checkConversationGate,
   ensureUser,
   getMessages,
   getMostRecentCommitment,
   getElementTally,
+  getUser,
   type Element,
 } from "@/lib/db";
 import { runChat } from "@/lib/anthropic";
@@ -46,6 +48,18 @@ export async function POST(req: NextRequest) {
   }
 
   await ensureUser(userId);
+
+  // Checked before touching history/runChat, so a blocked turn costs
+  // nothing -- no Anthropic call, and nothing gets persisted to messages.
+  const gate = await checkConversationGate(userId);
+  if (!gate.allowed) {
+    return NextResponse.json({
+      blocked: true,
+      message:
+        "You've used your 3 free conversations this month. Subscribe for unlimited, or come back next month.",
+    });
+  }
+
   const history = await getMessages(userId);
 
   let result: {
@@ -95,16 +109,19 @@ export async function GET(req: NextRequest) {
   }
   const sinceMessageId = parseInt(req.nextUrl.searchParams.get("sinceMessageId") || "0", 10) || 0;
   await ensureUser(userId);
-  const [messages, lastCommitment, elementTally] = await Promise.all([
+  const [messages, lastCommitment, elementTally, user] = await Promise.all([
     getMessages(userId),
     getMostRecentCommitment(userId),
     getElementTally(userId, sinceMessageId),
+    getUser(userId),
   ]);
+  const subscribed = !!user?.subscribed_until && new Date(user.subscribed_until) > new Date();
   return NextResponse.json({
     messages,
     lastCommitment: lastCommitment
       ? { action: lastCommitment.action, status: lastCommitment.status }
       : null,
     elementTally,
+    subscribed,
   });
 }
