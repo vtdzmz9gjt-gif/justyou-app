@@ -1223,3 +1223,91 @@ export async function getNodeReflection(
     return stored?.reflection ?? "";
   }
 }
+
+// --- Aliveness Compass (standalone exercise) ---
+// A short, separate, fixed-sequence exercise (its own entry point, not the
+// main conversation) -- distinct from "Aliveness as compass" above, which
+// fires on its own judgment mid-conversation and is untouched by this.
+// Two answers in, five fresh lines and a closing line out. Nothing here is
+// stored: no messages row, no tag, no tree/family contamination -- this
+// is scripted exercise content, not organic conversation, and the two
+// systems must never mix.
+const ALIVENESS_EXERCISE_TOOL: Anthropic.Tool = {
+  name: "give_aliveness_exercise",
+  description:
+    "Return the five-part reveal and the closing line for the Aliveness Compass exercise, composed fresh from the person's two answers.",
+  input_schema: {
+    type: "object",
+    properties: {
+      signs: {
+        type: "array",
+        description:
+          "Exactly five short lines, one per idea-seed, each composed fresh and grounded in the person's two specific answers -- never the idea-seed wording verbatim, never generic.",
+        items: { type: "string" },
+        minItems: 5,
+        maxItems: 5,
+      },
+      closing: {
+        type: "string",
+        description:
+          "One closing line, also composed fresh, tying the five together and grounded in their specific answers.",
+      },
+    },
+    required: ["signs", "closing"],
+  },
+};
+
+export async function generateAlivenessExercise(
+  alivenessAnswer: string,
+  stuckAnswer: string,
+  uiLang?: string | null
+): Promise<{ signs: string[]; closing: string }> {
+  const langLine =
+    uiLang && uiLang !== "en"
+      ? `Reply in the language these answers are written in (UI language: "${uiLang}").`
+      : "Reply in English unless the answers below are clearly in another language.";
+
+  const system = `You are the voice of Just You, running a short standalone reflective exercise. Someone has answered two questions:
+
+1. "Where did you feel most alive this week?" -- ${JSON.stringify(alivenessAnswer)}
+2. "What's the thing you keep going back and forth on?" -- ${JSON.stringify(stuckAnswer)}
+
+Call give_aliveness_exercise with five short lines and one closing line, all composed fresh and grounded specifically in what they actually wrote above -- never generic, never reusable for someone else's answers.
+
+Draw each of the five lines from one of these ideas -- as inspiration for what to say, never phrasing to reuse verbatim:
+- What lit them up wasn't random -- it's information their thinking hasn't caught up to yet.
+- Full commitment beats rationing -- giving something everything, past the point it feels sensible, tells them more than a cautious taste of it does.
+- Needing to know how it turns out is often the same grip that's keeping them from moving at all.
+- Difficulty isn't proof of wrongness -- it's just the shape truth takes before it's familiar.
+- Ask whether the hesitation is actually theirs, or an inherited rule they never checked.
+
+Never suggest that belief alone rewrites what's actually true -- an inherited pattern, a hard fact, the real structural position someone is in. What's given is never talked away or reframed as something to simply think or feel your way past. What's genuinely free is only what someone does with it: keep carrying it, or consciously set it down. "Give it everything" always means full presence and effort, never "believe hard enough and the facts change."
+
+Each line: one sentence, short, direct -- a close friend who sees clearly, never therapy language, never a list read aloud. The closing line ties the five together and should feel like the one thing worth carrying out of this, not a summary.
+
+${langLine}`;
+
+  const response = await anthropic.messages.create({
+    model: MODEL,
+    max_tokens: 500,
+    system,
+    tools: [ALIVENESS_EXERCISE_TOOL],
+    tool_choice: { type: "tool", name: "give_aliveness_exercise" },
+    messages: [{ role: "user", content: "Give the exercise." }],
+  });
+
+  const call = response.content.find(
+    (b): b is Anthropic.ToolUseBlock => b.type === "tool_use" && b.name === "give_aliveness_exercise"
+  );
+  const input = call?.input as { signs?: unknown; closing?: unknown } | undefined;
+  const signs = Array.isArray(input?.signs)
+    ? input.signs.filter((s): s is string => typeof s === "string" && s.trim().length > 0)
+    : [];
+  const closing = typeof input?.closing === "string" ? input.closing.trim() : "";
+
+  if (signs.length !== 5 || !closing) {
+    throw new Error("Malformed aliveness exercise response.");
+  }
+
+  return { signs: signs.map((s) => s.trim()), closing };
+}

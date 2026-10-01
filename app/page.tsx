@@ -20,6 +20,7 @@ import { NODES as TREE_NODES, type SephirahKey } from "@/lib/tree";
 // three.js needs a real canvas/WebGL context -- both client-only, no SSR.
 const ElementOrb = dynamic(() => import("./ElementOrb"), { ssr: false });
 const AvatarReveal = dynamic(() => import("./AvatarReveal"), { ssr: false });
+const AlivenessCompass = dynamic(() => import("./AlivenessCompass"), { ssr: false });
 
 // `id` is only present for messages fetched from the server -- a message
 // appended optimistically on send (before the round-trip completes) has
@@ -2175,6 +2176,7 @@ export default function Home() {
   const [mirrorLine, setMirrorLine] = useState<string | null>(null);
   const [branches, setBranches] = useState<string[]>([]);
   const [showTree, setShowTree] = useState(false);
+  const [showAlivenessCompass, setShowAlivenessCompass] = useState(false);
   const [treeState, setTreeState] = useState<TreeState>({});
   const [connectionToast, setConnectionToast] = useState<string | null>(null);
   const [tensionInsights, setTensionInsights] = useState<{ pair: string; insight: string }[]>([]);
@@ -2937,6 +2939,12 @@ export default function Home() {
               →
             </span>
           </button>
+          <button type="button" className="tree-entry-btn" onClick={() => setShowAlivenessCompass(true)}>
+            <span>Aliveness Compass</span>
+            <span className="tree-entry-btn-arrow" aria-hidden="true">
+              →
+            </span>
+          </button>
           {mirrorLine && (
             <div className="mirror-card">
               <div className="mirror-card-label">{s.returnLabel}</div>
@@ -3220,6 +3228,10 @@ export default function Home() {
             </button>
           </div>
         </div>
+      )}
+
+      {showAlivenessCompass && (
+        <AlivenessCompass lang={lang} onClose={() => setShowAlivenessCompass(false)} />
       )}
     </div>
   );
