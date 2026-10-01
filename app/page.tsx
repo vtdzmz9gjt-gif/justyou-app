@@ -244,6 +244,24 @@ const ALIVENESS_FALLBACK = {
   alivenessSavedLabel: "Noted.",
 };
 
+// English-only for now, same call made for SUBSCRIPTION_FALLBACK and the
+// standalone Aliveness Compass copy -- this inline continuation (stuck
+// question + five-part reveal) is new enough not to be worth threading
+// through all 22 languages yet.
+const ALIVENESS_EXERCISE_COPY = {
+  stuckQuestion: "What's the thing you keep going back and forth on?",
+  wordsHint: "A few more words would help this mean something.",
+  loadingLabel: "Putting it together",
+  tryAgainLabel: "Try again",
+  charge: "to carry into the day",
+  skipLabel: "skip — just let me write",
+};
+
+const ALIVENESS_EXERCISE_MIN_WORDS = 3;
+function hasEnoughWordsForExercise(value: string): boolean {
+  return value.trim().split(/\s+/).filter(Boolean).length >= ALIVENESS_EXERCISE_MIN_WORDS;
+}
+
 const THRESHOLD_FALLBACK = {
   thresholdLine:
     "You know exactly who you're not. You've just never asked who's left. This is where you meet the rest of it.",
@@ -2172,7 +2190,22 @@ export default function Home() {
   const [depth, setDepth] = useState<Depth | null>(null);
   const [stage, setStage] = useState<string | null>(null);
   const [alivenessInput, setAlivenessInput] = useState("");
-  const [alivenessSaved, setAlivenessSaved] = useState(false);
+  // The inline continuation of the aliveness question -- same screen, same
+  // sequence, every open: aliveness question (step 1) -> stuck question
+  // (step 2) -> five-part reveal (step 3). Fully separate from the organic
+  // in-conversation "aliveness as compass" behavior, and from the identical
+  // standalone flow in Settings (AlivenessCompass.tsx) -- this one just
+  // happens to share its generation endpoint.
+  const [alivenessStep, setAlivenessStep] = useState<1 | 2 | 3>(1);
+  const [alivenessSkipped, setAlivenessSkipped] = useState(false);
+  const [stuckInput, setStuckInput] = useState("");
+  const [alivenessHint, setAlivenessHint] = useState(false);
+  const [stuckHint, setStuckHint] = useState(false);
+  const [exerciseLoading, setExerciseLoading] = useState(false);
+  const [exerciseError, setExerciseError] = useState<string | null>(null);
+  const [exerciseResult, setExerciseResult] = useState<{ signs: string[]; closing: string } | null>(
+    null
+  );
   const [mirrorLine, setMirrorLine] = useState<string | null>(null);
   const [branches, setBranches] = useState<string[]>([]);
   const [showTree, setShowTree] = useState(false);
@@ -2431,8 +2464,7 @@ export default function Home() {
     const alivenessAnswer = isFirstMessage ? alivenessInput.trim() || undefined : undefined;
 
     setDraft("");
-    setAlivenessInput("");
-    setAlivenessSaved(false);
+    resetAlivenessFlow();
     setError(null);
     setSubscriptionLimit(null);
     setBranches([]);
@@ -2506,6 +2538,58 @@ export default function Home() {
     }
   }
 
+  function resetAlivenessFlow() {
+    setAlivenessInput("");
+    setStuckInput("");
+    setAlivenessStep(1);
+    setAlivenessSkipped(false);
+    setAlivenessHint(false);
+    setStuckHint(false);
+    setExerciseLoading(false);
+    setExerciseError(null);
+    setExerciseResult(null);
+  }
+
+  async function runAlivenessExercise(aliveness: string, stuck: string) {
+    setExerciseLoading(true);
+    setExerciseError(null);
+    try {
+      const res = await fetch("/api/aliveness-exercise", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ alivenessAnswer: aliveness, stuckAnswer: stuck, lang }),
+      });
+      const data = await res.json();
+      if (!res.ok || !Array.isArray(data.signs) || typeof data.closing !== "string") {
+        throw new Error(data.error || "Couldn't put that together.");
+      }
+      setExerciseResult({ signs: data.signs, closing: data.closing });
+    } catch (err) {
+      setExerciseError(err instanceof Error ? err.message : "Couldn't put that together just now.");
+    } finally {
+      setExerciseLoading(false);
+    }
+  }
+
+  function handleAlivenessContinue() {
+    if (!hasEnoughWordsForExercise(alivenessInput)) {
+      setAlivenessHint(true);
+      return;
+    }
+    setAlivenessHint(false);
+    setAlivenessStep(2);
+  }
+
+  function handleStuckContinue() {
+    if (!hasEnoughWordsForExercise(stuckInput)) {
+      setStuckHint(true);
+      return;
+    }
+    setStuckHint(false);
+    setAlivenessStep(3);
+    runAlivenessExercise(alivenessInput, stuckInput);
+  }
+
   // Picking a mood chip doesn't send anything yet — it opens the depth-check
   // interstitial first. Someone who just types their own opening line
   // instead skips both and goes straight through `send()`, same as before.
@@ -2534,8 +2618,7 @@ export default function Home() {
     setBranches([]);
     setError(null);
     setDraft("");
-    setAlivenessInput("");
-    setAlivenessSaved(false);
+    resetAlivenessFlow();
     setShowLastCommitment(false);
     setElementTally(EMPTY_TALLY);
     setAvatarReveal(null);
@@ -3049,45 +3132,141 @@ export default function Home() {
             ))}
           </div>
           <div className="aliveness-field">
-            <label htmlFor="aliveness">
-              {s.alivenessQuestion || ALIVENESS_FALLBACK.alivenessQuestion}{" "}
-              <span className="aliveness-optional">
-                ({s.alivenessOptional || ALIVENESS_FALLBACK.alivenessOptional})
-              </span>
-            </label>
-            {alivenessSaved ? (
-              <span className="settings-status">
-                {s.alivenessSavedLabel || ALIVENESS_FALLBACK.alivenessSavedLabel}
-              </span>
-            ) : (
+            {alivenessStep !== 3 && !alivenessSkipped && (
+              <button
+                type="button"
+                className="aliveness-compass-start-over"
+                onClick={() => {
+                  setAlivenessSkipped(true);
+                  textareaRef.current?.focus();
+                }}
+              >
+                {ALIVENESS_EXERCISE_COPY.skipLabel}
+              </button>
+            )}
+
+            {alivenessSkipped ? null : alivenessStep === 1 ? (
               <>
+                <label htmlFor="aliveness">
+                  {s.alivenessQuestion || ALIVENESS_FALLBACK.alivenessQuestion}
+                </label>
                 <input
                   id="aliveness"
                   type="text"
                   value={alivenessInput}
-                  onChange={(e) => setAlivenessInput(e.target.value)}
+                  onChange={(e) => {
+                    setAlivenessInput(e.target.value);
+                    if (alivenessHint) setAlivenessHint(false);
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
-                      setAlivenessSaved(true);
-                      textareaRef.current?.focus();
+                      handleAlivenessContinue();
                     }
                   }}
                   disabled={sending}
                 />
+                {alivenessHint && (
+                  <p className="aliveness-compass-hint">{ALIVENESS_EXERCISE_COPY.wordsHint}</p>
+                )}
                 {alivenessInput.trim() && (
                   <button
                     type="button"
                     className="aliveness-continue key-action"
-                    onClick={() => {
-                      setAlivenessSaved(true);
-                      textareaRef.current?.focus();
-                    }}
+                    onClick={handleAlivenessContinue}
                     disabled={sending}
                   >
                     <ArrowIcon />
                     {s.alivenessContinueLabel || ALIVENESS_FALLBACK.alivenessContinueLabel}
                   </button>
+                )}
+              </>
+            ) : alivenessStep === 2 ? (
+              <>
+                <label htmlFor="aliveness-stuck">{ALIVENESS_EXERCISE_COPY.stuckQuestion}</label>
+                <input
+                  id="aliveness-stuck"
+                  type="text"
+                  value={stuckInput}
+                  onChange={(e) => {
+                    setStuckInput(e.target.value);
+                    if (stuckHint) setStuckHint(false);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleStuckContinue();
+                    }
+                  }}
+                  disabled={sending}
+                  autoFocus
+                />
+                {stuckHint && (
+                  <p className="aliveness-compass-hint">{ALIVENESS_EXERCISE_COPY.wordsHint}</p>
+                )}
+                {stuckInput.trim() && (
+                  <button
+                    type="button"
+                    className="aliveness-continue key-action"
+                    onClick={handleStuckContinue}
+                    disabled={sending}
+                  >
+                    <ArrowIcon />
+                    {s.alivenessContinueLabel || ALIVENESS_FALLBACK.alivenessContinueLabel}
+                  </button>
+                )}
+              </>
+            ) : (
+              <>
+                {exerciseLoading && (
+                  <p className="aliveness-compass-loading">
+                    {ALIVENESS_EXERCISE_COPY.loadingLabel}
+                    <span className="typing-dots">
+                      <span />
+                      <span />
+                      <span />
+                    </span>
+                  </p>
+                )}
+                {!exerciseLoading && exerciseError && (
+                  <>
+                    <p className="aliveness-compass-error">{exerciseError}</p>
+                    <button
+                      type="button"
+                      className="aliveness-continue key-action"
+                      onClick={() => runAlivenessExercise(alivenessInput, stuckInput)}
+                    >
+                      <ArrowIcon />
+                      {ALIVENESS_EXERCISE_COPY.tryAgainLabel}
+                    </button>
+                  </>
+                )}
+                {!exerciseLoading && !exerciseError && exerciseResult && (
+                  <>
+                    <ol className="aliveness-compass-signs">
+                      {exerciseResult.signs.map((line, i) => (
+                        <li
+                          key={i}
+                          className="sign-item"
+                          style={{ animationDelay: `${0.4 + i * 0.9}s` }}
+                        >
+                          <span className="sign-num">{i + 1} / 5</span>
+                          <span className="sign-text">{line}</span>
+                        </li>
+                      ))}
+                    </ol>
+                    <div
+                      className="aliveness-compass-charge"
+                      style={{
+                        animationDelay: `${0.4 + exerciseResult.signs.length * 0.9 + 0.4}s`,
+                      }}
+                    >
+                      <p className="aliveness-compass-charge-text">{exerciseResult.closing}</p>
+                      <div className="aliveness-compass-charge-label">
+                        {ALIVENESS_EXERCISE_COPY.charge}
+                      </div>
+                    </div>
+                  </>
                 )}
               </>
             )}
