@@ -973,8 +973,11 @@ export async function getFamilyState(userId: string): Promise<FamilyState> {
     const tier = deriveTier(tags);
     const latest = tags[tags.length - 1];
     // The milestone -- 2+ distinct calendar days with a genuine reported
-    // instance, same anti-gaming shape as "returned to". One dramatic
-    // report alone never qualifies.
+    // instance. Unlike deriveTier's tiers above (which no longer need a
+    // second day), this one stays day-gated on purpose: it claims actual
+    // real-world behavior change, which can't honestly be demonstrated
+    // twice inside a single conversation. One dramatic report alone
+    // never qualifies.
     const brokenDays = new Set(tags.filter((t) => t.pattern_broken_instance).map((t) => t.day));
     const broken = brokenDays.size >= 2;
     state[theme] = { tier, groundedIn: latest.grounded_in, tracesTo: latest.traces_to, broken };
