@@ -20,6 +20,7 @@ import { NODES as TREE_NODES, type SephirahKey } from "@/lib/tree";
 // three.js needs a real canvas/WebGL context -- both client-only, no SSR.
 const ElementOrb = dynamic(() => import("./ElementOrb"), { ssr: false });
 const AvatarReveal = dynamic(() => import("./AvatarReveal"), { ssr: false });
+const AlivenessCompass = dynamic(() => import("./AlivenessCompass"), { ssr: false });
 
 // `id` is only present for messages fetched from the server -- a message
 // appended optimistically on send (before the round-trip completes) has
@@ -46,7 +47,6 @@ const USER_ID_KEY = "the_return_user_id";
 const ONBOARDED_KEY = "the_return_onboarded";
 const LANG_KEY = "the_return_lang";
 // Shown once, ever, the first time the orb appears for this person.
-const ORB_INTRO_SEEN_KEY = "the_return_orb_intro_seen";
 // sessionStorage, not localStorage -- shown once per fresh app open, not
 // once ever and not on every re-render while scrolling the same visit.
 const LAST_COMMITMENT_SEEN_KEY = "the_return_last_commitment_seen";
@@ -198,10 +198,6 @@ type Strings = {
   // full history/memory regardless. Not yet translated for every
   // language -- falls back to English, see START_FRESH_FALLBACK below.
   startFreshLabel?: string;
-  // One-time-ever line shown the first time the elemental orb appears.
-  // Not yet translated for every language -- falls back to English, see
-  // ORB_INTRO_FALLBACK below.
-  orbIntroLine?: string;
   winHeadline?: string;
   weeklyRecapHeadline?: string;
   // A person's own chosen time to talk, most days -- never a hard rule,
@@ -243,6 +239,24 @@ const ALIVENESS_FALLBACK = {
   alivenessSavedLabel: "Noted.",
 };
 
+// English-only for now, same call made for SUBSCRIPTION_FALLBACK and the
+// standalone Aliveness Compass copy -- this inline continuation (stuck
+// question + five-part reveal) is new enough not to be worth threading
+// through all 22 languages yet.
+const ALIVENESS_EXERCISE_COPY = {
+  stuckQuestion: "What's the thing you keep going back and forth on?",
+  wordsHint: "A few more words would help this mean something.",
+  loadingLabel: "Putting it together",
+  tryAgainLabel: "Try again",
+  charge: "to carry into the day",
+  skipLabel: "skip — just let me write",
+};
+
+const ALIVENESS_EXERCISE_MIN_WORDS = 3;
+function hasEnoughWordsForExercise(value: string): boolean {
+  return value.trim().split(/\s+/).filter(Boolean).length >= ALIVENESS_EXERCISE_MIN_WORDS;
+}
+
 const THRESHOLD_FALLBACK = {
   thresholdLine:
     "You know exactly who you're not. You've just never asked who's left. This is where you meet the rest of it.",
@@ -263,10 +277,6 @@ const LAST_COMMITMENT_FALLBACK = {
 
 const START_FRESH_FALLBACK = {
   startFreshLabel: "start fresh",
-};
-
-const ORB_INTRO_FALLBACK = {
-  orbIntroLine: "Every true thing you say shapes this. By the end, you'll see the shape.",
 };
 
 const WIN_FALLBACK = {
@@ -343,7 +353,6 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLabel: "Last time: {action}.",
     lastCommitmentLandedLabel: "Last time: {action} — and you did it.",
     startFreshLabel: "start fresh",
-    orbIntroLine: "Every true thing you say shapes this. By the end, you'll see the shape.",
     winHeadline: "You did it.",
     weeklyRecapHeadline: "This week.",
     checkInPromptText:
@@ -388,7 +397,6 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLabel: "La última vez: {action}.",
     lastCommitmentLandedLabel: "La última vez: {action} — y lo hiciste.",
     startFreshLabel: "empezar de nuevo",
-    orbIntroLine: "Cada cosa verdadera que digas le da forma a esto. Al final, verás la forma.",
     winHeadline: "Lo lograste.",
     weeklyRecapHeadline: "Esta semana.",
     checkInPromptText:
@@ -433,7 +441,6 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLabel: "La dernière fois : {action}.",
     lastCommitmentLandedLabel: "La dernière fois : {action} — et tu l'as fait.",
     startFreshLabel: "recommencer",
-    orbIntroLine: "Chaque chose vraie que tu dis façonne ceci. À la fin, tu verras la forme.",
     winHeadline: "Tu l'as fait.",
     weeklyRecapHeadline: "Cette semaine.",
     checkInPromptText:
@@ -478,7 +485,6 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLabel: "Letztes Mal: {action}.",
     lastCommitmentLandedLabel: "Letztes Mal: {action} — und du hast es geschafft.",
     startFreshLabel: "neu anfangen",
-    orbIntroLine: "Jede wahre Sache, die du sagst, formt das hier. Am Ende siehst du die Form.",
     winHeadline: "Du hast es geschafft.",
     weeklyRecapHeadline: "Diese Woche.",
     checkInPromptText:
@@ -523,7 +529,6 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLabel: "Da última vez: {action}.",
     lastCommitmentLandedLabel: "Da última vez: {action} — e você fez isso.",
     startFreshLabel: "recomeçar",
-    orbIntroLine: "Cada coisa verdadeira que você diz molda isso. No final, você verá a forma.",
     winHeadline: "Você conseguiu.",
     weeklyRecapHeadline: "Esta semana.",
     checkInPromptText:
@@ -568,7 +573,6 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLabel: "L'ultima volta: {action}.",
     lastCommitmentLandedLabel: "L'ultima volta: {action} — e l'hai fatto.",
     startFreshLabel: "ricomincia",
-    orbIntroLine: "Ogni cosa vera che dici dà forma a questo. Alla fine, vedrai la forma.",
     winHeadline: "Ce l'hai fatta.",
     weeklyRecapHeadline: "Questa settimana.",
     checkInPromptText:
@@ -612,7 +616,6 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLabel: "בפעם הקודמת: {action}.",
     lastCommitmentLandedLabel: "בפעם הקודמת: {action} — ועשית את זה.",
     startFreshLabel: "להתחיל מחדש",
-    orbIntroLine: "כל דבר אמיתי שאתה אומר מעצב את זה. בסוף, תראה את הצורה.",
     winHeadline: "עשית את זה.",
     weeklyRecapHeadline: "השבוע.",
     checkInPromptText:
@@ -656,7 +659,6 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLabel: "آخر مرة: {action}.",
     lastCommitmentLandedLabel: "آخر مرة: {action} — وقد فعلتها.",
     startFreshLabel: "ابدأ من جديد",
-    orbIntroLine: "كل شيء حقيقي تقوله يشكّل هذا. في النهاية، سترى الشكل.",
     winHeadline: "لقد فعلتها.",
     weeklyRecapHeadline: "هذا الأسبوع.",
     checkInPromptText:
@@ -701,7 +703,6 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLabel: "पिछली बार: {action}।",
     lastCommitmentLandedLabel: "पिछली बार: {action} — और तुमने कर दिखाया।",
     startFreshLabel: "नई शुरुआत करें",
-    orbIntroLine: "तुम जो भी सच कहते हो, वह इसे आकार देता है। अंत में, तुम आकार देख लोगे।",
     winHeadline: "तुमने कर दिखाया।",
     weeklyRecapHeadline: "इस हफ्ते।",
     checkInPromptText:
@@ -745,7 +746,6 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLabel: "上次：{action}。",
     lastCommitmentLandedLabel: "上次：{action}——你做到了。",
     startFreshLabel: "重新开始",
-    orbIntroLine: "你说的每一句真话都在塑造这个。到最后，你会看到它的形状。",
     winHeadline: "你做到了。",
     weeklyRecapHeadline: "这一周。",
     checkInPromptText:
@@ -790,7 +790,6 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLabel: "前回：{action}。",
     lastCommitmentLandedLabel: "前回：{action} — そして、やり遂げました。",
     startFreshLabel: "最初からやり直す",
-    orbIntroLine: "あなたが語るすべての真実が、これを形作ります。最後には、その形が見えるでしょう。",
     winHeadline: "やり遂げた。",
     weeklyRecapHeadline: "今週。",
     checkInPromptText:
@@ -835,7 +834,6 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLabel: "В прошлый раз: {action}.",
     lastCommitmentLandedLabel: "В прошлый раз: {action} — и ты это сделал.",
     startFreshLabel: "начать заново",
-    orbIntroLine: "Каждая правда, которую ты говоришь, формирует это. В конце ты увидишь форму.",
     winHeadline: "Ты сделал это.",
     weeklyRecapHeadline: "На этой неделе.",
     checkInPromptText:
@@ -879,7 +877,6 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLabel: "Herën e fundit: {action}.",
     lastCommitmentLandedLabel: "Herën e fundit: {action} — dhe e bëre.",
     startFreshLabel: "fillo nga e para",
-    orbIntroLine: "Çdo gjë e vërtetë që thua e formon këtë. Në fund, do ta shohësh formën.",
     winHeadline: "E bëre.",
     weeklyRecapHeadline: "Këtë javë.",
     checkInPromptText:
@@ -924,7 +921,6 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLabel: "Την τελευταία φορά: {action}.",
     lastCommitmentLandedLabel: "Την τελευταία φορά: {action} — και το έκανες.",
     startFreshLabel: "ξεκίνα από την αρχή",
-    orbIntroLine: "Κάθε αληθινό πράγμα που λες, το διαμορφώνει αυτό. Στο τέλος, θα δεις τη μορφή.",
     winHeadline: "Το έκανες.",
     weeklyRecapHeadline: "Αυτή την εβδομάδα.",
     checkInPromptText:
@@ -969,7 +965,6 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLabel: "Վերջին անգամ․ {action}։",
     lastCommitmentLandedLabel: "Վերջին անգամ․ {action} — և դու արեցիր դա։",
     startFreshLabel: "սկսել նորից",
-    orbIntroLine: "Ամեն ճշմարիտ բան, որ ասում ես, ձևավորում է սա։ Վերջում կտեսնես ձևը։",
     winHeadline: "Դու արեցիր դա։",
     weeklyRecapHeadline: "Այս շաբաթ։",
     checkInPromptText:
@@ -1014,7 +1009,6 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLabel: "Prošli put: {action}.",
     lastCommitmentLandedLabel: "Prošli put: {action} — i uspeo si.",
     startFreshLabel: "počni ispočetka",
-    orbIntroLine: "Svaka istinita stvar koju kažeš oblikuje ovo. Na kraju ćeš videti oblik.",
     winHeadline: "Uspeo si.",
     weeklyRecapHeadline: "Ove nedelje.",
     checkInPromptText:
@@ -1059,7 +1053,6 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLabel: "Prošli put: {action}.",
     lastCommitmentLandedLabel: "Prošli put: {action} — i uspio si.",
     startFreshLabel: "počni ispočetka",
-    orbIntroLine: "Svaka istinita stvar koju kažeš oblikuje ovo. Na kraju ćeš vidjeti oblik.",
     winHeadline: "Uspio si.",
     weeklyRecapHeadline: "Ovaj tjedan.",
     checkInPromptText:
@@ -1104,7 +1097,6 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLabel: "Prošli put: {action}.",
     lastCommitmentLandedLabel: "Prošli put: {action} — i uspio si.",
     startFreshLabel: "počni ispočetka",
-    orbIntroLine: "Svaka istinita stvar koju kažeš oblikuje ovo. Na kraju ćeš vidjeti oblik.",
     winHeadline: "Uspio si.",
     weeklyRecapHeadline: "Ove sedmice.",
     checkInPromptText:
@@ -1149,7 +1141,6 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLabel: "Последния път: {action}.",
     lastCommitmentLandedLabel: "Последния път: {action} — и го направи.",
     startFreshLabel: "започни отначало",
-    orbIntroLine: "Всяко истинско нещо, което казваш, оформя това. В края ще видиш формата.",
     winHeadline: "Успя.",
     weeklyRecapHeadline: "Тази седмица.",
     checkInPromptText:
@@ -1194,7 +1185,6 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLabel: "Минатиот пат: {action}.",
     lastCommitmentLandedLabel: "Минатиот пат: {action} — и го направи тоа.",
     startFreshLabel: "почни одново",
-    orbIntroLine: "Секое вистинско нешто што го кажуваш ја обликува ова. На крајот, ќе ја видиш формата.",
     winHeadline: "Успеа.",
     weeklyRecapHeadline: "Оваа недела.",
     checkInPromptText:
@@ -1239,7 +1229,6 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLabel: "Data trecută: {action}.",
     lastCommitmentLandedLabel: "Data trecută: {action} — și ai făcut-o.",
     startFreshLabel: "ia-o de la capăt",
-    orbIntroLine: "Fiecare lucru adevărat pe care îl spui dă formă acestui lucru. La final, vei vedea forma.",
     winHeadline: "Ai reușit.",
     weeklyRecapHeadline: "Săptămâna aceasta.",
     checkInPromptText:
@@ -1284,7 +1273,6 @@ const STRINGS: Record<string, Strings> = {
     lastCommitmentLabel: "Zadnjič: {action}.",
     lastCommitmentLandedLabel: "Zadnjič: {action} — in si to naredil.",
     startFreshLabel: "začni znova",
-    orbIntroLine: "Vsaka resnična stvar, ki jo poveš, oblikuje to. Na koncu boš videl obliko.",
     winHeadline: "Uspelo ti je.",
     weeklyRecapHeadline: "Ta teden.",
     checkInPromptText:
@@ -2153,7 +2141,6 @@ export default function Home() {
   const [openingQuestion, setOpeningQuestion] = useState("");
   const [visibleFromId, setVisibleFromId] = useState(0);
   const [elementTally, setElementTally] = useState<ElementTally>(EMPTY_TALLY);
-  const [showOrbIntro, setShowOrbIntro] = useState(false);
   const [avatarReveal, setAvatarReveal] = useState<AvatarRevealData | null>(null);
   // Fetched alongside the pattern review, but only promoted into `avatarReveal`
   // (and shown) once the person closes/continues past the pattern-review
@@ -2171,10 +2158,26 @@ export default function Home() {
   const [depth, setDepth] = useState<Depth | null>(null);
   const [stage, setStage] = useState<string | null>(null);
   const [alivenessInput, setAlivenessInput] = useState("");
-  const [alivenessSaved, setAlivenessSaved] = useState(false);
+  // The inline continuation of the aliveness question -- same screen, same
+  // sequence, every open: aliveness question (step 1) -> stuck question
+  // (step 2) -> five-part reveal (step 3). Fully separate from the organic
+  // in-conversation "aliveness as compass" behavior, and from the identical
+  // standalone flow in Settings (AlivenessCompass.tsx) -- this one just
+  // happens to share its generation endpoint.
+  const [alivenessStep, setAlivenessStep] = useState<1 | 2 | 3>(1);
+  const [alivenessSkipped, setAlivenessSkipped] = useState(false);
+  const [stuckInput, setStuckInput] = useState("");
+  const [alivenessHint, setAlivenessHint] = useState(false);
+  const [stuckHint, setStuckHint] = useState(false);
+  const [exerciseLoading, setExerciseLoading] = useState(false);
+  const [exerciseError, setExerciseError] = useState<string | null>(null);
+  const [exerciseResult, setExerciseResult] = useState<{ signs: string[]; closing: string } | null>(
+    null
+  );
   const [mirrorLine, setMirrorLine] = useState<string | null>(null);
   const [branches, setBranches] = useState<string[]>([]);
   const [showTree, setShowTree] = useState(false);
+  const [showAlivenessCompass, setShowAlivenessCompass] = useState(false);
   const [treeState, setTreeState] = useState<TreeState>({});
   const [connectionToast, setConnectionToast] = useState<string | null>(null);
   const [tensionInsights, setTensionInsights] = useState<{ pair: string; insight: string }[]>([]);
@@ -2230,15 +2233,6 @@ export default function Home() {
 
     if (!localStorage.getItem(ONBOARDED_KEY)) {
       setShowOnboarding(true);
-    }
-
-    try {
-      if (!localStorage.getItem(ORB_INTRO_SEEN_KEY)) {
-        setShowOrbIntro(true);
-        localStorage.setItem(ORB_INTRO_SEEN_KEY, "1");
-      }
-    } catch {
-      /* private browsing or storage disabled -- the intro just won't show */
     }
 
     // Captured in a local var, not just read back from state right after
@@ -2429,8 +2423,7 @@ export default function Home() {
     const alivenessAnswer = isFirstMessage ? alivenessInput.trim() || undefined : undefined;
 
     setDraft("");
-    setAlivenessInput("");
-    setAlivenessSaved(false);
+    resetAlivenessFlow();
     setError(null);
     setSubscriptionLimit(null);
     setBranches([]);
@@ -2504,6 +2497,58 @@ export default function Home() {
     }
   }
 
+  function resetAlivenessFlow() {
+    setAlivenessInput("");
+    setStuckInput("");
+    setAlivenessStep(1);
+    setAlivenessSkipped(false);
+    setAlivenessHint(false);
+    setStuckHint(false);
+    setExerciseLoading(false);
+    setExerciseError(null);
+    setExerciseResult(null);
+  }
+
+  async function runAlivenessExercise(aliveness: string, stuck: string) {
+    setExerciseLoading(true);
+    setExerciseError(null);
+    try {
+      const res = await fetch("/api/aliveness-exercise", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ alivenessAnswer: aliveness, stuckAnswer: stuck, lang }),
+      });
+      const data = await res.json();
+      if (!res.ok || !Array.isArray(data.signs) || typeof data.closing !== "string") {
+        throw new Error(data.error || "Couldn't put that together.");
+      }
+      setExerciseResult({ signs: data.signs, closing: data.closing });
+    } catch (err) {
+      setExerciseError(err instanceof Error ? err.message : "Couldn't put that together just now.");
+    } finally {
+      setExerciseLoading(false);
+    }
+  }
+
+  function handleAlivenessContinue() {
+    if (!hasEnoughWordsForExercise(alivenessInput)) {
+      setAlivenessHint(true);
+      return;
+    }
+    setAlivenessHint(false);
+    setAlivenessStep(2);
+  }
+
+  function handleStuckContinue() {
+    if (!hasEnoughWordsForExercise(stuckInput)) {
+      setStuckHint(true);
+      return;
+    }
+    setStuckHint(false);
+    setAlivenessStep(3);
+    runAlivenessExercise(alivenessInput, stuckInput);
+  }
+
   // Picking a mood chip doesn't send anything yet — it opens the depth-check
   // interstitial first. Someone who just types their own opening line
   // instead skips both and goes straight through `send()`, same as before.
@@ -2532,8 +2577,7 @@ export default function Home() {
     setBranches([]);
     setError(null);
     setDraft("");
-    setAlivenessInput("");
-    setAlivenessSaved(false);
+    resetAlivenessFlow();
     setShowLastCommitment(false);
     setElementTally(EMPTY_TALLY);
     setAvatarReveal(null);
@@ -2797,16 +2841,6 @@ export default function Home() {
         </div>
       )}
 
-      {showOrbIntro && hasStarted && (
-        <button
-          type="button"
-          className="orb-intro"
-          onClick={() => setShowOrbIntro(false)}
-        >
-          {s.orbIntroLine || ORB_INTRO_FALLBACK.orbIntroLine}
-        </button>
-      )}
-
       {avatarReveal && (
         <AvatarReveal
           tally={elementTally}
@@ -2937,6 +2971,12 @@ export default function Home() {
               →
             </span>
           </button>
+          <button type="button" className="tree-entry-btn" onClick={() => setShowAlivenessCompass(true)}>
+            <span>Aliveness Compass</span>
+            <span className="tree-entry-btn-arrow" aria-hidden="true">
+              →
+            </span>
+          </button>
           {mirrorLine && (
             <div className="mirror-card">
               <div className="mirror-card-label">{s.returnLabel}</div>
@@ -3041,45 +3081,141 @@ export default function Home() {
             ))}
           </div>
           <div className="aliveness-field">
-            <label htmlFor="aliveness">
-              {s.alivenessQuestion || ALIVENESS_FALLBACK.alivenessQuestion}{" "}
-              <span className="aliveness-optional">
-                ({s.alivenessOptional || ALIVENESS_FALLBACK.alivenessOptional})
-              </span>
-            </label>
-            {alivenessSaved ? (
-              <span className="settings-status">
-                {s.alivenessSavedLabel || ALIVENESS_FALLBACK.alivenessSavedLabel}
-              </span>
-            ) : (
+            {alivenessStep !== 3 && !alivenessSkipped && (
+              <button
+                type="button"
+                className="aliveness-compass-start-over"
+                onClick={() => {
+                  setAlivenessSkipped(true);
+                  textareaRef.current?.focus();
+                }}
+              >
+                {ALIVENESS_EXERCISE_COPY.skipLabel}
+              </button>
+            )}
+
+            {alivenessSkipped ? null : alivenessStep === 1 ? (
               <>
+                <label htmlFor="aliveness">
+                  {s.alivenessQuestion || ALIVENESS_FALLBACK.alivenessQuestion}
+                </label>
                 <input
                   id="aliveness"
                   type="text"
                   value={alivenessInput}
-                  onChange={(e) => setAlivenessInput(e.target.value)}
+                  onChange={(e) => {
+                    setAlivenessInput(e.target.value);
+                    if (alivenessHint) setAlivenessHint(false);
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       e.preventDefault();
-                      setAlivenessSaved(true);
-                      textareaRef.current?.focus();
+                      handleAlivenessContinue();
                     }
                   }}
                   disabled={sending}
                 />
+                {alivenessHint && (
+                  <p className="aliveness-compass-hint">{ALIVENESS_EXERCISE_COPY.wordsHint}</p>
+                )}
                 {alivenessInput.trim() && (
                   <button
                     type="button"
                     className="aliveness-continue key-action"
-                    onClick={() => {
-                      setAlivenessSaved(true);
-                      textareaRef.current?.focus();
-                    }}
+                    onClick={handleAlivenessContinue}
                     disabled={sending}
                   >
                     <ArrowIcon />
                     {s.alivenessContinueLabel || ALIVENESS_FALLBACK.alivenessContinueLabel}
                   </button>
+                )}
+              </>
+            ) : alivenessStep === 2 ? (
+              <>
+                <label htmlFor="aliveness-stuck">{ALIVENESS_EXERCISE_COPY.stuckQuestion}</label>
+                <input
+                  id="aliveness-stuck"
+                  type="text"
+                  value={stuckInput}
+                  onChange={(e) => {
+                    setStuckInput(e.target.value);
+                    if (stuckHint) setStuckHint(false);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleStuckContinue();
+                    }
+                  }}
+                  disabled={sending}
+                  autoFocus
+                />
+                {stuckHint && (
+                  <p className="aliveness-compass-hint">{ALIVENESS_EXERCISE_COPY.wordsHint}</p>
+                )}
+                {stuckInput.trim() && (
+                  <button
+                    type="button"
+                    className="aliveness-continue key-action"
+                    onClick={handleStuckContinue}
+                    disabled={sending}
+                  >
+                    <ArrowIcon />
+                    {s.alivenessContinueLabel || ALIVENESS_FALLBACK.alivenessContinueLabel}
+                  </button>
+                )}
+              </>
+            ) : (
+              <>
+                {exerciseLoading && (
+                  <p className="aliveness-compass-loading">
+                    {ALIVENESS_EXERCISE_COPY.loadingLabel}
+                    <span className="typing-dots">
+                      <span />
+                      <span />
+                      <span />
+                    </span>
+                  </p>
+                )}
+                {!exerciseLoading && exerciseError && (
+                  <>
+                    <p className="aliveness-compass-error">{exerciseError}</p>
+                    <button
+                      type="button"
+                      className="aliveness-continue key-action"
+                      onClick={() => runAlivenessExercise(alivenessInput, stuckInput)}
+                    >
+                      <ArrowIcon />
+                      {ALIVENESS_EXERCISE_COPY.tryAgainLabel}
+                    </button>
+                  </>
+                )}
+                {!exerciseLoading && !exerciseError && exerciseResult && (
+                  <>
+                    <ol className="aliveness-compass-signs">
+                      {exerciseResult.signs.map((line, i) => (
+                        <li
+                          key={i}
+                          className="sign-item"
+                          style={{ animationDelay: `${0.4 + i * 0.9}s` }}
+                        >
+                          <span className="sign-num">{i + 1} / 5</span>
+                          <span className="sign-text">{line}</span>
+                        </li>
+                      ))}
+                    </ol>
+                    <div
+                      className="aliveness-compass-charge"
+                      style={{
+                        animationDelay: `${0.4 + exerciseResult.signs.length * 0.9 + 0.4}s`,
+                      }}
+                    >
+                      <p className="aliveness-compass-charge-text">{exerciseResult.closing}</p>
+                      <div className="aliveness-compass-charge-label">
+                        {ALIVENESS_EXERCISE_COPY.charge}
+                      </div>
+                    </div>
+                  </>
                 )}
               </>
             )}
@@ -3220,6 +3356,10 @@ export default function Home() {
             </button>
           </div>
         </div>
+      )}
+
+      {showAlivenessCompass && (
+        <AlivenessCompass lang={lang} onClose={() => setShowAlivenessCompass(false)} />
       )}
     </div>
   );

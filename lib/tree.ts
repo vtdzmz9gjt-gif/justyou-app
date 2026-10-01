@@ -103,17 +103,18 @@ export const TIER_RANK: Record<SephirahTier, number> = {
 // app (sephirah_tags, family_pattern_tags, and anything future) -- a
 // node/theme is never re-derived by AI judgment, always read fresh from
 // its own tag history: lightly touched needs only one tag; returned to
-// needs substantive-or-deeper tags on 2+ distinct calendar days (not 2+
-// mentions in one sitting -- the "talks-a-lot-looks-resolved" trap);
-// deeply worked additionally needs at least one "confronted" tag
-// anywhere in that history. Pulling this into one function means the
-// Tree and Family Constellation can never quietly drift apart on what
-// these words mean.
+// needs 2+ substantive-or-deeper tags anywhere in the history, same
+// conversation or not; deeply worked additionally needs at least one
+// "confronted" tag anywhere in that history. One genuinely rich sitting
+// can reach full depth on its own -- the bar is real, repeated
+// disclosure, not a second calendar day; `day` stays on the input shape
+// since getFamilyState's separate "pattern broken" milestone still needs
+// it. Pulling this into one function means the Tree and Family
+// Constellation can never quietly drift apart on what these words mean.
 export function deriveTier(tags: { weight: SephirahWeight; day: string }[]): SephirahTier {
   const substantiveOrDeeper = tags.filter((t) => t.weight !== "surface");
-  const distinctDays = new Set(substantiveOrDeeper.map((t) => t.day));
   const hasConfronted = tags.some((t) => t.weight === "confronted");
-  if (distinctDays.size >= 2) {
+  if (substantiveOrDeeper.length >= 2) {
     return hasConfronted ? "deeply_worked" : "returned_to";
   }
   return "lightly_touched";
