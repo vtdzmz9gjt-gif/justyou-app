@@ -1733,46 +1733,8 @@ body {
 }
 
 
-.orb-intro {
-  position: fixed;
-  top: 84px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 5;
-  max-width: 26ch;
-  background: rgba(28, 24, 21, 0.85);
-  backdrop-filter: blur(6px);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 0.85rem 1.1rem;
-  font-family: var(--font-display);
-  font-style: italic;
-  font-size: 14px;
-  line-height: 1.6;
-  color: var(--text-muted);
-  text-align: center;
-  cursor: pointer;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
-  animation: revealFadeIn 1s ease forwards;
-  transition: color 0.15s ease, border-color 0.15s ease;
-}
-
-.orb-intro:hover,
-.orb-intro:focus-visible {
-  color: var(--text);
-  border-color: var(--accent);
-}
-
-@media (max-width: 640px) {
-  .orb-intro {
-    top: 64px;
-    max-width: 22ch;
-    font-size: 13px;
-  }
-}
-
 .app
-  > *:not(.ambient-glow):not(.element-orb-wrap):not(.orb-intro):not(
+  > *:not(.ambient-glow):not(.element-orb-wrap):not(
     .avatar-reveal-overlay
   ):not(.pattern-review-overlay):not(.tree-overlay):not(.patterns-tabs):not(.opening-bg) {
   position: relative;
