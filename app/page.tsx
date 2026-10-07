@@ -249,7 +249,7 @@ const ALIVENESS_EXERCISE_COPY = {
   loadingLabel: "Putting it together",
   tryAgainLabel: "Try again",
   charge: "to carry into the day",
-  skipLabel: "skip — just let me write",
+  skipLabel: "Skip this, just write",
 };
 
 const ALIVENESS_EXERCISE_MIN_WORDS = 3;
@@ -3080,20 +3080,20 @@ export default function Home() {
               </button>
             ))}
           </div>
+          {alivenessStep !== 3 && !alivenessSkipped && (
+            <button
+              type="button"
+              className="aliveness-skip"
+              onClick={() => {
+                setAlivenessSkipped(true);
+                textareaRef.current?.focus();
+              }}
+            >
+              <span aria-hidden="true">×</span>
+              {ALIVENESS_EXERCISE_COPY.skipLabel}
+            </button>
+          )}
           <div className="aliveness-field">
-            {alivenessStep !== 3 && !alivenessSkipped && (
-              <button
-                type="button"
-                className="aliveness-compass-start-over"
-                onClick={() => {
-                  setAlivenessSkipped(true);
-                  textareaRef.current?.focus();
-                }}
-              >
-                {ALIVENESS_EXERCISE_COPY.skipLabel}
-              </button>
-            )}
-
             {alivenessSkipped ? null : alivenessStep === 1 ? (
               <>
                 <label htmlFor="aliveness">
