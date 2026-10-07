@@ -22,6 +22,7 @@ import {
   saveReflection,
   recordCrossLink,
   consumePendingCrossLinks,
+  getAvoidancePattern,
   type StoredMessage,
   type Stage,
   type Element,
@@ -539,6 +540,25 @@ ${lines.join("\n")}
 If a real opening comes up naturally, you can let an unspoken or barely-touched area inform which question you ask next -- but only when that's genuinely where the conversation is already headed, never forced, never more than once in a conversation, and never by naming the mechanism to the person.`;
 }
 
+// Surfaces a node/theme that's been approached and pulled back from
+// repeatedly -- see getAvoidancePattern's own comment in lib/db.ts for
+// the detection rule. This is itself real information, not a gap to
+// fill: named only if it's genuinely how the conversation is already
+// going, at most once per conversation, same restraint as treeContext
+// above, and never by naming the mechanism ("Tree," "sephirah," a
+// node's internal name) to the person.
+async function avoidanceContext(userId: string): Promise<string> {
+  const pattern = await getAvoidancePattern(userId);
+  if (!pattern) return "";
+
+  const label =
+    pattern.system === "tree"
+      ? `${NODES[pattern.node as SephirahKey].title} (${NODES[pattern.node as SephirahKey].subtitle})`
+      : THEMES[pattern.node as FamilyTheme].title;
+
+  return `This person has approached "${label}" and pulled back before going deeper, on ${pattern.distinctSurfaceDays} separate occasions now -- never once past the surface. That repeated approach-and-retreat may be real information worth naming plainly, in your own words, if it genuinely fits where this conversation is already going -- never forced, never more than once, never by naming the mechanism to the person.`;
+}
+
 // A same-turn double-tag from the PREVIOUS message, queued for this reply
 // to name retroactively -- see the pending_cross_links table comment in
 // lib/db.ts for why this has to be a turn late rather than same-turn.
@@ -639,11 +659,12 @@ export async function runChat(
   const sephirahPromise = resolveSephirahTag(userId, tagSephirah(userMessage));
   const familyPromise = resolveFamilyPatternTag(userId, tagFamilyPattern(userMessage));
 
-  const [openCommitment, stageInfo, treeInfo, crossLinkInfo] = await Promise.all([
+  const [openCommitment, stageInfo, treeInfo, crossLinkInfo, avoidanceInfo] = await Promise.all([
     openCommitmentContext(userId),
     stageContext(userId),
     treeContext(userId),
     crossLinkContext(userId),
+    avoidanceContext(userId),
   ]);
   // Split into a frozen block (cached -- identical for every user, every
   // turn, forever) and a dynamic block (never cached -- today's date,
@@ -652,7 +673,7 @@ export async function runChat(
   // notes below the tools array for why this split exists.
   const contextText = `CONTEXT (not visible to the person, never repeat it back verbatim):\n${todayContext()}\n${openCommitment}\n${depthContext(
     depth
-  )}\n${uiLanguageContext(uiLang)}\n${alivenessContext(alivenessAnswer)}\n${pacingContext(history)}\n${stageInfo}\n${treeInfo}\n${crossLinkInfo}`;
+  )}\n${uiLanguageContext(uiLang)}\n${alivenessContext(alivenessAnswer)}\n${pacingContext(history)}\n${stageInfo}\n${treeInfo}\n${crossLinkInfo}\n${avoidanceInfo}`;
 
   const system: Anthropic.TextBlockParam[] = [
     { type: "text", text: BASE_SYSTEM_PROMPT, cache_control: { type: "ephemeral", ttl: "1h" } },

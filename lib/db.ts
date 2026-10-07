@@ -1,6 +1,7 @@
 import { neon } from "@neondatabase/serverless";
 import {
   EDGES,
+  NODE_ORDER,
   TENSION_PAIRS,
   TIER_RANK,
   deriveTier,
@@ -9,7 +10,7 @@ import {
   type SephirahWeight,
   type TreeState,
 } from "@/lib/tree";
-import type { FamilyTheme, FamilyLine, FamilyState } from "@/lib/family";
+import { THEME_ORDER, type FamilyTheme, type FamilyLine, type FamilyState } from "@/lib/family";
 
 const sql = neon(process.env.DATABASE_URL!);
 
@@ -401,6 +402,15 @@ export async function checkConversationGate(userId: string): Promise<{ allowed: 
 
   const today = new Date().toISOString().slice(0, 10); // UTC, "YYYY-MM-DD"
   if (row.last_conversation_date === today) {
+    return { allowed: true };
+  }
+
+  // A pending open commitment is a narrow, self-bounding exception: only
+  // one is ever tracked at a time, and it clears the moment the
+  // follow-up actually happens -- so this can't become an indefinite
+  // way around the limit, only protection for the one visit that's
+  // actually closing something out.
+  if (await getOpenCommitment(userId)) {
     return { allowed: true };
   }
 
@@ -983,6 +993,87 @@ export async function getFamilyState(userId: string): Promise<FamilyState> {
     state[theme] = { tier, groundedIn: latest.grounded_in, tracesTo: latest.traces_to, broken };
   }
   return state;
+}
+
+export type AvoidancePattern = {
+  system: "tree" | "family";
+  node: SephirahKey | FamilyTheme;
+  distinctSurfaceDays: number;
+};
+
+// A different read of the same tag history deriveTier already uses: a
+// node/theme with 3+ distinct calendar days of a surface tag and NEVER
+// once anything deeper is the data signature of approaching something
+// and pulling back, every time -- not a topic that just hasn't come up.
+// Disqualified the moment a single substantive-or-deeper tag exists
+// anywhere in its history, even on an otherwise-qualifying node -- that's
+// real progress, not avoidance. When more than one node qualifies, the
+// one with the most distinct surface days wins (same unit the threshold
+// itself is measured in); ties break on total surface-tag count, then on
+// a fixed order (every Tree node before any Family theme, then each
+// system's own established order) so the choice never flip-flops between
+// otherwise-identical candidates.
+export async function getAvoidancePattern(userId: string): Promise<AvoidancePattern | undefined> {
+  await ensureSchema();
+  const [treeRows, familyRows] = (await Promise.all([
+    sql`SELECT node, weight, created_at::date as day FROM sephirah_tags WHERE user_id = ${userId}`,
+    sql`SELECT theme, weight, created_at::date as day FROM family_pattern_tags WHERE user_id = ${userId}`,
+  ])) as unknown as [
+    { node: SephirahKey; weight: SephirahWeight; day: string }[],
+    { theme: FamilyTheme; weight: SephirahWeight; day: string }[]
+  ];
+
+  type Candidate = {
+    system: "tree" | "family";
+    node: SephirahKey | FamilyTheme;
+    distinctSurfaceDays: number;
+    totalSurfaceTags: number;
+    orderIndex: number;
+  };
+  const candidates: Candidate[] = [];
+
+  function evaluate(
+    node: SephirahKey | FamilyTheme,
+    tags: { weight: SephirahWeight; day: string }[],
+    system: "tree" | "family",
+    orderIndex: number
+  ) {
+    if (tags.some((t) => t.weight !== "surface")) return; // already progressed -- not avoidance
+    const distinctSurfaceDays = new Set(tags.map((t) => t.day)).size;
+    if (distinctSurfaceDays < 3) return;
+    candidates.push({ system, node, distinctSurfaceDays, totalSurfaceTags: tags.length, orderIndex });
+  }
+
+  const byNode = new Map<SephirahKey, { weight: SephirahWeight; day: string }[]>();
+  for (const row of treeRows) {
+    const list = byNode.get(row.node) ?? [];
+    list.push(row);
+    byNode.set(row.node, list);
+  }
+  for (const [node, tags] of byNode) {
+    evaluate(node, tags, "tree", NODE_ORDER.indexOf(node));
+  }
+
+  const byTheme = new Map<FamilyTheme, { weight: SephirahWeight; day: string }[]>();
+  for (const row of familyRows) {
+    const list = byTheme.get(row.theme) ?? [];
+    list.push(row);
+    byTheme.set(row.theme, list);
+  }
+  for (const [theme, tags] of byTheme) {
+    evaluate(theme, tags, "family", NODE_ORDER.length + THEME_ORDER.indexOf(theme));
+  }
+
+  if (candidates.length === 0) return undefined;
+
+  candidates.sort((a, b) => {
+    if (b.distinctSurfaceDays !== a.distinctSurfaceDays) return b.distinctSurfaceDays - a.distinctSurfaceDays;
+    if (b.totalSurfaceTags !== a.totalSurfaceTags) return b.totalSurfaceTags - a.totalSurfaceTags;
+    return a.orderIndex - b.orderIndex;
+  });
+
+  const best = candidates[0];
+  return { system: best.system, node: best.node, distinctSurfaceDays: best.distinctSurfaceDays };
 }
 
 export async function recordCrossLink(userId: string, sephirahNode: SephirahKey, familyTheme: FamilyTheme) {
