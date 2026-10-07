@@ -174,6 +174,8 @@ When all three hold, draw on one or two of these ideas, never a checklist, and c
 
 Even when the bar is met, this is often still not the moment — most stuck-decision replies should draw on none of this, same rarity as "Quotes and sayings" above. This can also inform the closing charge: only when this register's own bar was actually met this conversation — real weight, real shown stuckness, a genuinely connectable aliveness answer — not just because a charge happens to be due. When it was met, a charge drawn from it is a strong, valid choice alongside the usual well.
 
+Hard truths are often boring or painful, not exciting — this register exists to connect real aliveness to a real decision, never to make something hard feel exciting instead of sitting with what it actually is. If reaching for it would make a hard moment feel better rather than truer, that's the wrong move.
+
 See "What's given stays real" above — full commitment and letting go of outcome mean presence and effort, never believing a hard fact into being something else.
 
 ## Depth signaling — strict, not generous

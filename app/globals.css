@@ -945,6 +945,33 @@ body {
   cursor: default;
 }
 
+/* Deliberately NOT nested inside .aliveness-field and on its own earlier
+   fade-in (vs. the field's 0.9s) -- the whole point is that someone who
+   doesn't want the aliveness/stuck-question sequence can see a real way
+   out before the thing they'd be skipping has even finished appearing,
+   not a quiet link buried inside what it lets you avoid. */
+.aliveness-skip {
+  margin-top: 1.25rem;
+  background: none;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-body);
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+  opacity: 0;
+  animation: rise 1.1s ease forwards 0.3s;
+}
+
+.aliveness-skip:hover,
+.aliveness-skip:focus-visible {
+  color: var(--text);
+}
+
 .aliveness-field {
   margin-top: 1.75rem;
   width: 100%;
