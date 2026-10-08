@@ -3048,6 +3048,13 @@ export default function Home() {
           <div className="settings-privacy">
             <p>{s.privacyLong1}</p>
             <p>{s.privacyLong2}</p>
+            <p>
+              Questions or feedback: <a href="mailto:hello@justyou.fyi">hello@justyou.fyi</a>
+            </p>
+            <p className="settings-privacy-links">
+              <a href="/privacy">Privacy Policy</a>
+              <a href="/terms">Terms of Service</a>
+            </p>
           </div>
         </div>
       )}
