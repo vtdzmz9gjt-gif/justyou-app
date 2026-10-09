@@ -10,7 +10,7 @@ import {
 } from "react";
 import dynamic from "next/dynamic";
 import SparseSky from "./SparseSky";
-import { ArrowIcon, EyeIcon, UnlockIcon } from "./icons";
+import { ArrowIcon, EyeIcon, SparkIcon, UnlockIcon } from "./icons";
 import WinCelebration from "./WinCelebration";
 import WeeklyRecap from "./WeeklyRecap";
 import TreeOfLife, { type TreeState } from "./TreeOfLife";
@@ -21,6 +21,7 @@ import { NODES as TREE_NODES, type SephirahKey } from "@/lib/tree";
 const ElementOrb = dynamic(() => import("./ElementOrb"), { ssr: false });
 const AvatarReveal = dynamic(() => import("./AvatarReveal"), { ssr: false });
 const AlivenessCompass = dynamic(() => import("./AlivenessCompass"), { ssr: false });
+const FirstLight = dynamic(() => import("./FirstLight"), { ssr: false });
 
 // `id` is only present for messages fetched from the server -- a message
 // appended optimistically on send (before the round-trip completes) has
@@ -165,13 +166,6 @@ type Strings = {
   // than always English, which was steering the AI's replies into English
   // regardless of the selected UI language.
   moodPhrase: string;
-  // Optional secondary question on the opening screen. Not yet translated
-  // for every language (like the extra rotating `questions`) -- falls back
-  // to English, see ALIVENESS_FALLBACK below.
-  alivenessQuestion?: string;
-  alivenessOptional?: string;
-  alivenessContinueLabel?: string;
-  alivenessSavedLabel?: string;
   // The fixed line shown once during the threshold moment (a few seconds
   // of near-black stillness on every app open, before anything else --
   // spec section 12/13). Only composed fresh for the launch languages
@@ -232,30 +226,6 @@ type Strings = {
   privacyLong2: string;
 };
 
-const ALIVENESS_FALLBACK = {
-  alivenessQuestion: "Where did you feel most alive this week?",
-  alivenessOptional: "optional",
-  alivenessContinueLabel: "Continue",
-  alivenessSavedLabel: "Noted.",
-};
-
-// English-only for now, same call made for SUBSCRIPTION_FALLBACK and the
-// standalone Aliveness Compass copy -- this inline continuation (stuck
-// question + five-part reveal) is new enough not to be worth threading
-// through all 22 languages yet.
-const ALIVENESS_EXERCISE_COPY = {
-  stuckQuestion: "What's the thing you keep going back and forth on?",
-  wordsHint: "A few more words would help this mean something.",
-  loadingLabel: "Putting it together",
-  tryAgainLabel: "Try again",
-  charge: "to carry into the day",
-  skipLabel: "Skip this, just write",
-};
-
-const ALIVENESS_EXERCISE_MIN_WORDS = 3;
-function hasEnoughWordsForExercise(value: string): boolean {
-  return value.trim().split(/\s+/).filter(Boolean).length >= ALIVENESS_EXERCISE_MIN_WORDS;
-}
 
 const THRESHOLD_FALLBACK = {
   thresholdLine:
@@ -344,8 +314,6 @@ const STRINGS: Record<string, Strings> = {
     depthQuestion: "How much do you want to get into today?",
     depthOptions: ["Just looking around", "A little", "I've got something on my mind"],
     moodPhrase: "I'm feeling {mood} right now.",
-    alivenessQuestion: "Where did you feel most alive this week?",
-    alivenessOptional: "optional",
     thresholdLine:
       "You know exactly who you're not. You've just never asked who's left. This is where you meet the rest of it.",
     patternReviewLabel: "See the pattern",
@@ -388,8 +356,6 @@ const STRINGS: Record<string, Strings> = {
     depthQuestion: "¿Qué tan a fondo quieres ir hoy?",
     depthOptions: ["Solo mirando", "Un poco", "Tengo algo en mente"],
     moodPhrase: "Me siento {mood} ahora mismo.",
-    alivenessQuestion: "¿Dónde te sentiste más vivo esta semana?",
-    alivenessOptional: "opcional",
     thresholdLine:
       "Sabes exactamente quién no eres. Solo nunca has preguntado quién queda. Aquí conoces al resto.",
     patternReviewLabel: "Ver el patrón",
@@ -432,8 +398,6 @@ const STRINGS: Record<string, Strings> = {
     depthQuestion: "Tu veux aller jusqu'où aujourd'hui ?",
     depthOptions: ["Je regarde juste", "Un peu", "J'ai quelque chose en tête"],
     moodPhrase: "Je me sens {mood} en ce moment.",
-    alivenessQuestion: "Où t'es-tu senti le plus vivant cette semaine ?",
-    alivenessOptional: "facultatif",
     thresholdLine:
       "Tu sais exactement qui tu n'es pas. Tu n'as juste jamais demandé qui reste. C'est ici que tu le rencontres.",
     patternReviewLabel: "Voir le schéma",
@@ -478,8 +442,6 @@ const STRINGS: Record<string, Strings> = {
     moodPhrase: "Ich fühle mich gerade {mood}.",
     thresholdLine:
       "Du weißt genau, wer du nicht bist. Wer noch übrig ist, hast du nie gefragt. Hier triffst du ihn.",
-    alivenessQuestion: "Wo hast du dich diese Woche am lebendigsten gefühlt?",
-    alivenessOptional: "optional",
     patternReviewLabel: "Das Muster sehen",
     stillHereLabel: "Noch da — das hier dauert etwas länger.",
     lastCommitmentLabel: "Letztes Mal: {action}.",
@@ -520,8 +482,6 @@ const STRINGS: Record<string, Strings> = {
     depthQuestion: "O quanto você quer se aprofundar hoje?",
     depthOptions: ["Só olhando", "Um pouco", "Tenho algo em mente"],
     moodPhrase: "Estou me sentindo {mood} agora.",
-    alivenessQuestion: "Onde você se sentiu mais vivo esta semana?",
-    alivenessOptional: "opcional",
     thresholdLine:
       "Você sabe exatamente quem não é. Só nunca perguntou quem sobrou. É aqui que você o encontra.",
     patternReviewLabel: "Ver o padrão",
@@ -566,8 +526,6 @@ const STRINGS: Record<string, Strings> = {
     moodPhrase: "Mi sento {mood} in questo momento.",
     thresholdLine:
       "Sai benissimo chi non sei. Ma chi sei davvero, non l'hai mai incontrato. Qui lo incontri.",
-    alivenessQuestion: "Dove ti sei sentito più vivo questa settimana?",
-    alivenessOptional: "facoltativo",
     patternReviewLabel: "Vedi lo schema",
     stillHereLabel: "Sono ancora qui — questa sta impiegando un po' più tempo.",
     lastCommitmentLabel: "L'ultima volta: {action}.",
@@ -608,8 +566,6 @@ const STRINGS: Record<string, Strings> = {
     depthQuestion: "כמה עמוק אתה רוצה להיכנס היום?",
     depthOptions: ["רק מסתכל", "קצת", "יש לי משהו בראש"],
     moodPhrase: "אני מרגיש {mood} כרגע.",
-    alivenessQuestion: "מתי הרגשת הכי חי השבוע?",
-    alivenessOptional: "לא חובה",
     thresholdLine: "אתה יודע בדיוק מי אתה לא. אבל מעולם לא שאלת מי נשאר. כאן אתה פוגש את זה.",
     patternReviewLabel: "לראות את התבנית",
     stillHereLabel: "עדיין כאן — זה לוקח קצת יותר זמן.",
@@ -651,8 +607,6 @@ const STRINGS: Record<string, Strings> = {
     depthQuestion: "كم تريد أن تتعمق اليوم؟",
     depthOptions: ["فقط أتصفح", "قليلاً", "لدي شيء في بالي"],
     moodPhrase: "أشعر بأنني {mood} الآن.",
-    alivenessQuestion: "متى شعرت بأنك الأكثر حيوية هذا الأسبوع؟",
-    alivenessOptional: "اختياري",
     thresholdLine: "أنت تعرف بالضبط من لست. لكنك لم تسأل قط من تبقى. هنا تقابله.",
     patternReviewLabel: "رؤية النمط",
     stillHereLabel: "ما زلت هنا — هذه تستغرق وقتًا أطول قليلاً.",
@@ -694,8 +648,6 @@ const STRINGS: Record<string, Strings> = {
     depthQuestion: "आज तुम कितना गहराई में जाना चाहते हो?",
     depthOptions: ["बस देख रहा हूँ", "थोड़ा सा", "मेरे मन में कुछ है"],
     moodPhrase: "मुझे अभी {mood} महसूस हो रहा है.",
-    alivenessQuestion: "इस हफ्ते तुम्हें सबसे ज़्यादा जीवंत कब महसूस हुआ?",
-    alivenessOptional: "वैकल्पिक",
     thresholdLine:
       "तुम ठीक-ठीक जानते हो कि तुम क्या नहीं हो। बस तुमने कभी नहीं पूछा कि बाकी कौन बचा है। यहाँ तुम उससे मिलते हो।",
     patternReviewLabel: "पैटर्न देखें",
@@ -738,8 +690,6 @@ const STRINGS: Record<string, Strings> = {
     depthQuestion: "今天你想深入到什么程度？",
     depthOptions: ["只是看看", "一点点", "我心里有件事"],
     moodPhrase: "我现在感觉{mood}。",
-    alivenessQuestion: "这周你在什么时候感觉最有活力？",
-    alivenessOptional: "可选",
     thresholdLine: "你清楚地知道自己不是谁。只是你从未问过，剩下的是谁。在这里，你会遇见他。",
     patternReviewLabel: "查看模式",
     stillHereLabel: "还在——这次要多花一点时间。",
@@ -781,8 +731,6 @@ const STRINGS: Record<string, Strings> = {
     depthQuestion: "今日はどのくらい深く話したいですか？",
     depthOptions: ["ただ見ているだけ", "少しだけ", "気になることがある"],
     moodPhrase: "今は{mood}な気分です。",
-    alivenessQuestion: "今週、一番生きていると感じたのはいつですか？",
-    alivenessOptional: "任意",
     thresholdLine:
       "自分が何者でないかは、はっきりわかっている。でも、残ったものが誰なのかは、一度も聞いたことがない。ここで、それに出会う。",
     patternReviewLabel: "パターンを見る",
@@ -825,8 +773,6 @@ const STRINGS: Record<string, Strings> = {
     depthQuestion: "Насколько глубоко ты хочешь зайти сегодня?",
     depthOptions: ["Просто смотрю", "Немного", "У меня кое-что на уме"],
     moodPhrase: "Сейчас я чувствую себя {mood}.",
-    alivenessQuestion: "Когда на этой неделе ты чувствовал себя наиболее живым?",
-    alivenessOptional: "необязательно",
     thresholdLine:
       "Ты точно знаешь, кем не являешься. Просто никогда не спрашивал, кто остался. Здесь ты с ним встретишься.",
     patternReviewLabel: "Посмотреть узор",
@@ -870,8 +816,6 @@ const STRINGS: Record<string, Strings> = {
     depthOptions: ["Vetëm po shikoj", "Pak", "Kam diçka në mendje"],
     moodPhrase: "Po ndihem {mood} tani.",
     thresholdLine: "E njeh mirë atë që s'je. Po atë që je — s'e ke takuar kurrë. Këtu e takon.",
-    alivenessQuestion: "Kur u ndjeve më i gjallë këtë javë?",
-    alivenessOptional: "opsionale",
     patternReviewLabel: "Shiko modelin",
     stillHereLabel: "Ende këtu — kjo po merr pak më shumë kohë.",
     lastCommitmentLabel: "Herën e fundit: {action}.",
@@ -914,8 +858,6 @@ const STRINGS: Record<string, Strings> = {
     moodPhrase: "Αισθάνομαι {mood} αυτή τη στιγμή.",
     thresholdLine:
       "Ξέρεις καλά ποιος δεν είσαι. Ποιος έμεινε, όμως, δεν τον έχεις ρωτήσει ποτέ. Εδώ τον γνωρίζεις.",
-    alivenessQuestion: "Πότε νιώθεις πιο ζωντανός αυτή την εβδομάδα;",
-    alivenessOptional: "προαιρετικό",
     patternReviewLabel: "Δες το μοτίβο",
     stillHereLabel: "Ακόμα εδώ — αυτό παίρνει λίγο παραπάνω χρόνο.",
     lastCommitmentLabel: "Την τελευταία φορά: {action}.",
@@ -956,8 +898,6 @@ const STRINGS: Record<string, Strings> = {
     depthQuestion: "Որքա՞ն խորը ես ուզում գնալ այսօր։",
     depthOptions: ["Պարզապես նայում եմ", "Մի քիչ", "Մտքումս մի բան կա"],
     moodPhrase: "Հիմա ես {mood} եմ։",
-    alivenessQuestion: "Այս շաբաթ ե՞րբ ես ամենակենդանի զգացել քեզ։",
-    alivenessOptional: "ընտրովի",
     thresholdLine:
       "Դու հստակ գիտես, թե ով չես։ Պարզապես երբեք չես հարցրել, թե ով է մնացել։ Այստեղ դու հանդիպում ես նրան։",
     patternReviewLabel: "Տեսնել օրինաչափությունը",
@@ -1000,8 +940,6 @@ const STRINGS: Record<string, Strings> = {
     depthQuestion: "Koliko duboko želiš da ideš danas?",
     depthOptions: ["Samo gledam", "Malo", "Imam nešto na umu"],
     moodPhrase: "Trenutno se osećam {mood}.",
-    alivenessQuestion: "Kada si se ove nedelje osećao najživlje?",
-    alivenessOptional: "opciono",
     thresholdLine:
       "Tačno znaš ko nisi. Samo nikad nisi pitao ko je ostao. Ovde ćeš ga upoznati.",
     patternReviewLabel: "Vidi obrazac",
@@ -1044,8 +982,6 @@ const STRINGS: Record<string, Strings> = {
     depthQuestion: "Koliko duboko želiš ići danas?",
     depthOptions: ["Samo gledam", "Malo", "Imam nešto na umu"],
     moodPhrase: "Trenutno se osjećam {mood}.",
-    alivenessQuestion: "Kada si se ovaj tjedan osjećao najživlje?",
-    alivenessOptional: "neobavezno",
     thresholdLine:
       "Točno znaš tko nisi. Samo nikad nisi pitao tko je ostao. Ovdje ćeš ga upoznati.",
     patternReviewLabel: "Vidi obrazac",
@@ -1088,8 +1024,6 @@ const STRINGS: Record<string, Strings> = {
     depthQuestion: "Koliko duboko želiš ići danas?",
     depthOptions: ["Samo gledam", "Malo", "Imam nešto na umu"],
     moodPhrase: "Trenutno se osjećam {mood}.",
-    alivenessQuestion: "Kada si se ove sedmice osjećao najživlje?",
-    alivenessOptional: "opciono",
     thresholdLine:
       "Tačno znaš ko nisi. Samo nikad nisi pitao ko je ostao. Ovdje ćeš ga upoznati.",
     patternReviewLabel: "Vidi obrazac",
@@ -1132,8 +1066,6 @@ const STRINGS: Record<string, Strings> = {
     depthQuestion: "Колко дълбоко искаш да отидеш днес?",
     depthOptions: ["Просто гледам", "Малко", "Имам нещо наум"],
     moodPhrase: "В момента се чувствам {mood}.",
-    alivenessQuestion: "Кога тази седмица се почувства най-жив?",
-    alivenessOptional: "по избор",
     thresholdLine:
       "Знаеш точно кой не си. Просто никога не си питал кой е останал. Тук го срещаш.",
     patternReviewLabel: "Виж модела",
@@ -1176,8 +1108,6 @@ const STRINGS: Record<string, Strings> = {
     depthQuestion: "Колку длабоко сакаш да одиш денес?",
     depthOptions: ["Само гледам", "Малку", "Имам нешто на ум"],
     moodPhrase: "Во моментот се чувствувам {mood}.",
-    alivenessQuestion: "Кога оваа недела се почувствува најживо?",
-    alivenessOptional: "опционално",
     thresholdLine:
       "Точно знаеш кој не си. Само никогаш не праша кој останал. Тука го запознаваш.",
     patternReviewLabel: "Види ја шемата",
@@ -1220,8 +1150,6 @@ const STRINGS: Record<string, Strings> = {
     depthQuestion: "Cât de adânc vrei să mergi azi?",
     depthOptions: ["Doar mă uit", "Puțin", "Am ceva pe suflet"],
     moodPhrase: "Mă simt {mood} chiar acum.",
-    alivenessQuestion: "Când te-ai simțit cel mai viu săptămâna aceasta?",
-    alivenessOptional: "opțional",
     thresholdLine:
       "Știi exact cine nu ești. Doar că nu ai întrebat niciodată cine a rămas. Aici îl întâlnești.",
     patternReviewLabel: "Vezi tiparul",
@@ -1264,8 +1192,6 @@ const STRINGS: Record<string, Strings> = {
     depthQuestion: "Kako globoko želiš iti danes?",
     depthOptions: ["Samo gledam", "Malo", "Nekaj imam v mislih"],
     moodPhrase: "Trenutno se počutim {mood}.",
-    alivenessQuestion: "Kdaj si se ta teden počutil najbolj živ?",
-    alivenessOptional: "neobvezno",
     thresholdLine:
       "Natančno veš, kdo nisi. Samo nikoli nisi vprašal, kdo je ostal. Tukaj ga srečaš.",
     patternReviewLabel: "Poglej vzorec",
@@ -2157,23 +2083,28 @@ export default function Home() {
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
   const [depth, setDepth] = useState<Depth | null>(null);
   const [stage, setStage] = useState<string | null>(null);
-  const [alivenessInput, setAlivenessInput] = useState("");
-  // The inline continuation of the aliveness question -- same screen, same
-  // sequence, every open: aliveness question (step 1) -> stuck question
-  // (step 2) -> five-part reveal (step 3). Fully separate from the organic
-  // in-conversation "aliveness as compass" behavior, and from the identical
-  // standalone flow in Settings (AlivenessCompass.tsx) -- this one just
-  // happens to share its generation endpoint.
-  const [alivenessStep, setAlivenessStep] = useState<1 | 2 | 3>(1);
-  const [alivenessSkipped, setAlivenessSkipped] = useState(false);
-  const [stuckInput, setStuckInput] = useState("");
-  const [alivenessHint, setAlivenessHint] = useState(false);
-  const [stuckHint, setStuckHint] = useState(false);
-  const [exerciseLoading, setExerciseLoading] = useState(false);
-  const [exerciseError, setExerciseError] = useState<string | null>(null);
-  const [exerciseResult, setExerciseResult] = useState<{ signs: string[]; closing: string } | null>(
-    null
-  );
+  // Every fresh open starts with the "touch the sky" prelude (see
+  // FirstLight.tsx) before any of the rest of the opening sequence
+  // renders -- never reset back to true by startFresh(), so it's a true
+  // once-per-page-load ritual, not something a mid-session "start fresh"
+  // click replays.
+  const [showFirstLight, setShowFirstLight] = useState(true);
+  // True the moment this person has sent a message they actually typed
+  // themselves -- deliberately NOT the same as `hasStarted` below, which
+  // also flips true from pickDepth()'s auto-sent mood/depth phrase. Gates
+  // the composer-side aliveness invitation: nobody sees it until they've
+  // proven real intent with their own words, never just a mood tap.
+  const [hasSentRealMessage, setHasSentRealMessage] = useState(false);
+  // Distinct calendar days with any message, from the server -- drives the
+  // invitation's graduated visibility (icon-only vs. a small labeled pill
+  // at 3+ days). Same metric the admin dashboard's retention cohort uses.
+  const [activeDays, setActiveDays] = useState(0);
+  // Set when the Aliveness Compass (Settings or composer entry point, same
+  // component either way) closes with a real answer given -- forwarded as
+  // context on the next real message, then cleared. Replaces the old
+  // session-start-only `alivenessInput` forwarding now that the exercise
+  // is an anytime detour rather than part of the mandatory opening.
+  const [pendingAlivenessAnswer, setPendingAlivenessAnswer] = useState<string | null>(null);
   const [mirrorLine, setMirrorLine] = useState<string | null>(null);
   const [branches, setBranches] = useState<string[]>([]);
   const [showTree, setShowTree] = useState(false);
@@ -2337,6 +2268,7 @@ export default function Home() {
           }
           if (data.elementTally) setElementTally(data.elementTally);
           if (typeof data.subscribed === "boolean") setSubscribed(data.subscribed);
+          if (typeof data.activeDays === "number") setActiveDays(data.activeDays);
           if (data.lastCommitment) {
             setLastCommitment(data.lastCommitment);
             let alreadySeenThisSession = true;
@@ -2410,20 +2342,27 @@ export default function Home() {
     setShowOnboarding(false);
   }
 
-  async function send(overrideText?: string, depthValue?: Depth | null) {
+  async function send(overrideText?: string, depthValue?: Depth | null, authored: boolean = true) {
     const text = (overrideText ?? draft).trim();
     if (!text || !userId || sending) return;
 
-    // The aliveness question now shows on every open, for everyone (see
-    // the opening-screen block below) -- so whatever fresh answer someone
-    // gives attaches to the first message of THIS visit, same as before
-    // PR #39. The AI's real history is unaffected either way; this only
-    // governs whether an answer just given gets forwarded as context.
-    const isFirstMessage = visibleMessages.length === 0;
-    const alivenessAnswer = isFirstMessage ? alivenessInput.trim() || undefined : undefined;
+    // authored=true only for a real, typed send (the composer's own
+    // Enter-key/send-button path, which never passes overrideText) --
+    // false for pickDepth()'s auto-sent mood/depth phrase and for tapping
+    // an offer_branches suggestion, neither of which is something the
+    // person actually wrote. This is the one bar the composer-side
+    // aliveness invitation gates on; see hasSentRealMessage above.
+    if (authored) setHasSentRealMessage(true);
+
+    // Whatever real answer the Aliveness Compass detour last gave (Settings
+    // or the composer invitation, same component) rides along on the very
+    // next message sent after it closes, then is cleared -- one-shot,
+    // decoupled from session-start now that the exercise isn't part of the
+    // mandatory opening. See pendingAlivenessAnswer above.
+    const alivenessAnswer = pendingAlivenessAnswer || undefined;
 
     setDraft("");
-    resetAlivenessFlow();
+    setPendingAlivenessAnswer(null);
     setError(null);
     setSubscriptionLimit(null);
     setBranches([]);
@@ -2497,58 +2436,6 @@ export default function Home() {
     }
   }
 
-  function resetAlivenessFlow() {
-    setAlivenessInput("");
-    setStuckInput("");
-    setAlivenessStep(1);
-    setAlivenessSkipped(false);
-    setAlivenessHint(false);
-    setStuckHint(false);
-    setExerciseLoading(false);
-    setExerciseError(null);
-    setExerciseResult(null);
-  }
-
-  async function runAlivenessExercise(aliveness: string, stuck: string) {
-    setExerciseLoading(true);
-    setExerciseError(null);
-    try {
-      const res = await fetch("/api/aliveness-exercise", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ alivenessAnswer: aliveness, stuckAnswer: stuck, lang }),
-      });
-      const data = await res.json();
-      if (!res.ok || !Array.isArray(data.signs) || typeof data.closing !== "string") {
-        throw new Error(data.error || "Couldn't put that together.");
-      }
-      setExerciseResult({ signs: data.signs, closing: data.closing });
-    } catch (err) {
-      setExerciseError(err instanceof Error ? err.message : "Couldn't put that together just now.");
-    } finally {
-      setExerciseLoading(false);
-    }
-  }
-
-  function handleAlivenessContinue() {
-    if (!hasEnoughWordsForExercise(alivenessInput)) {
-      setAlivenessHint(true);
-      return;
-    }
-    setAlivenessHint(false);
-    setAlivenessStep(2);
-  }
-
-  function handleStuckContinue() {
-    if (!hasEnoughWordsForExercise(stuckInput)) {
-      setStuckHint(true);
-      return;
-    }
-    setStuckHint(false);
-    setAlivenessStep(3);
-    runAlivenessExercise(alivenessInput, stuckInput);
-  }
-
   // Picking a mood chip doesn't send anything yet — it opens the depth-check
   // interstitial first. Someone who just types their own opening line
   // instead skips both and goes straight through `send()`, same as before.
@@ -2577,7 +2464,6 @@ export default function Home() {
     setBranches([]);
     setError(null);
     setDraft("");
-    resetAlivenessFlow();
     setShowLastCommitment(false);
     setElementTally(EMPTY_TALLY);
     setAvatarReveal(null);
@@ -2593,7 +2479,7 @@ export default function Home() {
     const moodIndex = MOOD_KEYS.indexOf(moodLabel);
     const translatedMood = (s.moods[moodIndex] ?? moodLabel).toLowerCase();
     const phrase = s.moodPhrase.replace("{mood}", translatedMood);
-    send(phrase, depthValue);
+    send(phrase, depthValue, false);
   }
 
   async function saveEmail(e: FormEvent) {
@@ -2831,7 +2717,7 @@ export default function Home() {
           there's no visible space left behind it for this. */}
       {!hasStarted && (
         <div className="opening-bg" aria-hidden="true">
-          <SparseSky />
+          {showFirstLight ? <FirstLight onDone={() => setShowFirstLight(false)} /> : <SparseSky />}
         </div>
       )}
 
@@ -3059,7 +2945,7 @@ export default function Home() {
         </div>
       )}
 
-      {!hasStarted && !awaitingDepth ? (
+      {showFirstLight ? null : !hasStarted && !awaitingDepth ? (
         <div className="opening">
           <p className="opening-question">{openingQuestion}</p>
           {showLastCommitment && lastCommitment && (
@@ -3086,146 +2972,6 @@ export default function Home() {
                 {mood}
               </button>
             ))}
-          </div>
-          {alivenessStep !== 3 && !alivenessSkipped && (
-            <button
-              type="button"
-              className="aliveness-skip"
-              onClick={() => {
-                setAlivenessSkipped(true);
-                textareaRef.current?.focus();
-              }}
-            >
-              <span aria-hidden="true">×</span>
-              {ALIVENESS_EXERCISE_COPY.skipLabel}
-            </button>
-          )}
-          <div className="aliveness-field">
-            {alivenessSkipped ? null : alivenessStep === 1 ? (
-              <>
-                <label htmlFor="aliveness">
-                  {s.alivenessQuestion || ALIVENESS_FALLBACK.alivenessQuestion}
-                </label>
-                <input
-                  id="aliveness"
-                  type="text"
-                  value={alivenessInput}
-                  onChange={(e) => {
-                    setAlivenessInput(e.target.value);
-                    if (alivenessHint) setAlivenessHint(false);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleAlivenessContinue();
-                    }
-                  }}
-                  disabled={sending}
-                />
-                {alivenessHint && (
-                  <p className="aliveness-compass-hint">{ALIVENESS_EXERCISE_COPY.wordsHint}</p>
-                )}
-                {alivenessInput.trim() && (
-                  <button
-                    type="button"
-                    className="aliveness-continue key-action"
-                    onClick={handleAlivenessContinue}
-                    disabled={sending}
-                  >
-                    <ArrowIcon />
-                    {s.alivenessContinueLabel || ALIVENESS_FALLBACK.alivenessContinueLabel}
-                  </button>
-                )}
-              </>
-            ) : alivenessStep === 2 ? (
-              <>
-                <label htmlFor="aliveness-stuck">{ALIVENESS_EXERCISE_COPY.stuckQuestion}</label>
-                <input
-                  id="aliveness-stuck"
-                  type="text"
-                  value={stuckInput}
-                  onChange={(e) => {
-                    setStuckInput(e.target.value);
-                    if (stuckHint) setStuckHint(false);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      handleStuckContinue();
-                    }
-                  }}
-                  disabled={sending}
-                  autoFocus
-                />
-                {stuckHint && (
-                  <p className="aliveness-compass-hint">{ALIVENESS_EXERCISE_COPY.wordsHint}</p>
-                )}
-                {stuckInput.trim() && (
-                  <button
-                    type="button"
-                    className="aliveness-continue key-action"
-                    onClick={handleStuckContinue}
-                    disabled={sending}
-                  >
-                    <ArrowIcon />
-                    {s.alivenessContinueLabel || ALIVENESS_FALLBACK.alivenessContinueLabel}
-                  </button>
-                )}
-              </>
-            ) : (
-              <>
-                {exerciseLoading && (
-                  <p className="aliveness-compass-loading">
-                    {ALIVENESS_EXERCISE_COPY.loadingLabel}
-                    <span className="typing-dots">
-                      <span />
-                      <span />
-                      <span />
-                    </span>
-                  </p>
-                )}
-                {!exerciseLoading && exerciseError && (
-                  <>
-                    <p className="aliveness-compass-error">{exerciseError}</p>
-                    <button
-                      type="button"
-                      className="aliveness-continue key-action"
-                      onClick={() => runAlivenessExercise(alivenessInput, stuckInput)}
-                    >
-                      <ArrowIcon />
-                      {ALIVENESS_EXERCISE_COPY.tryAgainLabel}
-                    </button>
-                  </>
-                )}
-                {!exerciseLoading && !exerciseError && exerciseResult && (
-                  <>
-                    <ol className="aliveness-compass-signs">
-                      {exerciseResult.signs.map((line, i) => (
-                        <li
-                          key={i}
-                          className="sign-item"
-                          style={{ animationDelay: `${0.4 + i * 0.9}s` }}
-                        >
-                          <span className="sign-num">{i + 1} / 5</span>
-                          <span className="sign-text">{line}</span>
-                        </li>
-                      ))}
-                    </ol>
-                    <div
-                      className="aliveness-compass-charge"
-                      style={{
-                        animationDelay: `${0.4 + exerciseResult.signs.length * 0.9 + 0.4}s`,
-                      }}
-                    >
-                      <p className="aliveness-compass-charge-text">{exerciseResult.closing}</p>
-                      <div className="aliveness-compass-charge-label">
-                        {ALIVENESS_EXERCISE_COPY.charge}
-                      </div>
-                    </div>
-                  </>
-                )}
-              </>
-            )}
           </div>
         </div>
       ) : awaitingDepth ? (
@@ -3276,7 +3022,7 @@ export default function Home() {
             {!sending && branches.length > 0 && (
               <div className="branches">
                 {branches.map((b, i) => (
-                  <button key={i} className="branch" onClick={() => send(b)} disabled={sending}>
+                  <button key={i} className="branch" onClick={() => send(b, undefined, false)} disabled={sending}>
                     {b}
                   </button>
                 ))}
@@ -3298,16 +3044,32 @@ export default function Home() {
         </div>
       ) : (
         <div className="composer">
-          {hasStarted && visibleMessages.length > 1 && (
-            <button
-              type="button"
-              className="pattern-review-trigger key-action"
-              onClick={handlePatternReview}
-              disabled={loadingPatternReview}
-            >
-              <EyeIcon />
-              {s.patternReviewLabel || PATTERN_REVIEW_FALLBACK.patternReviewLabel}
-            </button>
+          {(hasSentRealMessage || (hasStarted && visibleMessages.length > 1)) && (
+            <div className="composer-affordances">
+              {hasStarted && visibleMessages.length > 1 && (
+                <button
+                  type="button"
+                  className="pattern-review-trigger key-action"
+                  onClick={handlePatternReview}
+                  disabled={loadingPatternReview}
+                >
+                  <EyeIcon />
+                  {s.patternReviewLabel || PATTERN_REVIEW_FALLBACK.patternReviewLabel}
+                </button>
+              )}
+              {hasSentRealMessage && (
+                <button
+                  type="button"
+                  className={activeDays >= 3 ? "aliveness-invite aliveness-invite-tier2" : "aliveness-invite"}
+                  onClick={() => setShowAlivenessCompass(true)}
+                  aria-label="Aliveness Compass"
+                  title="Aliveness Compass"
+                >
+                  <SparkIcon />
+                  {activeDays >= 3 && <span className="aliveness-invite-label">Aliveness Compass</span>}
+                </button>
+              )}
+            </div>
           )}
           {error && <p className="error-line">{error}</p>}
           <div className="composer-inner">
@@ -3366,7 +3128,13 @@ export default function Home() {
       )}
 
       {showAlivenessCompass && (
-        <AlivenessCompass lang={lang} onClose={() => setShowAlivenessCompass(false)} />
+        <AlivenessCompass
+          lang={lang}
+          onClose={(answer) => {
+            setShowAlivenessCompass(false);
+            if (answer) setPendingAlivenessAnswer(answer);
+          }}
+        />
       )}
     </div>
   );

@@ -3,6 +3,7 @@ import {
   addMessage,
   checkConversationGate,
   ensureUser,
+  getDistinctActiveDays,
   getMessages,
   getMostRecentCommitment,
   getElementTally,
@@ -109,11 +110,12 @@ export async function GET(req: NextRequest) {
   }
   const sinceMessageId = parseInt(req.nextUrl.searchParams.get("sinceMessageId") || "0", 10) || 0;
   await ensureUser(userId);
-  const [messages, lastCommitment, elementTally, user] = await Promise.all([
+  const [messages, lastCommitment, elementTally, user, activeDays] = await Promise.all([
     getMessages(userId),
     getMostRecentCommitment(userId),
     getElementTally(userId, sinceMessageId),
     getUser(userId),
+    getDistinctActiveDays(userId),
   ]);
   const subscribed = !!user?.subscribed_until && new Date(user.subscribed_until) > new Date();
   return NextResponse.json({
@@ -123,5 +125,6 @@ export async function GET(req: NextRequest) {
       : null,
     elementTally,
     subscribed,
+    activeDays,
   });
 }

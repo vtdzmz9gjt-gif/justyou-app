@@ -47,6 +47,26 @@ export function EyeIcon({ size = 16 }: { size?: number }) {
   );
 }
 
+export function SparkIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+      className="key-action-icon"
+    >
+      <path
+        d="M12 3L13.8 9.2L20 11L13.8 12.8L12 19L10.2 12.8L4 11L10.2 9.2L12 3Z"
+        stroke="currentColor"
+        strokeWidth={STROKE}
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 export function UnlockIcon({ size = 16 }: { size?: number }) {
   return (
     <svg

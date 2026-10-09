@@ -43,7 +43,11 @@ export default function AlivenessCompass({
   onClose,
 }: {
   lang: string;
-  onClose: () => void;
+  // Hands back the first answer (if any real one was given) so the
+  // conversation can treat it the same way an opening-sequence answer
+  // used to be treated -- forwarded as context on the next real message,
+  // not persisted anywhere by this component itself.
+  onClose: (alivenessAnswer?: string) => void;
 }) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [alivenessAnswer, setAlivenessAnswer] = useState("");
@@ -105,9 +109,16 @@ export default function AlivenessCompass({
   }
 
   return (
-    <div className="aliveness-compass-overlay" onClick={onClose}>
+    <div
+      className="aliveness-compass-overlay"
+      onClick={() => onClose(alivenessAnswer.trim() || undefined)}
+    >
       <div className="aliveness-compass-card" onClick={(e) => e.stopPropagation()}>
-        <button type="button" className="aliveness-compass-dismiss" onClick={onClose}>
+        <button
+          type="button"
+          className="aliveness-compass-dismiss"
+          onClick={() => onClose(alivenessAnswer.trim() || undefined)}
+        >
           {COPY.dismissLabel}
         </button>
 
@@ -207,7 +218,11 @@ export default function AlivenessCompass({
                   <button type="button" className="aliveness-compass-start-over" onClick={startOver}>
                     {COPY.startOverLabel}
                   </button>
-                  <button type="button" className="aliveness-compass-close" onClick={onClose}>
+                  <button
+                    type="button"
+                    className="aliveness-compass-close"
+                    onClick={() => onClose(alivenessAnswer.trim() || undefined)}
+                  >
                     {COPY.doneLabel}
                   </button>
                 </div>

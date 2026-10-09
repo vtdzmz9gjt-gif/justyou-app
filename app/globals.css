@@ -953,77 +953,6 @@ body {
   cursor: default;
 }
 
-/* Deliberately NOT nested inside .aliveness-field and on its own earlier
-   fade-in (vs. the field's 0.9s) -- the whole point is that someone who
-   doesn't want the aliveness/stuck-question sequence can see a real way
-   out before the thing they'd be skipping has even finished appearing,
-   not a quiet link buried inside what it lets you avoid. */
-.aliveness-skip {
-  margin-top: 1.25rem;
-  background: none;
-  border: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-family: var(--font-body);
-  font-size: 0.85rem;
-  color: var(--text-muted);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  cursor: pointer;
-  opacity: 0;
-  animation: rise 1.1s ease forwards 0.3s;
-}
-
-.aliveness-skip:hover,
-.aliveness-skip:focus-visible {
-  color: var(--text);
-}
-
-.aliveness-field {
-  margin-top: 1.75rem;
-  width: 100%;
-  max-width: 480px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.4rem;
-  opacity: 0;
-  animation: rise 1.1s ease forwards 0.9s;
-}
-
-.aliveness-field label {
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-}
-
-.aliveness-optional {
-  opacity: 0.7;
-}
-
-.aliveness-field input {
-  width: min(320px, 80vw);
-  background: transparent;
-  border: none;
-  border-bottom: 1px solid var(--border);
-  color: var(--text);
-  font-family: var(--font-body);
-  font-size: 0.9rem;
-  text-align: center;
-  padding: 0.3rem 0.2rem;
-}
-
-.aliveness-field input:focus-visible {
-  outline: none;
-  border-color: var(--accent);
-}
-
-.aliveness-continue {
-  margin-top: 0.5rem;
-}
-
 /* ---------- transcript ---------- */
 
 .transcript {
@@ -1202,9 +1131,71 @@ body {
   background: linear-gradient(to top, var(--bg) 60%, transparent);
 }
 
+.composer-affordances {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.6rem;
+}
+
+/* The composer-side aliveness invitation -- deliberately quieter than
+   .pattern-review-trigger (which composes with .key-action's bold gold
+   fill): icon-only by default, so it never competes for attention until
+   someone's actually curious. At 3+ active days it grows a short label and
+   a touch more color, the one graduated-visibility tier this ships with;
+   a second tier is deliberately not pre-built -- see the aliveness-invite
+   button's gating logic in page.tsx. */
+.aliveness-invite {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  width: 2.1rem;
+  height: 2.1rem;
+  padding: 0;
+  background: var(--surface);
+  color: var(--text-faint);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease, width 0.2s ease,
+    padding 0.2s ease;
+}
+
+.aliveness-invite:hover {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.aliveness-invite-tier2 {
+  width: auto;
+  padding: 0.4rem 0.9rem 0.4rem 0.7rem;
+  color: var(--text-muted);
+  border-color: var(--accent-dim);
+}
+
+.aliveness-invite-tier2:hover {
+  color: var(--accent-strong);
+  border-color: var(--accent);
+}
+
+.aliveness-invite-label {
+  font-family: var(--font-body);
+  font-size: 0.76rem;
+  white-space: nowrap;
+}
+
 .pattern-review-trigger {
+  /* Centering/spacing now comes from the shared .composer-affordances
+     wrapper (it can sit alongside .aliveness-invite there), not from its
+     own margin -- display stays block only because .key-action's own
+     comment notes a block box is what lets margin:auto center a button at
+     all; harmless now that a flex parent handles alignment instead. */
   display: block;
-  margin: 0 auto 0.6rem;
+  margin: 0;
   background: var(--surface);
   color: var(--text-muted);
   border: 1px solid var(--border);
@@ -2032,4 +2023,51 @@ body {
 
 .legal-cross-links a:hover {
   color: var(--accent-strong);
+}
+
+/* ---------- first light (opening prelude) ---------- */
+
+.first-light {
+  position: absolute;
+  inset: 0;
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.first-light-sky {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.first-light-invite {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 22%;
+  text-align: center;
+  margin: 0;
+  font-family: var(--font-body);
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  color: var(--text-faint);
+  opacity: 0.25;
+  animation: first-light-breathe 3.5s ease-in-out infinite;
+  transition: opacity 1s ease;
+  pointer-events: none;
+}
+
+.first-light-invite.hide {
+  opacity: 0 !important;
+  animation: none;
+}
+
+@keyframes first-light-breathe {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0.65;
+  }
 }
