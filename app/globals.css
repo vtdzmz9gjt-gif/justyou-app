@@ -907,6 +907,43 @@ body {
   }
 }
 
+/* The opening question's own dedicated answer field -- separate from the
+   real composer, which stays visible/usable underneath this the whole
+   time (the bypass: typing there directly skips this entire sequence).
+   Submitting this reveals the returning-user banner and mood picker. */
+.opening-answer-field {
+  margin-top: 1.75rem;
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  opacity: 0;
+  animation: rise 1.1s ease forwards 0.4s;
+}
+
+.opening-answer-field input {
+  width: min(320px, 80vw);
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 0.95rem;
+  text-align: center;
+  padding: 0.3rem 0.2rem;
+}
+
+.opening-answer-field input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.opening-answer-continue {
+  margin-top: 0.5rem;
+}
+
 .mood-caption {
   font-family: var(--font-mono);
   font-size: 0.7rem;
@@ -926,6 +963,19 @@ body {
   max-width: 26rem;
   opacity: 0;
   animation: rise 1.1s ease forwards 0.7s;
+}
+
+/* 17 moods wrap to far more rows than the original 7 was designed for --
+   a bounded, internally-scrollable box keeps the opening screen's
+   footprint close to the original rather than growing tall. Everything
+   stays reachable with one small scroll; nothing is hidden behind an
+   extra tap or a "show more" hierarchy. */
+.mood-row-bounded {
+  max-height: 8.6rem;
+  overflow-y: auto;
+  padding: 0.15rem 0.1rem;
+  -webkit-mask-image: linear-gradient(to bottom, black 82%, transparent 100%);
+  mask-image: linear-gradient(to bottom, black 82%, transparent 100%);
 }
 
 .mood-chip {

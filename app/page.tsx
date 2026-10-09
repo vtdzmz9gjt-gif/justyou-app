@@ -86,9 +86,37 @@ const MOOD_COLORS: Record<string, { glow: string; pulse: string; speed: string }
   Tired: { glow: "#AFA9EC", pulse: "#7F77DD", speed: "5.5s" },
   Hopeful: { glow: "#EF9F27", pulse: "#BA7517", speed: "4s" },
   Stuck: { glow: "#85B7EB", pulse: "#378ADD", speed: "5s" },
+  Overwhelmed: { glow: "#F2816B", pulse: "#D8431F", speed: "1.6s" },
+  Restless: { glow: "#F2B24A", pulse: "#D88A1A", speed: "2s" },
+  Content: { glow: "#8FCB6B", pulse: "#5B9E3A", speed: "6.5s" },
+  Lonely: { glow: "#8E9FE0", pulse: "#5C6FC4", speed: "6s" },
+  Frustrated: { glow: "#E8755F", pulse: "#C23E27", speed: "2s" },
+  Curious: { glow: "#F2D24A", pulse: "#C4A017", speed: "3s" },
+  Heavy: { glow: "#8A82A0", pulse: "#5C5470", speed: "7.5s" },
+  Drained: { glow: "#A3A099", pulse: "#716E66", speed: "7s" },
+  Grateful: { glow: "#E8C06B", pulse: "#BA8F2E", speed: "5s" },
+  Nervous: { glow: "#F0C066", pulse: "#D89A2A", speed: "2.4s" },
 };
 
-const MOOD_KEYS = ["Calm", "Anxious", "Angry", "Numb", "Tired", "Hopeful", "Stuck"];
+const MOOD_KEYS = [
+  "Calm",
+  "Anxious",
+  "Angry",
+  "Numb",
+  "Tired",
+  "Hopeful",
+  "Stuck",
+  "Overwhelmed",
+  "Restless",
+  "Content",
+  "Lonely",
+  "Frustrated",
+  "Curious",
+  "Heavy",
+  "Drained",
+  "Grateful",
+  "Nervous",
+];
 
 // --- Narrative depth, signaled invisibly by the model (see signal_depth in
 // lib/anthropic.ts). Drives the ambient glow color -- never shown as a
@@ -160,12 +188,6 @@ type Strings = {
   returnLabel: string;
   depthQuestion: string;
   depthOptions: string[];
-  // Template for the synthetic opening line sent when someone picks a mood
-  // chip instead of typing — "{mood}" is replaced with the translated mood
-  // word. Needed so that line is actually in the visitor's language rather
-  // than always English, which was steering the AI's replies into English
-  // regardless of the selected UI language.
-  moodPhrase: string;
   // The fixed line shown once during the threshold moment (a few seconds
   // of near-black stillness on every app open, before anything else --
   // spec section 12/13). Only composed fresh for the launch languages
@@ -300,9 +322,47 @@ const STRINGS: Record<string, Strings> = {
       "What are you pretending not to want?",
       "What would you say if no one was grading you?",
       "What's the thing you're most tired of proving?",
+      "How are you, really?",
+      "What's today been like?",
+      "What's on your mind?",
+      "Where's your head at right now?",
+      "What's been taking up space in you lately?",
+      "What are you carrying today?",
+      "How's your week been, actually?",
+      "What's true for you right now?",
+      "What's been sitting with you?",
+      "What do you need right now?",
+      "What's weighing on you today?",
+      "What kind of day is this turning into?",
+      "What's your energy like right now?",
+      "What's the first thing you'd tell a friend about today?",
+      "What's been loud in your head lately?",
+      "How's your body feeling right now?",
+      "What's one thing from today that's stayed with you?",
+      "What do you wish someone would ask you right now?",
+      "What's the honest answer to 'how are you'?",
+      "What's been quietly bothering you?",
     ],
-    moodCaption: "Not sure how to put it into words? Start here",
-    moods: ["Calm", "Anxious", "Angry", "Numb", "Tired", "Hopeful", "Stuck"],
+    moodCaption: "And how are you feeling right now?",
+    moods: [
+      "Calm",
+      "Anxious",
+      "Angry",
+      "Numb",
+      "Tired",
+      "Hopeful",
+      "Stuck",
+      "Overwhelmed",
+      "Restless",
+      "Content",
+      "Lonely",
+      "Frustrated",
+      "Curious",
+      "Heavy",
+      "Drained",
+      "Grateful",
+      "Nervous",
+    ],
     placeholderStart: "Answer, or say anything.",
     placeholderContinue: "Say what's true.",
     settingsText: "Leave an email and if a commitment comes due, you'll hear from Just You before you have to come back on your own.",
@@ -313,7 +373,6 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "just you",
     depthQuestion: "How much do you want to get into today?",
     depthOptions: ["Just looking around", "A little", "I've got something on my mind"],
-    moodPhrase: "I'm feeling {mood} right now.",
     thresholdLine:
       "You know exactly who you're not. You've just never asked who's left. This is where you meet the rest of it.",
     patternReviewLabel: "See the pattern",
@@ -343,7 +402,7 @@ const STRINGS: Record<string, Strings> = {
   es: {
     brand: "Just You",
     questions: ["¿Qué estás listo para dejar de aparentar?"],
-    moodCaption: "¿No sabes cómo ponerlo en palabras? Empieza aquí",
+    moodCaption: "¿Y cómo te sientes ahora mismo?",
     moods: ["Tranquilo", "Ansioso", "Enfadado", "Entumecido", "Cansado", "Esperanzado", "Atascado"],
     placeholderStart: "Responde, o di cualquier cosa.",
     placeholderContinue: "Di lo que es verdad.",
@@ -355,7 +414,6 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "just you",
     depthQuestion: "¿Qué tan a fondo quieres ir hoy?",
     depthOptions: ["Solo mirando", "Un poco", "Tengo algo en mente"],
-    moodPhrase: "Me siento {mood} ahora mismo.",
     thresholdLine:
       "Sabes exactamente quién no eres. Solo nunca has preguntado quién queda. Aquí conoces al resto.",
     patternReviewLabel: "Ver el patrón",
@@ -385,7 +443,7 @@ const STRINGS: Record<string, Strings> = {
   fr: {
     brand: "Just You",
     questions: ["Qu'es-tu prêt à arrêter de jouer ?"],
-    moodCaption: "Tu ne sais pas comment le dire ? Commence ici",
+    moodCaption: "Et comment te sens-tu en ce moment ?",
     moods: ["Calme", "Anxieux", "En colère", "Engourdi", "Fatigué", "Plein d'espoir", "Bloqué"],
     placeholderStart: "Réponds, ou dis n'importe quoi.",
     placeholderContinue: "Dis ce qui est vrai.",
@@ -397,7 +455,6 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "just you",
     depthQuestion: "Tu veux aller jusqu'où aujourd'hui ?",
     depthOptions: ["Je regarde juste", "Un peu", "J'ai quelque chose en tête"],
-    moodPhrase: "Je me sens {mood} en ce moment.",
     thresholdLine:
       "Tu sais exactement qui tu n'es pas. Tu n'as juste jamais demandé qui reste. C'est ici que tu le rencontres.",
     patternReviewLabel: "Voir le schéma",
@@ -427,7 +484,7 @@ const STRINGS: Record<string, Strings> = {
   de: {
     brand: "Just You",
     questions: ["Was bist du bereit, nicht mehr vorzuspielen?"],
-    moodCaption: "Findest du keine Worte dafür? Fang hier an",
+    moodCaption: "Und wie fühlst du dich gerade?",
     moods: ["Ruhig", "Ängstlich", "Wütend", "Taub", "Müde", "Hoffnungsvoll", "Feststeckend"],
     placeholderStart: "Antworte, oder sag irgendetwas.",
     placeholderContinue: "Sag, was wahr ist.",
@@ -439,7 +496,6 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "just you",
     depthQuestion: "Wie tief willst du heute gehen?",
     depthOptions: ["Ich schaue nur", "Ein bisschen", "Ich habe etwas im Kopf"],
-    moodPhrase: "Ich fühle mich gerade {mood}.",
     thresholdLine:
       "Du weißt genau, wer du nicht bist. Wer noch übrig ist, hast du nie gefragt. Hier triffst du ihn.",
     patternReviewLabel: "Das Muster sehen",
@@ -469,7 +525,7 @@ const STRINGS: Record<string, Strings> = {
   pt: {
     brand: "Just You",
     questions: ["O que você está pronto para parar de fingir?"],
-    moodCaption: "Não sabe como colocar em palavras? Comece aqui",
+    moodCaption: "E como você está se sentindo agora?",
     moods: ["Calmo", "Ansioso", "Irritado", "Anestesiado", "Cansado", "Esperançoso", "Travado"],
     placeholderStart: "Responda, ou diga qualquer coisa.",
     placeholderContinue: "Diga o que é verdade.",
@@ -481,7 +537,6 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "just you",
     depthQuestion: "O quanto você quer se aprofundar hoje?",
     depthOptions: ["Só olhando", "Um pouco", "Tenho algo em mente"],
-    moodPhrase: "Estou me sentindo {mood} agora.",
     thresholdLine:
       "Você sabe exatamente quem não é. Só nunca perguntou quem sobrou. É aqui que você o encontra.",
     patternReviewLabel: "Ver o padrão",
@@ -511,7 +566,7 @@ const STRINGS: Record<string, Strings> = {
   it: {
     brand: "Just You",
     questions: ["Cosa sei pronto a smettere di recitare?"],
-    moodCaption: "Non sai come dirlo a parole? Inizia qui",
+    moodCaption: "E come ti senti adesso?",
     moods: ["Calmo", "Ansioso", "Arrabbiato", "Intorpidito", "Stanco", "Speranzoso", "Bloccato"],
     placeholderStart: "Rispondi, o di' qualsiasi cosa.",
     placeholderContinue: "Di' ciò che è vero.",
@@ -523,7 +578,6 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "just you",
     depthQuestion: "Quanto vuoi approfondire oggi?",
     depthOptions: ["Sto solo guardando", "Un po'", "Ho qualcosa in mente"],
-    moodPhrase: "Mi sento {mood} in questo momento.",
     thresholdLine:
       "Sai benissimo chi non sei. Ma chi sei davvero, non l'hai mai incontrato. Qui lo incontri.",
     patternReviewLabel: "Vedi lo schema",
@@ -553,7 +607,7 @@ const STRINGS: Record<string, Strings> = {
   he: {
     brand: "Just You",
     questions: ["מה אתה מוכן להפסיק להעמיד פנים?"],
-    moodCaption: "לא בטוח איך לנסח את זה? התחל כאן",
+    moodCaption: "ואיך אתה מרגיש עכשיו?",
     moods: ["רגוע", "חרד", "כועס", "קהה", "עייף", "מקווה", "תקוע"],
     placeholderStart: "תענה, או תגיד משהו.",
     placeholderContinue: "תגיד מה שנכון.",
@@ -565,7 +619,6 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "just you",
     depthQuestion: "כמה עמוק אתה רוצה להיכנס היום?",
     depthOptions: ["רק מסתכל", "קצת", "יש לי משהו בראש"],
-    moodPhrase: "אני מרגיש {mood} כרגע.",
     thresholdLine: "אתה יודע בדיוק מי אתה לא. אבל מעולם לא שאלת מי נשאר. כאן אתה פוגש את זה.",
     patternReviewLabel: "לראות את התבנית",
     stillHereLabel: "עדיין כאן — זה לוקח קצת יותר זמן.",
@@ -594,7 +647,7 @@ const STRINGS: Record<string, Strings> = {
   ar: {
     brand: "Just You",
     questions: ["ما الذي أنت مستعد للتوقف عن التظاهر به؟"],
-    moodCaption: "لا تعرف كيف تصوغها بكلمات؟ ابدأ هنا",
+    moodCaption: "وكيف تشعر الآن؟",
     moods: ["هادئ", "قلق", "غاضب", "خدر", "متعب", "متفائل", "عالق"],
     placeholderStart: "أجب، أو قل أي شيء.",
     placeholderContinue: "قل ما هو حقيقي.",
@@ -606,7 +659,6 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "just you",
     depthQuestion: "كم تريد أن تتعمق اليوم؟",
     depthOptions: ["فقط أتصفح", "قليلاً", "لدي شيء في بالي"],
-    moodPhrase: "أشعر بأنني {mood} الآن.",
     thresholdLine: "أنت تعرف بالضبط من لست. لكنك لم تسأل قط من تبقى. هنا تقابله.",
     patternReviewLabel: "رؤية النمط",
     stillHereLabel: "ما زلت هنا — هذه تستغرق وقتًا أطول قليلاً.",
@@ -635,7 +687,7 @@ const STRINGS: Record<string, Strings> = {
   hi: {
     brand: "Just You",
     questions: ["तुम अब क्या दिखावा करना बंद करने को तैयार हो?"],
-    moodCaption: "शब्दों में नहीं आ रहा? यहाँ से शुरू करें",
+    moodCaption: "और अभी तुम्हें कैसा महसूस हो रहा है?",
     moods: ["शांत", "चिंतित", "क्रोधित", "सुन्न", "थका हुआ", "आशान्वित", "अटका हुआ"],
     placeholderStart: "जवाब दो, या कुछ भी कहो।",
     placeholderContinue: "जो सच है वह कहो।",
@@ -647,7 +699,6 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "just you",
     depthQuestion: "आज तुम कितना गहराई में जाना चाहते हो?",
     depthOptions: ["बस देख रहा हूँ", "थोड़ा सा", "मेरे मन में कुछ है"],
-    moodPhrase: "मुझे अभी {mood} महसूस हो रहा है.",
     thresholdLine:
       "तुम ठीक-ठीक जानते हो कि तुम क्या नहीं हो। बस तुमने कभी नहीं पूछा कि बाकी कौन बचा है। यहाँ तुम उससे मिलते हो।",
     patternReviewLabel: "पैटर्न देखें",
@@ -677,7 +728,7 @@ const STRINGS: Record<string, Strings> = {
   zh: {
     brand: "Just You",
     questions: ["你准备好不再伪装什么了？"],
-    moodCaption: "不知道怎么说？从这里开始",
+    moodCaption: "那你现在感觉怎么样？",
     moods: ["平静", "焦虑", "愤怒", "麻木", "疲惫", "有希望", "卡住了"],
     placeholderStart: "回答，或者说点什么。",
     placeholderContinue: "说出真实的想法。",
@@ -689,7 +740,6 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "just you",
     depthQuestion: "今天你想深入到什么程度？",
     depthOptions: ["只是看看", "一点点", "我心里有件事"],
-    moodPhrase: "我现在感觉{mood}。",
     thresholdLine: "你清楚地知道自己不是谁。只是你从未问过，剩下的是谁。在这里，你会遇见他。",
     patternReviewLabel: "查看模式",
     stillHereLabel: "还在——这次要多花一点时间。",
@@ -718,7 +768,7 @@ const STRINGS: Record<string, Strings> = {
   ja: {
     brand: "Just You",
     questions: ["もう演じるのをやめてもいいことは何ですか？"],
-    moodCaption: "言葉にならない？ここから始めてみて",
+    moodCaption: "それで、今はどんな気分？",
     moods: ["穏やか", "不安", "怒り", "無感覚", "疲れた", "希望がある", "行き詰まっている"],
     placeholderStart: "答えるか、何か言ってみて。",
     placeholderContinue: "本当のことを言って。",
@@ -730,7 +780,6 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "just you",
     depthQuestion: "今日はどのくらい深く話したいですか？",
     depthOptions: ["ただ見ているだけ", "少しだけ", "気になることがある"],
-    moodPhrase: "今は{mood}な気分です。",
     thresholdLine:
       "自分が何者でないかは、はっきりわかっている。でも、残ったものが誰なのかは、一度も聞いたことがない。ここで、それに出会う。",
     patternReviewLabel: "パターンを見る",
@@ -760,7 +809,7 @@ const STRINGS: Record<string, Strings> = {
   ru: {
     brand: "Just You",
     questions: ["Что ты готов перестать изображать?"],
-    moodCaption: "Не знаешь, как это выразить? Начни здесь",
+    moodCaption: "А как ты себя чувствуешь прямо сейчас?",
     moods: ["Спокойный", "Тревожный", "Злой", "Онемевший", "Уставший", "С надеждой", "Застрявший"],
     placeholderStart: "Ответь или скажи что угодно.",
     placeholderContinue: "Скажи то, что правда.",
@@ -772,7 +821,6 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "just you",
     depthQuestion: "Насколько глубоко ты хочешь зайти сегодня?",
     depthOptions: ["Просто смотрю", "Немного", "У меня кое-что на уме"],
-    moodPhrase: "Сейчас я чувствую себя {mood}.",
     thresholdLine:
       "Ты точно знаешь, кем не являешься. Просто никогда не спрашивал, кто остался. Здесь ты с ним встретишься.",
     patternReviewLabel: "Посмотреть узор",
@@ -802,7 +850,7 @@ const STRINGS: Record<string, Strings> = {
   sq: {
     brand: "Just You",
     questions: ["Çfarë je gati të mos shtiresh më?"],
-    moodCaption: "Nuk je i sigurt si ta shprehësh me fjalë? Fillo këtu",
+    moodCaption: "Dhe si ndihesh tani?",
     moods: ["I qetë", "I shqetësuar", "I zemëruar", "I shurdhuar", "I lodhur", "Shpresëplotë", "I bllokuar"],
     placeholderStart: "Përgjigju, ose thuaj çfarëdo.",
     placeholderContinue: "Thuaj çfarë është e vërtetë.",
@@ -814,7 +862,6 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "just you",
     depthQuestion: "Sa thellë dëshiron të shkosh sot?",
     depthOptions: ["Vetëm po shikoj", "Pak", "Kam diçka në mendje"],
-    moodPhrase: "Po ndihem {mood} tani.",
     thresholdLine: "E njeh mirë atë që s'je. Po atë që je — s'e ke takuar kurrë. Këtu e takon.",
     patternReviewLabel: "Shiko modelin",
     stillHereLabel: "Ende këtu — kjo po merr pak më shumë kohë.",
@@ -843,7 +890,7 @@ const STRINGS: Record<string, Strings> = {
   el: {
     brand: "Just You",
     questions: ["Τι είσαι έτοιμος να σταματήσεις να προσποιείσαι;"],
-    moodCaption: "Δεν ξέρεις πώς να το εκφράσεις; Ξεκίνα εδώ",
+    moodCaption: "Και πώς νιώθεις τώρα;",
     moods: ["Ήρεμος", "Ανήσυχος", "Θυμωμένος", "Μουδιασμένος", "Κουρασμένος", "Με ελπίδα", "Κολλημένος"],
     placeholderStart: "Απάντησε, ή πες οτιδήποτε.",
     placeholderContinue: "Πες αυτό που είναι αλήθεια.",
@@ -855,7 +902,6 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "just you",
     depthQuestion: "Πόσο βαθιά θέλεις να πας σήμερα;",
     depthOptions: ["Απλώς κοιτάζω", "Λίγο", "Έχω κάτι στο μυαλό μου"],
-    moodPhrase: "Αισθάνομαι {mood} αυτή τη στιγμή.",
     thresholdLine:
       "Ξέρεις καλά ποιος δεν είσαι. Ποιος έμεινε, όμως, δεν τον έχεις ρωτήσει ποτέ. Εδώ τον γνωρίζεις.",
     patternReviewLabel: "Δες το μοτίβο",
@@ -885,7 +931,7 @@ const STRINGS: Record<string, Strings> = {
   hy: {
     brand: "Just You",
     questions: ["Ի՞նչ ես պատրաստ դադարել ձևացնել։"],
-    moodCaption: "Չգիտե՞ս ինչպես բացատրել բառերով։ Սկսիր այստեղից",
+    moodCaption: "Իսկ ինչպե՞ս ես զգում հիմա։",
     moods: ["Հանգիստ", "Անհանգիստ", "Զայրացած", "Թմրած", "Հոգնած", "Հուսադրված", "Խրված"],
     placeholderStart: "Պատասխանիր, կամ ասա ինչ-որ բան։",
     placeholderContinue: "Ասա, ինչն է ճշմարիտ։",
@@ -897,7 +943,6 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "just you",
     depthQuestion: "Որքա՞ն խորը ես ուզում գնալ այսօր։",
     depthOptions: ["Պարզապես նայում եմ", "Մի քիչ", "Մտքումս մի բան կա"],
-    moodPhrase: "Հիմա ես {mood} եմ։",
     thresholdLine:
       "Դու հստակ գիտես, թե ով չես։ Պարզապես երբեք չես հարցրել, թե ով է մնացել։ Այստեղ դու հանդիպում ես նրան։",
     patternReviewLabel: "Տեսնել օրինաչափությունը",
@@ -927,7 +972,7 @@ const STRINGS: Record<string, Strings> = {
   sr: {
     brand: "Just You",
     questions: ["Šta si spreman da prestaneš da glumiš?"],
-    moodCaption: "Ne znaš kako to da izraziš rečima? Počni ovde",
+    moodCaption: "A kako se osećaš upravo sada?",
     moods: ["Miran", "Anksiozan", "Ljut", "Utrnuo", "Umoran", "Pun nade", "Zaglavljen"],
     placeholderStart: "Odgovori, ili reci bilo šta.",
     placeholderContinue: "Reci ono što je istina.",
@@ -939,7 +984,6 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "just you",
     depthQuestion: "Koliko duboko želiš da ideš danas?",
     depthOptions: ["Samo gledam", "Malo", "Imam nešto na umu"],
-    moodPhrase: "Trenutno se osećam {mood}.",
     thresholdLine:
       "Tačno znaš ko nisi. Samo nikad nisi pitao ko je ostao. Ovde ćeš ga upoznati.",
     patternReviewLabel: "Vidi obrazac",
@@ -969,7 +1013,7 @@ const STRINGS: Record<string, Strings> = {
   hr: {
     brand: "Just You",
     questions: ["Što si spreman prestati glumiti?"],
-    moodCaption: "Ne znaš kako to izraziti riječima? Počni ovdje",
+    moodCaption: "A kako se osjećaš upravo sada?",
     moods: ["Miran", "Tjeskoban", "Ljut", "Utrnuo", "Umoran", "Pun nade", "Zaglavljen"],
     placeholderStart: "Odgovori, ili reci bilo što.",
     placeholderContinue: "Reci ono što je istina.",
@@ -981,7 +1025,6 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "just you",
     depthQuestion: "Koliko duboko želiš ići danas?",
     depthOptions: ["Samo gledam", "Malo", "Imam nešto na umu"],
-    moodPhrase: "Trenutno se osjećam {mood}.",
     thresholdLine:
       "Točno znaš tko nisi. Samo nikad nisi pitao tko je ostao. Ovdje ćeš ga upoznati.",
     patternReviewLabel: "Vidi obrazac",
@@ -1011,7 +1054,7 @@ const STRINGS: Record<string, Strings> = {
   bs: {
     brand: "Just You",
     questions: ["Šta si spreman prestati glumiti?"],
-    moodCaption: "Ne znaš kako to izraziti riječima? Počni ovdje",
+    moodCaption: "A kako se osjećaš upravo sada?",
     moods: ["Miran", "Anksiozan", "Ljut", "Utrnuo", "Umoran", "Pun nade", "Zaglavljen"],
     placeholderStart: "Odgovori, ili reci bilo šta.",
     placeholderContinue: "Reci ono što je istina.",
@@ -1023,7 +1066,6 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "just you",
     depthQuestion: "Koliko duboko želiš ići danas?",
     depthOptions: ["Samo gledam", "Malo", "Imam nešto na umu"],
-    moodPhrase: "Trenutno se osjećam {mood}.",
     thresholdLine:
       "Tačno znaš ko nisi. Samo nikad nisi pitao ko je ostao. Ovdje ćeš ga upoznati.",
     patternReviewLabel: "Vidi obrazac",
@@ -1053,7 +1095,7 @@ const STRINGS: Record<string, Strings> = {
   bg: {
     brand: "Just You",
     questions: ["Какво си готов да спреш да преструваш?"],
-    moodCaption: "Не знаеш как да го изразиш с думи? Започни оттук",
+    moodCaption: "А как се чувстваш точно сега?",
     moods: ["Спокоен", "Тревожен", "Ядосан", "Изтръпнал", "Уморен", "С надежда", "Заседнал"],
     placeholderStart: "Отговори, или кажи каквото и да е.",
     placeholderContinue: "Кажи това, което е истина.",
@@ -1065,7 +1107,6 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "just you",
     depthQuestion: "Колко дълбоко искаш да отидеш днес?",
     depthOptions: ["Просто гледам", "Малко", "Имам нещо наум"],
-    moodPhrase: "В момента се чувствам {mood}.",
     thresholdLine:
       "Знаеш точно кой не си. Просто никога не си питал кой е останал. Тук го срещаш.",
     patternReviewLabel: "Виж модела",
@@ -1095,7 +1136,7 @@ const STRINGS: Record<string, Strings> = {
   mk: {
     brand: "Just You",
     questions: ["Што си спремен да престанеш да глумиш?"],
-    moodCaption: "Не знаеш како да го кажеш со зборови? Почни овде",
+    moodCaption: "А како се чувствуваш токму сега?",
     moods: ["Смирен", "Вознемирен", "Лут", "Вкочанет", "Уморен", "Полн со надеж", "Заглавен"],
     placeholderStart: "Одговори, или кажи било што.",
     placeholderContinue: "Кажи го тоа што е вистина.",
@@ -1107,7 +1148,6 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "just you",
     depthQuestion: "Колку длабоко сакаш да одиш денес?",
     depthOptions: ["Само гледам", "Малку", "Имам нешто на ум"],
-    moodPhrase: "Во моментот се чувствувам {mood}.",
     thresholdLine:
       "Точно знаеш кој не си. Само никогаш не праша кој останал. Тука го запознаваш.",
     patternReviewLabel: "Види ја шемата",
@@ -1137,7 +1177,7 @@ const STRINGS: Record<string, Strings> = {
   ro: {
     brand: "Just You",
     questions: ["Ce ești pregătit să încetezi să mai prefaci?"],
-    moodCaption: "Nu știi cum să o pui în cuvinte? Începe aici",
+    moodCaption: "Și cum te simți chiar acum?",
     moods: ["Calm", "Anxios", "Furios", "Amorțit", "Obosit", "Plin de speranță", "Blocat"],
     placeholderStart: "Răspunde, sau spune orice.",
     placeholderContinue: "Spune ce e adevărat.",
@@ -1149,7 +1189,6 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "just you",
     depthQuestion: "Cât de adânc vrei să mergi azi?",
     depthOptions: ["Doar mă uit", "Puțin", "Am ceva pe suflet"],
-    moodPhrase: "Mă simt {mood} chiar acum.",
     thresholdLine:
       "Știi exact cine nu ești. Doar că nu ai întrebat niciodată cine a rămas. Aici îl întâlnești.",
     patternReviewLabel: "Vezi tiparul",
@@ -1179,7 +1218,7 @@ const STRINGS: Record<string, Strings> = {
   sl: {
     brand: "Just You",
     questions: ["Kaj si pripravljen nehati igrati?"],
-    moodCaption: "Ne veš, kako to ubesediti? Začni tukaj",
+    moodCaption: "In kako se počutiš prav zdaj?",
     moods: ["Miren", "Tesnoben", "Jezen", "Otopel", "Utrujen", "Poln upanja", "Obtičal"],
     placeholderStart: "Odgovori, ali povej karkoli.",
     placeholderContinue: "Povej, kar je res.",
@@ -1191,7 +1230,6 @@ const STRINGS: Record<string, Strings> = {
     returnLabel: "just you",
     depthQuestion: "Kako globoko želiš iti danes?",
     depthOptions: ["Samo gledam", "Malo", "Nekaj imam v mislih"],
-    moodPhrase: "Trenutno se počutim {mood}.",
     thresholdLine:
       "Natančno veš, kdo nisi. Samo nikoli nisi vprašal, kdo je ostal. Tukaj ga srečaš.",
     patternReviewLabel: "Poglej vzorec",
@@ -2082,6 +2120,14 @@ export default function Home() {
   } | null>(null);
   const [selectedMood, setSelectedMood] = useState<string | null>(null);
   const [depth, setDepth] = useState<Depth | null>(null);
+  // The opening question now has its own dedicated field, separate from
+  // the real composer below it (same two-track pattern the old inline
+  // aliveness flow used: a guided field coexisting with an always-usable
+  // composer). Submitting it reveals the returning-user banner and mood
+  // picker; the real composer stays untouched the whole time, so typing
+  // there directly still bypasses this entire sequence, exactly as before.
+  const [openingAnswer, setOpeningAnswer] = useState("");
+  const [openingAnswerSubmitted, setOpeningAnswerSubmitted] = useState(false);
   const [stage, setStage] = useState<string | null>(null);
   // Every fresh open starts with the "touch the sky" prelude (see
   // FirstLight.tsx) before any of the rest of the opening sequence
@@ -2437,8 +2483,9 @@ export default function Home() {
   }
 
   // Picking a mood chip doesn't send anything yet — it opens the depth-check
-  // interstitial first. Someone who just types their own opening line
-  // instead skips both and goes straight through `send()`, same as before.
+  // interstitial first. Only reachable after the opening answer field has
+  // been submitted; someone who types their own line in the real composer
+  // instead skips this and the mood/depth steps entirely, same as before.
   function pickMood(moodIndex: number) {
     setSelectedMood(MOOD_KEYS[moodIndex]);
   }
@@ -2461,6 +2508,8 @@ export default function Home() {
     }
     setSelectedMood(null);
     setDepth(null);
+    setOpeningAnswer("");
+    setOpeningAnswerSubmitted(false);
     setBranches([]);
     setError(null);
     setDraft("");
@@ -2474,12 +2523,12 @@ export default function Home() {
     setOpeningQuestion(questions[Math.floor(Math.random() * questions.length)]);
   }
 
-  function pickDepth(depthValue: Depth, moodLabel: string) {
+  function pickDepth(depthValue: Depth) {
     setDepth(depthValue);
-    const moodIndex = MOOD_KEYS.indexOf(moodLabel);
-    const translatedMood = (s.moods[moodIndex] ?? moodLabel).toLowerCase();
-    const phrase = s.moodPhrase.replace("{mood}", translatedMood);
-    send(phrase, depthValue, false);
+    // What they actually typed answering the opening question is the real
+    // first message now -- authored: true, since it genuinely is, unlike
+    // the canned mood-phrase this replaced.
+    send(openingAnswer, depthValue, true);
   }
 
   async function saveEmail(e: FormEvent) {
@@ -2948,31 +2997,64 @@ export default function Home() {
       {showFirstLight ? null : !hasStarted && !awaitingDepth ? (
         <div className="opening">
           <p className="opening-question">{openingQuestion}</p>
-          {showLastCommitment && lastCommitment && (
-            <button
-              type="button"
-              className="last-commitment"
-              onClick={() => setShowLastCommitment(false)}
-            >
-              {(lastCommitment.status === "landed"
-                ? s.lastCommitmentLandedLabel || LAST_COMMITMENT_FALLBACK.lastCommitmentLandedLabel
-                : s.lastCommitmentLabel || LAST_COMMITMENT_FALLBACK.lastCommitmentLabel
-              ).replace("{action}", lastCommitment.action)}
-            </button>
-          )}
-          <p className="mood-caption">{s.moodCaption}</p>
-          <div className="mood-row">
-            {s.moods.map((mood, i) => (
-              <button
-                key={mood}
-                className="mood-chip"
-                onClick={() => pickMood(i)}
+          {!openingAnswerSubmitted ? (
+            <div className="opening-answer-field">
+              <input
+                id="opening-answer"
+                type="text"
+                value={openingAnswer}
+                onChange={(e) => setOpeningAnswer(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && openingAnswer.trim()) {
+                    e.preventDefault();
+                    setOpeningAnswerSubmitted(true);
+                  }
+                }}
+                placeholder={s.placeholderStart}
                 disabled={sending}
-              >
-                {mood}
-              </button>
-            ))}
-          </div>
+                autoFocus
+              />
+              {openingAnswer.trim() && (
+                <button
+                  type="button"
+                  className="opening-answer-continue key-action"
+                  onClick={() => setOpeningAnswerSubmitted(true)}
+                  disabled={sending}
+                >
+                  <ArrowIcon />
+                  {s.continueLabel}
+                </button>
+              )}
+            </div>
+          ) : (
+            <>
+              {showLastCommitment && lastCommitment && (
+                <button
+                  type="button"
+                  className="last-commitment"
+                  onClick={() => setShowLastCommitment(false)}
+                >
+                  {(lastCommitment.status === "landed"
+                    ? s.lastCommitmentLandedLabel || LAST_COMMITMENT_FALLBACK.lastCommitmentLandedLabel
+                    : s.lastCommitmentLabel || LAST_COMMITMENT_FALLBACK.lastCommitmentLabel
+                  ).replace("{action}", lastCommitment.action)}
+                </button>
+              )}
+              <p className="mood-caption">{s.moodCaption}</p>
+              <div className="mood-row mood-row-bounded">
+                {s.moods.map((mood, i) => (
+                  <button
+                    key={mood}
+                    className="mood-chip"
+                    onClick={() => pickMood(i)}
+                    disabled={sending}
+                  >
+                    {mood}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       ) : awaitingDepth ? (
         <div className="opening">
@@ -2982,7 +3064,7 @@ export default function Home() {
               <button
                 key={d}
                 className="mood-chip"
-                onClick={() => pickDepth(d, selectedMood!)}
+                onClick={() => pickDepth(d)}
                 disabled={sending}
               >
                 {s.depthOptions[i]}
