@@ -16,8 +16,8 @@ export default function PrivacyPage() {
         <h1 className="legal-title">Privacy Policy</h1>
         <p className="legal-updated">Last updated October 8, 2026</p>
         <p className="legal-intro">
-          Just You is operated by Tea Ajazi, an individual (&ldquo;we,&rdquo; &ldquo;us,&rdquo; &ldquo;Just
-          You&rdquo;). This page explains what the app collects, how it&apos;s stored, who it&apos;s shared with,
+          Just You is operated by an individual (&ldquo;we,&rdquo; &ldquo;us,&rdquo; &ldquo;Just You&rdquo;).
+          This page explains what the app collects, how it&apos;s stored, who it&apos;s shared with,
           and how to have it deleted. Questions: <a href="mailto:hello@justyou.fyi">hello@justyou.fyi</a>.
         </p>
 
