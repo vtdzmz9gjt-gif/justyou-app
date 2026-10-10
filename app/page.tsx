@@ -3895,6 +3895,19 @@ export default function Home() {
                   {m.role === "user" ? s.youLabel : s.returnLabel}
                 </span>
                 <p className="msg-bubble">{m.content}</p>
+                {m.role !== "user" && visibleMessages.length > 1 && (
+                  <div className="composer-affordances">
+                    <button
+                      type="button"
+                      className="pattern-review-trigger key-action"
+                      onClick={handlePatternReview}
+                      disabled={loadingPatternReview}
+                    >
+                      <EyeIcon />
+                      {s.patternReviewLabel || PATTERN_REVIEW_FALLBACK.patternReviewLabel}
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
             {sending && (
@@ -3922,19 +3935,6 @@ export default function Home() {
                     {b}
                   </button>
                 ))}
-              </div>
-            )}
-            {hasStarted && visibleMessages.length > 1 && (
-              <div className="composer-affordances">
-                <button
-                  type="button"
-                  className="pattern-review-trigger key-action"
-                  onClick={handlePatternReview}
-                  disabled={loadingPatternReview}
-                >
-                  <EyeIcon />
-                  {s.patternReviewLabel || PATTERN_REVIEW_FALLBACK.patternReviewLabel}
-                </button>
               </div>
             )}
           </div>
