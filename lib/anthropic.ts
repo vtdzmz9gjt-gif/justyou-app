@@ -31,7 +31,16 @@ import {
 import { NODES, NODE_ORDER, TENSION_PAIRS, TIER_RANK, type SephirahKey, type TreeState } from "@/lib/tree";
 import { THEMES, type FamilyTheme, type FamilyLine } from "@/lib/family";
 
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// Explicit timeout/retries, not SDK defaults -- an unbounded retry (the
+// default backs off and retries 2x on 429/5xx) can silently add real
+// latency to any one of the several calls a single turn makes, pushing a
+// turn's total time toward the route's own internal timeout invisibly.
+// Bounding each individual call keeps worst-case turn latency predictable.
+const anthropic = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+  timeout: 20_000,
+  maxRetries: 1,
+});
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
 
 const BASE_SYSTEM_PROMPT = fs.readFileSync(
@@ -687,7 +696,13 @@ export async function runChat(
 
   let newStage: Stage | undefined;
   let newBranches: string[] | undefined;
-  let newWin: { action: string; reflection: string } | undefined;
+  // Fired, not awaited, the moment a landed commitment is resolved -- same
+  // pattern as elementPromise/sephirahPromise/familyPromise above. Its
+  // inputs (the action, the messages so far, uiLang) are all already known
+  // at that point, so nothing about it depends on a later round; awaiting
+  // it inline used to block the next tool-use round on a full extra
+  // Claude call for no reason.
+  let winPromise: Promise<{ action: string; reflection: string }> | undefined;
   let committed = false;
 
   // Tool-use loop: the model may call record_commitment / resolve_open_commitment /
@@ -731,7 +746,7 @@ export async function runChat(
         sephirah,
         familyTheme,
         committed,
-        win: newWin,
+        win: await winPromise,
       };
     }
 
@@ -754,12 +769,12 @@ export async function runChat(
           const resolved = await resolveCommitment(userId, input.outcome);
           const landedCount = await countLandedCommitments(userId);
           if (input.outcome === "landed" && resolved) {
-            const reflection = await generateWinReflection(
-              resolved.action,
+            const action = resolved.action;
+            winPromise = generateWinReflection(
+              action,
               [...history, { role: "user", content: userMessage }] as StoredMessage[],
               uiLang
-            );
-            newWin = { action: resolved.action, reflection };
+            ).then((reflection) => ({ action, reflection }));
           }
           toolResults.push({
             type: "tool_result",
@@ -817,7 +832,7 @@ export async function runChat(
           sephirah,
           familyTheme,
           committed,
-          win: newWin,
+          win: await winPromise,
         };
       }
     }
@@ -835,7 +850,7 @@ export async function runChat(
       sephirah,
       familyTheme,
       committed,
-      win: newWin,
+      win: await winPromise,
     };
   }
 }

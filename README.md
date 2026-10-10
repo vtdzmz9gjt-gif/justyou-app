@@ -68,6 +68,24 @@ way it would be with SQLite.
 Skip all of this and the app still works — see "proactive check-ins"
 above.
 
+## Monitoring /api/chat (optional, recommended before real traffic)
+
+1. Create a free Sentry account and project (platform: Next.js).
+2. Set `SENTRY_DSN` as an environment variable on Vercel. That alone is
+   enough to get alerted by email when `/api/chat` throws or times out —
+   `Sentry.init()` is a harmless no-op without it, so nothing breaks if
+   you skip this.
+3. `vercel.json` also schedules a Cron Job hitting `GET
+   /api/cron/health-check` every 15 minutes, which sends a real test
+   message through the real public `/api/chat` endpoint and reports to
+   Sentry if it fails or takes longer than 20s. Same `CRON_SECRET`
+   handling as check-ins. The synthetic test user this uses is excluded
+   from every admin-facing count (`getAdminSignals`, `getSignals`) by a
+   fixed id, so it never shows up as a real visitor.
+4. Optionally set `SENTRY_ORG` / `SENTRY_PROJECT` too, if you want
+   readable (unminified) stack traces in Sentry's UI instead of just
+   knowing something failed.
+
 ## Testing with real people (spec step 5)
 
 Send people the deployed URL. Nothing to install. Each browser gets its

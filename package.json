@@ -11,6 +11,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "latest",
     "@neondatabase/serverless": "^1.1.0",
+    "@sentry/nextjs": "^11.6.0",
     "@types/three": "^0.186.0",
     "next": "latest",
     "react": "latest",
