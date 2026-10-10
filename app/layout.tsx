@@ -1,9 +1,16 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 
+const SITE_URL = "https://www.justyou.fyi";
+const SHORT_DESCRIPTION =
+  "A subscription AI app that traces personal patterns to their root and gives real guidance toward actually resolving them — not just reflecting.";
+const LONG_DESCRIPTION =
+  "Just You is a subscription AI app that helps people understand why they keep repeating the same patterns, and what to actually do about it. It traces a problem back to its real root — a family pattern, an internal conflict — instead of just reflecting feelings back, then offers real guidance toward actually resolving it. It remembers across conversations too.";
+
 export const metadata: Metadata = {
-  title: "Just You",
-  description: "A space to come back to yourself.",
+  metadataBase: new URL(SITE_URL),
+  title: "Just You — Understand why. Know what to do next.",
+  description: SHORT_DESCRIPTION,
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
@@ -13,6 +20,20 @@ export const metadata: Metadata = {
   icons: {
     icon: "/favicon-32.png",
     apple: "/apple-touch-icon.png",
+  },
+  openGraph: {
+    title: "Just You",
+    description: LONG_DESCRIPTION,
+    url: SITE_URL,
+    siteName: "Just You",
+    images: [{ url: "/og-image.jpg", width: 1200, height: 630, alt: "Just You" }],
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Just You",
+    description: SHORT_DESCRIPTION,
+    images: ["/og-image.jpg"],
   },
 };
 
