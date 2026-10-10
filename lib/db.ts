@@ -14,6 +14,13 @@ import { THEME_ORDER, type FamilyTheme, type FamilyLine, type FamilyState } from
 
 const sql = neon(process.env.DATABASE_URL!);
 
+// Fixed id for the automated health-check turn (see
+// app/api/cron/health-check/route.ts) -- a plain readable string, never a
+// crypto.randomUUID(), so it can never collide with a real user and is
+// trivial to exclude from getAdminSignals() below, which does exactly
+// that everywhere real-user counts are computed.
+export const HEALTH_CHECK_USER_ID = "health-check-synthetic-user";
+
 let schemaReady: Promise<void> | null = null;
 
 // A migration step that's safe to skip if it fails -- widening/refreshing a
@@ -716,16 +723,22 @@ export interface Signals {
 
 export async function getSignals(): Promise<Signals> {
   await ensureSchema();
-  const totalRows = (await sql`SELECT COUNT(*) as count FROM users`) as unknown as {
+  const totalRows = (await sql`
+    SELECT COUNT(*) as count FROM users WHERE id != ${HEALTH_CHECK_USER_ID}
+  `) as unknown as {
     count: string | number;
   }[];
   const returningRows = (await sql`
     SELECT COUNT(*) as count FROM (
-      SELECT user_id FROM messages GROUP BY user_id HAVING COUNT(DISTINCT created_at::date) > 1
+      SELECT user_id FROM messages
+      WHERE user_id != ${HEALTH_CHECK_USER_ID}
+      GROUP BY user_id HAVING COUNT(DISTINCT created_at::date) > 1
     ) t
   `) as unknown as { count: string | number }[];
   const outcomeRows = (await sql`
-    SELECT status, COUNT(*) as count FROM commitments GROUP BY status
+    SELECT status, COUNT(*) as count FROM commitments
+    WHERE user_id != ${HEALTH_CHECK_USER_ID}
+    GROUP BY status
   `) as unknown as { status: string; count: string | number }[];
 
   const commitmentOutcomes = { landed: 0, tried: 0, not_landed: 0, pending: 0 };
@@ -788,27 +801,34 @@ export async function getAdminSignals(): Promise<AdminSignals> {
   await ensureSchema();
 
   const totalUsers = Number(
-    ((await sql`SELECT COUNT(*) as count FROM users`) as unknown as { count: string | number }[])[0]
-      .count
+    ((await sql`
+      SELECT COUNT(*) as count FROM users WHERE id != ${HEALTH_CHECK_USER_ID}
+    `) as unknown as { count: string | number }[])[0].count
   );
 
   const realConvoRows = (await sql`
     SELECT COUNT(*) as count FROM (
-      SELECT user_id FROM messages WHERE role = 'user' GROUP BY user_id HAVING COUNT(*) >= 2
+      SELECT user_id FROM messages
+      WHERE role = 'user' AND user_id != ${HEALTH_CHECK_USER_ID}
+      GROUP BY user_id HAVING COUNT(*) >= 2
     ) t
   `) as unknown as { count: string | number }[];
   const usersWithRealConversation = Number(realConvoRows[0].count);
 
   const active7dRows = (await sql`
-    SELECT COUNT(DISTINCT user_id) as count FROM messages WHERE created_at >= now() - interval '7 days'
+    SELECT COUNT(DISTINCT user_id) as count FROM messages
+    WHERE created_at >= now() - interval '7 days' AND user_id != ${HEALTH_CHECK_USER_ID}
   `) as unknown as { count: string | number }[];
   const active30dRows = (await sql`
-    SELECT COUNT(DISTINCT user_id) as count FROM messages WHERE created_at >= now() - interval '30 days'
+    SELECT COUNT(DISTINCT user_id) as count FROM messages
+    WHERE created_at >= now() - interval '30 days' AND user_id != ${HEALTH_CHECK_USER_ID}
   `) as unknown as { count: string | number }[];
 
   // Retention cohort: distinct active days per user, bucketed.
   const dayCountRows = (await sql`
-    SELECT COUNT(DISTINCT created_at::date) as days FROM messages GROUP BY user_id
+    SELECT COUNT(DISTINCT created_at::date) as days FROM messages
+    WHERE user_id != ${HEALTH_CHECK_USER_ID}
+    GROUP BY user_id
   `) as unknown as { days: string | number }[];
   const dayCounts = dayCountRows.map((r) => Number(r.days));
   const day1 = dayCounts.filter((d) => d >= 1).length;
@@ -820,7 +840,9 @@ export async function getAdminSignals(): Promise<AdminSignals> {
   retention.push({ day: "5+", users: day5plus, pct: day1 > 0 ? (day5plus / day1) * 100 : 0 });
 
   const outcomeRows = (await sql`
-    SELECT status, COUNT(*) as count FROM commitments GROUP BY status
+    SELECT status, COUNT(*) as count FROM commitments
+    WHERE user_id != ${HEALTH_CHECK_USER_ID}
+    GROUP BY status
   `) as unknown as { status: string; count: string | number }[];
   const outcomes = { landed: 0, tried: 0, not_landed: 0, pending: 0 };
   for (const r of outcomeRows) {
@@ -843,9 +865,11 @@ export async function getAdminSignals(): Promise<AdminSignals> {
   // from what a user's own Tree/Family screen actually shows them.
   const sephirahRows = (await sql`
     SELECT user_id, node, weight, created_at::date as day FROM sephirah_tags
+    WHERE user_id != ${HEALTH_CHECK_USER_ID}
   `) as unknown as { user_id: string; node: SephirahKey; weight: SephirahWeight; day: string }[];
   const familyRows = (await sql`
     SELECT user_id, theme, weight, created_at::date as day FROM family_pattern_tags
+    WHERE user_id != ${HEALTH_CHECK_USER_ID}
   `) as unknown as { user_id: string; theme: FamilyTheme; weight: SephirahWeight; day: string }[];
 
   function usersWithDepth<R extends { user_id: string; weight: SephirahWeight; day: string }>(
