@@ -3214,6 +3214,16 @@ export default function Home() {
     setMessages((m) => [...m, { role: "user", content: text }]);
     setSending(true);
 
+    // No server-side guarantee a hung connection always closes cleanly
+    // (a platform-level timeout kill doesn't go through normal HTTP
+    // close in every case) -- without this, a stuck request leaves
+    // `sending` true forever, since the finally block below never runs
+    // on a fetch promise that never settles. 58s: just under the API
+    // route's own 60s maxDuration, so this fires after the server would
+    // have given up anyway, not before.
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 58000);
+
     try {
       const res = await fetch("/api/chat", {
         method: "POST",
@@ -3226,6 +3236,7 @@ export default function Home() {
           alivenessAnswer,
           sinceMessageId: visibleFromId,
         }),
+        signal: controller.signal,
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Something went wrong.");
@@ -3266,8 +3277,13 @@ export default function Home() {
       if (data.elementTally) setElementTally(data.elementTally);
       if (data.win) setWinCelebration(data.win);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      if (err instanceof DOMException && err.name === "AbortError") {
+        setError("That took too long to respond. Try sending it again.");
+      } else {
+        setError(err instanceof Error ? err.message : "Something went wrong.");
+      }
     } finally {
+      clearTimeout(timeout);
       setSending(false);
       textareaRef.current?.focus();
     }
