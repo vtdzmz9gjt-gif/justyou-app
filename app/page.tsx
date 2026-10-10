@@ -3895,6 +3895,19 @@ export default function Home() {
                   {m.role === "user" ? s.youLabel : s.returnLabel}
                 </span>
                 <p className="msg-bubble">{m.content}</p>
+                {m.role !== "user" && visibleMessages.length > 1 && (
+                  <div className="composer-affordances">
+                    <button
+                      type="button"
+                      className="pattern-review-trigger key-action"
+                      onClick={handlePatternReview}
+                      disabled={loadingPatternReview}
+                    >
+                      <EyeIcon />
+                      {s.patternReviewLabel || PATTERN_REVIEW_FALLBACK.patternReviewLabel}
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
             {sending && (
@@ -3940,31 +3953,18 @@ export default function Home() {
         </div>
       ) : (
         <div className="composer">
-          {(hasSentRealMessage || (hasStarted && visibleMessages.length > 1)) && (
+          {hasSentRealMessage && (
             <div className="composer-affordances">
-              {hasStarted && visibleMessages.length > 1 && (
-                <button
-                  type="button"
-                  className="pattern-review-trigger key-action"
-                  onClick={handlePatternReview}
-                  disabled={loadingPatternReview}
-                >
-                  <EyeIcon />
-                  {s.patternReviewLabel || PATTERN_REVIEW_FALLBACK.patternReviewLabel}
-                </button>
-              )}
-              {hasSentRealMessage && (
-                <button
-                  type="button"
-                  className={activeDays >= 3 ? "aliveness-invite aliveness-invite-tier2" : "aliveness-invite"}
-                  onClick={() => setShowAlivenessCompass(true)}
-                  aria-label="Aliveness Compass"
-                  title="Aliveness Compass"
-                >
-                  <SparkIcon />
-                  {activeDays >= 3 && <span className="aliveness-invite-label">Aliveness Compass</span>}
-                </button>
-              )}
+              <button
+                type="button"
+                className={activeDays >= 3 ? "aliveness-invite aliveness-invite-tier2" : "aliveness-invite"}
+                onClick={() => setShowAlivenessCompass(true)}
+                aria-label="Aliveness Compass"
+                title="Aliveness Compass"
+              >
+                <SparkIcon />
+                {activeDays >= 3 && <span className="aliveness-invite-label">Aliveness Compass</span>}
+              </button>
             </div>
           )}
           {error && <p className="error-line">{error}</p>}
