@@ -2982,6 +2982,13 @@ export default function Home() {
   // message) always counts as visible -- it's always newer than any real
   // boundary id.
   const visibleMessages = messages.filter((m) => (m.id ?? Infinity) > visibleFromId);
+  // Only the most recent answer gets the pattern-review trigger, and only
+  // once there's been at least one full exchange -- not the lone opening
+  // reply by itself.
+  const lastAssistantIndex =
+    visibleMessages.length > 1
+      ? visibleMessages.reduce((acc, m, idx) => (m.role !== "user" ? idx : acc), -1)
+      : -1;
 
   useEffect(() => {
     // Registers the no-op service worker so browsers offer "Add to Home
@@ -3895,7 +3902,7 @@ export default function Home() {
                   {m.role === "user" ? s.youLabel : s.returnLabel}
                 </span>
                 <p className="msg-bubble">{m.content}</p>
-                {m.role !== "user" && visibleMessages.length > 1 && (
+                {m.role !== "user" && i === lastAssistantIndex && (
                   <div className="composer-affordances">
                     <button
                       type="button"
