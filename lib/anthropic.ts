@@ -735,11 +735,17 @@ export async function runChat(
     );
 
     if (toolUses.length === 0) {
+      // No tool calls and no text is a real, if rare, possibility (e.g. a
+      // response that lands with only non-text content) -- fall back here
+      // too, same as the trailing-text path below, rather than ever
+      // returning an empty reply. An empty string is indistinguishable
+      // from no answer at all once it reaches the transcript.
+      const text = textBlocks.map((b) => b.text).join("\n").trim();
       const sephirah = await sephirahPromise;
       const familyTheme = await familyPromise;
       await recordCrossLinkIfBoth(userId, sephirah, familyTheme);
       return {
-        reply: textBlocks.map((b) => b.text).join("\n").trim(),
+        reply: text || "Something got tangled on my end — say that again?",
         stage: newStage,
         branches: newBranches,
         element: await elementPromise,
