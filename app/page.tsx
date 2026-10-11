@@ -9,6 +9,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import dynamic from "next/dynamic";
+import * as Sentry from "@sentry/nextjs";
 import SparseSky from "./SparseSky";
 import { ArrowIcon, EyeIcon, SparkIcon, UnlockIcon } from "./icons";
 import WinCelebration from "./WinCelebration";
@@ -203,6 +204,12 @@ type Strings = {
   // calls before actually replying). Not yet translated for every
   // language -- falls back to English, see STILL_HERE_FALLBACK below.
   stillHereLabel?: string;
+  // Landed in the transcript itself, as a real assistant turn, whenever a
+  // send() fails for any reason (timeout, network error, server error) --
+  // the person just said something real and should never get back total
+  // silence. Not yet translated for every language -- falls back to
+  // English, see REPLY_FAILED_FALLBACK below.
+  replyFailedLabel?: string;
   // Quiet returning-visitor callback to the last commitment, shown once per
   // fresh app open -- "{action}" is replaced with what they committed to.
   // Not yet translated for every language -- falls back to English, see
@@ -260,6 +267,14 @@ const PATTERN_REVIEW_FALLBACK = {
 
 const STILL_HERE_FALLBACK = {
   stillHereLabel: "Still here — this one's taking a little longer.",
+};
+
+// English-only for now, same reasoning as SUBSCRIPTION_FALLBACK below --
+// shipping the always-answer guarantee now matters more than blocking it
+// on 22 languages of translation.
+const REPLY_FAILED_FALLBACK = {
+  replyFailedLabel:
+    "That didn't come through right on my end. I'm still here — try sending that again?",
 };
 
 const LAST_COMMITMENT_FALLBACK = {
@@ -2982,6 +2997,13 @@ export default function Home() {
   // message) always counts as visible -- it's always newer than any real
   // boundary id.
   const visibleMessages = messages.filter((m) => (m.id ?? Infinity) > visibleFromId);
+  // Only the most recent answer gets the pattern-review trigger, and only
+  // once there's been at least one full exchange -- not the lone opening
+  // reply by itself.
+  const lastAssistantIndex =
+    visibleMessages.length > 1
+      ? visibleMessages.reduce((acc, m, idx) => (m.role !== "user" ? idx : acc), -1)
+      : -1;
 
   useEffect(() => {
     // Registers the no-op service worker so browsers offer "Add to Home
@@ -3277,11 +3299,20 @@ export default function Home() {
       if (data.elementTally) setElementTally(data.elementTally);
       if (data.win) setWinCelebration(data.win);
     } catch (err) {
-      if (err instanceof DOMException && err.name === "AbortError") {
-        setError("That took too long to respond. Try sending it again.");
-      } else {
-        setError(err instanceof Error ? err.message : "Something went wrong.");
-      }
+      // Whatever actually went wrong (timeout, network drop, a 5xx from
+      // the route) -- the person just said something real and should
+      // never land on total silence. Always close the loop with a real
+      // assistant turn in the transcript itself, not just a banner that's
+      // easy to miss above the composer.
+      console.error("send() failed:", err);
+      const timedOut = err instanceof DOMException && err.name === "AbortError";
+      Sentry.captureException(err, {
+        tags: { component: "send", timedOut: String(timedOut) },
+      });
+      setMessages((m) => [
+        ...m,
+        { role: "assistant", content: s.replyFailedLabel || REPLY_FAILED_FALLBACK.replyFailedLabel },
+      ]);
     } finally {
       clearTimeout(timeout);
       setSending(false);
@@ -3895,6 +3926,19 @@ export default function Home() {
                   {m.role === "user" ? s.youLabel : s.returnLabel}
                 </span>
                 <p className="msg-bubble">{m.content}</p>
+                {m.role !== "user" && i === lastAssistantIndex && (
+                  <div className="composer-affordances">
+                    <button
+                      type="button"
+                      className="pattern-review-trigger key-action"
+                      onClick={handlePatternReview}
+                      disabled={loadingPatternReview}
+                    >
+                      <EyeIcon />
+                      {s.patternReviewLabel || PATTERN_REVIEW_FALLBACK.patternReviewLabel}
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
             {sending && (
@@ -3940,31 +3984,18 @@ export default function Home() {
         </div>
       ) : (
         <div className="composer">
-          {(hasSentRealMessage || (hasStarted && visibleMessages.length > 1)) && (
+          {hasSentRealMessage && (
             <div className="composer-affordances">
-              {hasStarted && visibleMessages.length > 1 && (
-                <button
-                  type="button"
-                  className="pattern-review-trigger key-action"
-                  onClick={handlePatternReview}
-                  disabled={loadingPatternReview}
-                >
-                  <EyeIcon />
-                  {s.patternReviewLabel || PATTERN_REVIEW_FALLBACK.patternReviewLabel}
-                </button>
-              )}
-              {hasSentRealMessage && (
-                <button
-                  type="button"
-                  className={activeDays >= 3 ? "aliveness-invite aliveness-invite-tier2" : "aliveness-invite"}
-                  onClick={() => setShowAlivenessCompass(true)}
-                  aria-label="Aliveness Compass"
-                  title="Aliveness Compass"
-                >
-                  <SparkIcon />
-                  {activeDays >= 3 && <span className="aliveness-invite-label">Aliveness Compass</span>}
-                </button>
-              )}
+              <button
+                type="button"
+                className={activeDays >= 3 ? "aliveness-invite aliveness-invite-tier2" : "aliveness-invite"}
+                onClick={() => setShowAlivenessCompass(true)}
+                aria-label="Aliveness Compass"
+                title="Aliveness Compass"
+              >
+                <SparkIcon />
+                {activeDays >= 3 && <span className="aliveness-invite-label">Aliveness Compass</span>}
+              </button>
             </div>
           )}
           {error && <p className="error-line">{error}</p>}
