@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import * as Sentry from "@sentry/nextjs";
 import fs from "fs";
 import path from "path";
 import {
@@ -741,6 +742,13 @@ export async function runChat(
       // returning an empty reply. An empty string is indistinguishable
       // from no answer at all once it reaches the transcript.
       const text = textBlocks.map((b) => b.text).join("\n").trim();
+      if (!text) {
+        Sentry.captureMessage("runChat: response had no tool calls and no text", {
+          level: "warning",
+          tags: { route: "runChat" },
+          extra: { userId, round, stopReason: response.stop_reason },
+        });
+      }
       const sephirah = await sephirahPromise;
       const familyTheme = await familyPromise;
       await recordCrossLinkIfBoth(userId, sephirah, familyTheme);
@@ -845,6 +853,14 @@ export async function runChat(
   }
 
   {
+    // Exhausted all 4 rounds without ever producing a reply -- rare, but
+    // worth knowing about: this is the model genuinely never landing on a
+    // text answer, not a transient network issue.
+    Sentry.captureMessage("runChat: exhausted all rounds without a reply", {
+      level: "warning",
+      tags: { route: "runChat" },
+      extra: { userId },
+    });
     const sephirah = await sephirahPromise;
     const familyTheme = await familyPromise;
     await recordCrossLinkIfBoth(userId, sephirah, familyTheme);

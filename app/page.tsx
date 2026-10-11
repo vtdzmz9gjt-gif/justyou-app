@@ -9,6 +9,7 @@ import {
   type KeyboardEvent,
 } from "react";
 import dynamic from "next/dynamic";
+import * as Sentry from "@sentry/nextjs";
 import SparseSky from "./SparseSky";
 import { ArrowIcon, EyeIcon, SparkIcon, UnlockIcon } from "./icons";
 import WinCelebration from "./WinCelebration";
@@ -3304,6 +3305,10 @@ export default function Home() {
       // assistant turn in the transcript itself, not just a banner that's
       // easy to miss above the composer.
       console.error("send() failed:", err);
+      const timedOut = err instanceof DOMException && err.name === "AbortError";
+      Sentry.captureException(err, {
+        tags: { component: "send", timedOut: String(timedOut) },
+      });
       setMessages((m) => [
         ...m,
         { role: "assistant", content: s.replyFailedLabel || REPLY_FAILED_FALLBACK.replyFailedLabel },
