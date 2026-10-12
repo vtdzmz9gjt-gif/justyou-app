@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const summary = await generateWeeklyRecapLine(wins, lang);
+    const summary = await generateWeeklyRecapLine(userId, wins, lang);
     return NextResponse.json({ wins, summary });
   } catch (err) {
     console.error("weekly recap error", err);

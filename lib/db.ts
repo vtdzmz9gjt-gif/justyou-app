@@ -260,6 +260,14 @@ function ensureSchema(): Promise<void> {
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS conversation_period TEXT`;
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS conversations_this_period INTEGER NOT NULL DEFAULT 0`;
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_conversation_date TEXT`;
+      // Real Anthropic API cost gate, alongside the day-count one above --
+      // whichever limit is hit first blocks access. Stored in microdollars
+      // (millionths of a dollar, e.g. $2.00 = 2,000,000) rather than cents,
+      // since a single tagging call can cost a fraction of a cent and
+      // repeated integer-cent rounding would systematically undercount.
+      // Scoped to the same conversation_period column/window as the count
+      // above -- reset together, by checkConversationGate, not here.
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS cost_microdollars_this_period BIGINT NOT NULL DEFAULT 0`;
       await sql`CREATE INDEX IF NOT EXISTS idx_users_restore_token ON users(restore_token)`;
     })();
     // If schema setup itself fails (not one of the non-fatal steps above,
@@ -383,17 +391,25 @@ export async function consumeRestoreToken(token: string): Promise<{ userId: stri
   return row ? { userId: row.id } : null;
 }
 
+// $2.00, in microdollars -- see cost_microdollars_this_period's comment in
+// ensureSchema for why microdollars rather than cents.
+const MAX_COST_MICRODOLLARS_PER_PERIOD = 2_000_000;
+
 // The free-tier frequency gate -- unlimited for an active subscriber,
-// otherwise up to 3 separate UTC calendar days of conversation per UTC
-// calendar month. Continuing the same day never counts twice (checked
-// before the count), and the count itself resets the first time someone
-// talks in a new month. A tiny race between two near-simultaneous requests
-// from the same person could let one extra day through -- not worth a
-// transaction for how rarely that could even happen.
+// otherwise blocked by whichever of two limits is hit first per UTC
+// calendar month: 3 separate UTC calendar days of conversation, or
+// $2.00 of real Anthropic API cost (see trackCost in lib/anthropic.ts,
+// called from every billed call across the app, not just this one).
+// Continuing the same day never counts twice (checked before either
+// limit), and both reset together the first time someone talks in a new
+// month. A tiny race between two near-simultaneous requests from the
+// same person could let one extra day or a few cents over -- not worth
+// a transaction for how rarely that could even happen.
 export async function checkConversationGate(userId: string): Promise<{ allowed: boolean }> {
   await ensureUser(userId);
   const rows = await sql`
-    SELECT subscribed_until, conversation_period, conversations_this_period, last_conversation_date
+    SELECT subscribed_until, conversation_period, conversations_this_period,
+           last_conversation_date, cost_microdollars_this_period
     FROM users WHERE id = ${userId}
   `;
   const row = rows[0] as {
@@ -401,6 +417,7 @@ export async function checkConversationGate(userId: string): Promise<{ allowed: 
     conversation_period: string | null;
     conversations_this_period: number;
     last_conversation_date: string | null;
+    cost_microdollars_this_period: number;
   };
 
   if (row.subscribed_until && new Date(row.subscribed_until) > new Date()) {
@@ -422,8 +439,15 @@ export async function checkConversationGate(userId: string): Promise<{ allowed: 
   }
 
   const month = today.slice(0, 7); // UTC, "YYYY-MM"
-  const countThisMonth = row.conversation_period === month ? row.conversations_this_period : 0;
-  if (countThisMonth >= 3) {
+  // A stored period from an earlier month means both counters are stale --
+  // treat them as 0 here, and the UPDATE below actually writes that reset
+  // back (cost_microdollars_this_period included), not just conversation_period.
+  // Otherwise a new month's trackCost() calls would add onto last month's
+  // leftover total instead of starting clean.
+  const isNewPeriod = row.conversation_period !== month;
+  const countThisMonth = isNewPeriod ? 0 : row.conversations_this_period;
+  const costThisMonth = isNewPeriod ? 0 : row.cost_microdollars_this_period;
+  if (countThisMonth >= 3 || costThisMonth >= MAX_COST_MICRODOLLARS_PER_PERIOD) {
     return { allowed: false };
   }
 
@@ -431,10 +455,24 @@ export async function checkConversationGate(userId: string): Promise<{ allowed: 
     UPDATE users
     SET conversation_period = ${month},
         conversations_this_period = ${countThisMonth + 1},
-        last_conversation_date = ${today}
+        last_conversation_date = ${today},
+        cost_microdollars_this_period = ${costThisMonth}
     WHERE id = ${userId}
   `;
   return { allowed: true };
+}
+
+// Called after every billed Anthropic API call, anywhere in the app --
+// see trackCost in lib/anthropic.ts, which computes the microdollar
+// amount and calls this. A no-op write of 0 is skipped by the caller,
+// not here, so this stays a plain unconditional increment.
+export async function incrementUserCost(userId: string, microdollars: number): Promise<void> {
+  await ensureUser(userId);
+  await sql`
+    UPDATE users
+    SET cost_microdollars_this_period = cost_microdollars_this_period + ${microdollars}
+    WHERE id = ${userId}
+  `;
 }
 
 export async function getUser(userId: string) {

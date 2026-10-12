@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const line = await generateMirrorLine(stage, resolved);
+    const line = await generateMirrorLine(userId, stage, resolved);
     if (!line) return NextResponse.json({ line: existing?.line ?? null });
     await saveMirrorLine(userId, line);
     return NextResponse.json({ line });

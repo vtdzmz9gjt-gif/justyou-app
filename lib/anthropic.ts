@@ -24,6 +24,7 @@ import {
   recordCrossLink,
   consumePendingCrossLinks,
   getAvoidancePattern,
+  incrementUserCost,
   type StoredMessage,
   type Stage,
   type Element,
@@ -43,6 +44,54 @@ const anthropic = new Anthropic({
   maxRetries: 1,
 });
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
+
+// Real Anthropic API cost, tracked per user to drive the $2/month cap in
+// checkConversationGate (lib/db.ts) -- these are claude-sonnet-5's actual
+// published per-token rates, not an estimate. If ANTHROPIC_MODEL is ever
+// changed to a different tier, these need to change with it -- there's no
+// live pricing lookup here. Cache-write pricing assumes the 1-hour TTL
+// specifically (2x base input): every cache_control in this file uses
+// ttl: "1h", none use the default 5-minute TTL, confirmed by grep before
+// writing this. $/MTok and microdollars/token are numerically identical
+// (both scale by 1e6), so no extra conversion factor is needed below.
+const PRICE_INPUT_PER_MTOK = 2.0;
+const PRICE_OUTPUT_PER_MTOK = 10.0;
+const PRICE_CACHE_WRITE_1H_PER_MTOK = 4.0; // 2x input
+const PRICE_CACHE_READ_PER_MTOK = 0.2; // 0.1x input
+
+function usageCostMicrodollars(usage: {
+  input_tokens: number;
+  output_tokens: number;
+  cache_creation_input_tokens?: number | null;
+  cache_read_input_tokens?: number | null;
+}): number {
+  return Math.round(
+    usage.input_tokens * PRICE_INPUT_PER_MTOK +
+      usage.output_tokens * PRICE_OUTPUT_PER_MTOK +
+      (usage.cache_creation_input_tokens ?? 0) * PRICE_CACHE_WRITE_1H_PER_MTOK +
+      (usage.cache_read_input_tokens ?? 0) * PRICE_CACHE_READ_PER_MTOK
+  );
+}
+
+// Called after every anthropic.messages.create() in this file that has a
+// real userId in scope. Logged, not thrown, on failure -- same resilience
+// rule as every other DB side-effect here: a missed cost record should
+// never break the actual reply.
+async function trackCost(
+  userId: string,
+  usage: {
+    input_tokens: number;
+    output_tokens: number;
+    cache_creation_input_tokens?: number | null;
+    cache_read_input_tokens?: number | null;
+  }
+): Promise<void> {
+  try {
+    await incrementUserCost(userId, usageCostMicrodollars(usage));
+  } catch (err) {
+    console.error("trackCost error", err);
+  }
+}
 
 const BASE_SYSTEM_PROMPT = fs.readFileSync(
   path.join(process.cwd(), "system-prompt.md"),
@@ -159,7 +208,7 @@ Call tag_element with your single best answer.`;
 // Runs in parallel with the main reply, not blocking it -- a small, cheap,
 // forced call (tool_choice leaves the model no way to skip it) dedicated
 // entirely to this one judgment.
-async function tagElement(userMessage: string): Promise<Element | undefined> {
+async function tagElement(userId: string, userMessage: string): Promise<Element | undefined> {
   try {
     const response = await anthropic.messages.create({
       model: MODEL,
@@ -169,6 +218,7 @@ async function tagElement(userMessage: string): Promise<Element | undefined> {
       tool_choice: { type: "tool", name: "tag_element" },
       messages: [{ role: "user", content: `Classify this message:\n\n"${userMessage}"` }],
     });
+    await trackCost(userId, response.usage);
     const call = response.content.find(
       (b): b is Anthropic.ToolUseBlock => b.type === "tool_use" && b.name === "tag_element"
     );
@@ -335,6 +385,7 @@ Call tag_family_pattern with your single best answer. When theme is "none", you 
 // Same parallel, non-blocking shape as tagElement -- fired alongside the
 // whole conversational loop, awaited only at the return points.
 async function tagSephirah(
+  userId: string,
   userMessage: string
 ): Promise<{ node: SephirahKey; weight: SephirahWeight; groundedIn: string } | undefined> {
   try {
@@ -346,6 +397,7 @@ async function tagSephirah(
       tool_choice: { type: "tool", name: "tag_sephirah" },
       messages: [{ role: "user", content: `Judge this message:\n\n"${userMessage}"` }],
     });
+    await trackCost(userId, response.usage);
     const call = response.content.find(
       (b): b is Anthropic.ToolUseBlock => b.type === "tool_use" && b.name === "tag_sephirah"
     );
@@ -383,7 +435,10 @@ async function tagSephirah(
 }
 
 // Same shape as tagSephirah.
-async function tagFamilyPattern(userMessage: string): Promise<
+async function tagFamilyPattern(
+  userId: string,
+  userMessage: string
+): Promise<
   | {
       theme: FamilyTheme;
       tracesTo: FamilyLine;
@@ -406,6 +461,7 @@ async function tagFamilyPattern(userMessage: string): Promise<
       tool_choice: { type: "tool", name: "tag_family_pattern" },
       messages: [{ role: "user", content: `Judge this message:\n\n"${userMessage}"` }],
     });
+    await trackCost(userId, response.usage);
     const call = response.content.find(
       (b): b is Anthropic.ToolUseBlock => b.type === "tool_use" && b.name === "tag_family_pattern"
     );
@@ -665,9 +721,9 @@ export async function runChat(
 ): Promise<ChatResult> {
   // Fired now, awaited later -- runs alongside the whole conversational
   // loop below rather than adding its own sequential round-trip.
-  const elementPromise = tagElement(userMessage);
-  const sephirahPromise = resolveSephirahTag(userId, tagSephirah(userMessage));
-  const familyPromise = resolveFamilyPatternTag(userId, tagFamilyPattern(userMessage));
+  const elementPromise = tagElement(userId, userMessage);
+  const sephirahPromise = resolveSephirahTag(userId, tagSephirah(userId, userMessage));
+  const familyPromise = resolveFamilyPatternTag(userId, tagFamilyPattern(userId, userMessage));
 
   const [openCommitment, stageInfo, treeInfo, crossLinkInfo, avoidanceInfo] = await Promise.all([
     openCommitmentContext(userId),
@@ -727,6 +783,7 @@ export async function runChat(
     console.log(
       `[cache] round=${round} input=${response.usage.input_tokens} cache_write=${response.usage.cache_creation_input_tokens ?? 0} cache_read=${response.usage.cache_read_input_tokens ?? 0}`
     );
+    await trackCost(userId, response.usage);
 
     const toolUses = response.content.filter(
       (b): b is Anthropic.ToolUseBlock => b.type === "tool_use"
@@ -785,6 +842,7 @@ export async function runChat(
           if (input.outcome === "landed" && resolved) {
             const action = resolved.action;
             winPromise = generateWinReflection(
+              userId,
               action,
               [...history, { role: "user", content: userMessage }] as StoredMessage[],
               uiLang
@@ -883,6 +941,7 @@ export async function runChat(
 // current stage, never in raw conversation content, so it stays safe to
 // put on a small shareable card.
 export async function generateMirrorLine(
+  userId: string,
   stage: Stage | undefined,
   resolved: { action: string; status: "landed" | "tried" | "not_landed" }[]
 ): Promise<string> {
@@ -907,6 +966,7 @@ Current stage: ${stage || "mystery"}`;
     system,
     messages: [{ role: "user", content: "Write the line." }],
   });
+  await trackCost(userId, response.usage);
 
   const text = response.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
@@ -924,6 +984,7 @@ Current stage: ${stage || "mystery"}`;
 // it's never meant to be shared or screenshotted -- just for them, in the
 // moment they ask for it.
 export async function generatePatternReview(
+  userId: string,
   stage: Stage | undefined,
   recentMessages: StoredMessage[],
   uiLang?: string | null
@@ -959,6 +1020,7 @@ ${transcript}`;
     system,
     messages: [{ role: "user", content: "Give the read." }],
   });
+  await trackCost(userId, response.usage);
 
   return response.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
@@ -974,6 +1036,7 @@ ${transcript}`;
 // the shape-family reveal (long-arc, invisible, no numbers), this one is
 // explicitly quantified -- that's the whole point of the orb.
 export async function generateElementReflection(
+  userId: string,
   dominant: Element,
   dominantPct: number,
   weakest: Element,
@@ -1013,6 +1076,7 @@ ${transcript}`;
     system,
     messages: [{ role: "user", content: "Give the reflection." }],
   });
+  await trackCost(userId, response.usage);
 
   return response.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
@@ -1027,6 +1091,7 @@ ${transcript}`;
 // grounded only in the actions themselves (no raw conversation content,
 // same boundary as the mirror line).
 export async function generateWeeklyRecapLine(
+  userId: string,
   wins: { action: string }[],
   uiLang?: string | null
 ): Promise<string> {
@@ -1050,6 +1115,7 @@ ${list}`;
     system,
     messages: [{ role: "user", content: "Write the line." }],
   });
+  await trackCost(userId, response.usage);
 
   return response.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
@@ -1064,6 +1130,7 @@ ${list}`;
 // review or mirror line. Grounded in the specific action and whatever
 // they just said about how it went, never generic praise.
 export async function generateWinReflection(
+  userId: string,
   action: string,
   recentMessages: { role: "user" | "assistant"; content: string }[],
   uiLang?: string | null
@@ -1093,6 +1160,7 @@ ${transcript}`;
     system,
     messages: [{ role: "user", content: "Mark it." }],
   });
+  await trackCost(userId, response.usage);
 
   return response.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
@@ -1106,6 +1174,7 @@ ${transcript}`;
 // else in this build -- no fixed phrase bank. Called at most once per
 // person per pair, ever; see getTensionInsights.
 async function generateTensionInsight(
+  userId: string,
   engagedLabel: string,
   quietLabel: string,
   groundedNotes: string[],
@@ -1132,6 +1201,7 @@ ${langLine}`;
     system,
     messages: [{ role: "user", content: "Name it." }],
   });
+  await trackCost(userId, response.usage);
 
   return response.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
@@ -1178,6 +1248,7 @@ export async function getTensionInsights(
 
     try {
       const insight = await generateTensionInsight(
+        userId,
         `${NODES[engaged].title} (${NODES[engaged].subtitle})`,
         `${NODES[quiet].title} (${NODES[quiet].subtitle})`,
         notes,
@@ -1204,6 +1275,7 @@ export async function getTensionInsights(
 // there's nothing specific enough to ground a sentence in, leave it out.
 // One real sentence beats three padded ones.
 async function generateNodeReflection(
+  userId: string,
   label: string,
   groundedNotes: string[],
   uiLang?: string | null
@@ -1227,6 +1299,7 @@ ${langLine}`;
     system,
     messages: [{ role: "user", content: "Reflect it back." }],
   });
+  await trackCost(userId, response.usage);
 
   return response.content
     .filter((b): b is Anthropic.TextBlock => b.type === "text")
@@ -1272,7 +1345,7 @@ export async function getNodeReflection(
       : THEMES[node as FamilyTheme].title;
 
   try {
-    const reflection = await generateNodeReflection(label, notes, uiLang);
+    const reflection = await generateNodeReflection(userId, label, notes, uiLang);
     if (!reflection) return "";
     await saveReflection(userId, system, node, reflection, currentCount);
     return reflection;
@@ -1316,6 +1389,7 @@ const ALIVENESS_EXERCISE_TOOL: Anthropic.Tool = {
 };
 
 export async function generateAlivenessExercise(
+  userId: string,
   alivenessAnswer: string,
   stuckAnswer: string,
   uiLang?: string | null
@@ -1353,6 +1427,7 @@ ${langLine}`;
     tool_choice: { type: "tool", name: "give_aliveness_exercise" },
     messages: [{ role: "user", content: "Give the exercise." }],
   });
+  await trackCost(userId, response.usage);
 
   const call = response.content.find(
     (b): b is Anthropic.ToolUseBlock => b.type === "tool_use" && b.name === "give_aliveness_exercise"
