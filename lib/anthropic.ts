@@ -16,6 +16,8 @@ import {
   saveTensionInsight,
   getTreeState,
   recordFamilyPatternTag,
+  getFamilyState,
+  claimGuidedFamilyOffer,
   getFamilyGroundedNotes,
   getSephirahTagCount,
   getFamilyTagCount,
@@ -120,6 +122,15 @@ const tools: Anthropic.Tool[] = [
         },
       },
       required: ["options"],
+    },
+  },
+  {
+    name: "signal_natural_ending",
+    description:
+      "Call this the moment a conversation has genuinely reached its natural end, per the exact same done-signals already governing \"Ending gracefully\" in the system prompt -- shrinking replies, resolution language, energy that's settled, nothing left unresolved. Call it every time that's true, in the same turn you would otherwise simply end gracefully, regardless of whether you end up naming the ending in this reply. Its result occasionally clears you to make a specific one-time offer -- see \"Offering the guided family session\" in the system prompt. Never call it speculatively, and never more than once per conversation.",
+    input_schema: {
+      type: "object",
+      properties: {},
     },
   },
 ];
@@ -844,6 +855,28 @@ export async function runChat(
             type: "tool_result",
             tool_use_id: call.id,
             content: "Shown to the person.",
+          });
+        } else if (call.name === "signal_natural_ending") {
+          // Gated, one-time clearance -- see claimGuidedFamilyOffer. The
+          // model never decides this on its own (no mention of Family
+          // Constellation being sparse anywhere in this tool's own
+          // description); it only ever learns it's available from this
+          // dynamic tool_result, same shape as resolve_open_commitment's
+          // landedCount above.
+          let clearance = "";
+          try {
+            const familyState = await getFamilyState(userId);
+            if (await claimGuidedFamilyOffer(userId, familyState)) {
+              clearance =
+                " This person's Family Constellation is still mostly untouched, and they've never been offered the guided family session before -- if it genuinely fits this ending, you may offer it now. See \"Offering the guided family session\" in the system prompt.";
+            }
+          } catch (err) {
+            console.error("claimGuidedFamilyOffer error", err);
+          }
+          toolResults.push({
+            type: "tool_result",
+            tool_use_id: call.id,
+            content: `Recorded.${clearance}`,
           });
         } else {
           toolResults.push({

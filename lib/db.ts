@@ -261,6 +261,17 @@ function ensureSchema(): Promise<void> {
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS conversations_this_period INTEGER NOT NULL DEFAULT 0`;
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_conversation_date TEXT`;
       await sql`CREATE INDEX IF NOT EXISTS idx_users_restore_token ON users(restore_token)`;
+      // The guided family session's one-time proactive offer -- same
+      // "claimed once, ever" shape as daat_reveals above. Only guards the
+      // *proactive* offer (fired from signal_natural_ending in
+      // lib/anthropic.ts); the Settings entry point bypasses this
+      // entirely and is always reachable, same as Aliveness Compass.
+      await sql`
+        CREATE TABLE IF NOT EXISTS guided_family_offers (
+          user_id TEXT PRIMARY KEY,
+          offered_at TIMESTAMPTZ NOT NULL DEFAULT now()
+        )
+      `;
     })();
     // If schema setup itself fails (not one of the non-fatal steps above,
     // but a real CREATE TABLE/INDEX failure), don't leave every future call
@@ -1017,6 +1028,33 @@ export async function getFamilyState(userId: string): Promise<FamilyState> {
     state[theme] = { tier, groundedIn: latest.grounded_in, tracesTo: latest.traces_to, broken };
   }
   return state;
+}
+
+// The guided family session's one-time proactive offer -- same shape as
+// claimDaatReveal above: check the real-data gate first (fewer than 2 of
+// the 4 themes touched -- this is for people organic tracing genuinely
+// hasn't reached yet), then claim the one-time slot, atomically enough
+// that a concurrent double-call can't claim it twice. Only governs the
+// *proactive* path fired from signal_natural_ending -- the Settings entry
+// point never calls this and is always reachable regardless of either
+// gate.
+export async function claimGuidedFamilyOffer(
+  userId: string,
+  state: FamilyState
+): Promise<boolean> {
+  if (Object.keys(state).length >= 2) return false;
+
+  await ensureSchema();
+  const existing = await sql`SELECT 1 FROM guided_family_offers WHERE user_id = ${userId}`;
+  if (existing.length > 0) return false;
+
+  await ensureUser(userId);
+  const inserted = await sql`
+    INSERT INTO guided_family_offers (user_id) VALUES (${userId})
+    ON CONFLICT (user_id) DO NOTHING
+    RETURNING user_id
+  `;
+  return inserted.length > 0;
 }
 
 export type AvoidancePattern = {

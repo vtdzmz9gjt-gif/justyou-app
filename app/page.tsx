@@ -3757,6 +3757,26 @@ export default function Home() {
               →
             </span>
           </button>
+          <button
+            type="button"
+            className="tree-entry-btn"
+            onClick={() => {
+              setShowSettings(false);
+              // A real message into the actual conversation, not a side
+              // modal -- see "Offering the guided family session" in
+              // system-prompt.md for why this can't be isolated the way
+              // Aliveness Compass is: its whole point is feeding real
+              // tag_family_pattern tags, so it has to run inside the real
+              // conversation loop. English-only for now, same call made
+              // for Aliveness Compass above.
+              send("I'd like to try the guided family session.", undefined, false);
+            }}
+          >
+            <span>Guided Family Session</span>
+            <span className="tree-entry-btn-arrow" aria-hidden="true">
+              →
+            </span>
+          </button>
           {mirrorLine && (
             <div className="mirror-card">
               <div className="mirror-card-label">{s.returnLabel}</div>
