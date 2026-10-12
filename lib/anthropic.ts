@@ -297,7 +297,7 @@ const FAMILY_TAG_TOOL: Anthropic.Tool = {
   },
 };
 
-const FAMILY_TAG_SYSTEM = `You're judging the most recent message from someone in a reflective conversation app against the Family Constellation system -- four life themes (money, love, work_life, body), each one either untouched or traced to a specific parent (father or mother). A short window of the conversation right before it is included too, strictly for context -- a theme and the parent it traces to routinely surface in different turns (the theme stated once, the parent named only when something later asks about or echoes it), so use the window to understand what the most recent message means and whether it completes a connection the earlier turns started. Most messages reveal nothing here -- use "none" freely; this should be your answer on most turns.
+const FAMILY_TAG_SYSTEM = `You're judging the most recent message from someone in a reflective conversation app against the Family Constellation system -- four life themes (money, love, work_life, body), each one either untouched or traced to a specific parent (father or mother). The full conversation so far is included too, strictly for context -- a theme and the parent it traces to routinely surface far apart, not just in adjacent turns (the theme stated once, the parent named only when something much later asks about or echoes it), so use the whole history to understand what the most recent message means and whether it completes a connection an earlier turn started, however far back. Most messages reveal nothing here -- use "none" freely; this should be your answer on most turns.
 
 Only pick a theme when BOTH of these are true, drawing on the most recent message and the window together:
 1. A real, specific pattern in one of the four themes was disclosed somewhere in this window -- not a topic merely mentioned.
@@ -386,23 +386,30 @@ async function tagSephirah(
 
 // Unlike tagSephirah (a single real condition, satisfiable from one
 // isolated message), this needs two things to line up -- a theme AND a
-// parent -- and in real conversations those routinely land in different
-// turns (see "Multiple lenses, held loosely" in system-prompt.md: the
-// angle is tried, the person confirms or denies it on a LATER turn). A
-// single isolated message almost never shows both at once, which is why
-// this took a window of recent turns and tagSephirah didn't.
-function recentFamilyContext(history: StoredMessage[]): Anthropic.MessageParam[] {
-  const window = history.slice(-6).map((m) => ({ role: m.role, content: m.content }));
-  // The API requires the first message to be role "user" -- a 6-message
-  // slice can land on an assistant turn at that boundary in a normal
-  // alternating history, so drop it rather than send an invalid request.
-  if (window[0]?.role === "assistant") window.shift();
-  return window;
+// parent -- and in real conversations those routinely land far apart, not
+// just in adjacent turns (see "Multiple lenses, held loosely" in
+// system-prompt.md: the angle is tried, the person confirms or denies it
+// on a LATER turn, and ordinary conversational drift can put many
+// exchanges between the two). A bounded recent-window version of this was
+// tried first and proved too narrow on real traffic -- a genuine, 7-turn
+// gap between a disclosed theme and its later parent-confirmation, well
+// within how people actually talk, not a contrived edge case. Full
+// history closes that gap properly; the cost difference is negligible
+// since this is a cheap, max_tokens: 200 classification call, not
+// something that scales with conversation length the way the main reply
+// loop does.
+function familyContextMessages(history: StoredMessage[]): Anthropic.MessageParam[] {
+  const messages = history.map((m) => ({ role: m.role, content: m.content }));
+  // The API requires the first message to be role "user" -- true by
+  // construction for a real conversation's full history, but kept as a
+  // defensive guard rather than assumed.
+  if (messages[0]?.role === "assistant") messages.shift();
+  return messages;
 }
 
 async function tagFamilyPattern(
   userMessage: string,
-  recentHistory: StoredMessage[]
+  history: StoredMessage[]
 ): Promise<
   | {
       theme: FamilyTheme;
@@ -425,7 +432,7 @@ async function tagFamilyPattern(
       tools: [FAMILY_TAG_TOOL],
       tool_choice: { type: "tool", name: "tag_family_pattern" },
       messages: [
-        ...recentFamilyContext(recentHistory),
+        ...familyContextMessages(history),
         {
           role: "user",
           content: `Judge the most recent message below -- the turns above it, if any, are context only:\n\n"${userMessage}"`,
