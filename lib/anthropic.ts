@@ -297,15 +297,17 @@ const FAMILY_TAG_TOOL: Anthropic.Tool = {
   },
 };
 
-const FAMILY_TAG_SYSTEM = `You're judging a single message from someone in a reflective conversation app against the Family Constellation system -- four life themes (money, love, work_life, body), each one either untouched or traced to a specific parent (father or mother). Most messages reveal nothing here -- use "none" freely; this should be your answer on most turns.
+const FAMILY_TAG_SYSTEM = `You're judging the most recent message from someone in a reflective conversation app against the Family Constellation system -- four life themes (money, love, work_life, body), each one either untouched or traced to a specific parent (father or mother). A short window of the conversation right before it is included too, strictly for context -- a theme and the parent it traces to routinely surface in different turns (the theme stated once, the parent named only when something later asks about or echoes it), so use the window to understand what the most recent message means and whether it completes a connection the earlier turns started. Most messages reveal nothing here -- use "none" freely; this should be your answer on most turns.
 
-Only pick a theme when BOTH of these are true from what was actually said:
-1. The message discloses a real, specific pattern in one of the four themes -- not a topic merely mentioned.
-2. That pattern is actually connected, in the person's own words, to a specific parent -- something they modeled, taught, or passed down, stated or clearly implied by what's actually said.
+Only pick a theme when BOTH of these are true, drawing on the most recent message and the window together:
+1. A real, specific pattern in one of the four themes was disclosed somewhere in this window -- not a topic merely mentioned.
+2. That pattern is actually connected, in the person's own words, to a specific parent -- something they modeled, taught, or passed down, stated or clearly implied by what's actually said, anywhere in this window.
 
-If a real pattern is disclosed but nothing connects it to a specific parent, do NOT guess which line it's from -- use "none". A pattern with no stated ancestral connection isn't this system's material, even if it's genuinely something real about the person (it may belong to a different part of this app instead -- not your concern here).
+The most recent message has to be doing real work toward this, not just sitting near it: either it's the message stating the theme, or it's the message naming or confirming the parent. If both the theme and the parent-connection were already fully resolved in earlier turns and the most recent message doesn't add either one, the answer is "none" -- a fresh tag reflects something actually happening now, not a re-confirmation of something the window happens to still show. Otherwise this is no different from double-counting the same disclosure on every later turn it's still in view.
 
-The same applies when the conversation explicitly explored a family-origin angle and the person denied it or didn't confirm it ("my parents were pretty steady, actually") -- that's a real, informative answer, not a prompt to guess anyway. Use "none" here even when a different, unrelated pattern lands well elsewhere in the same conversation -- a lens that was tried and came up empty is never tagged just because another lens succeeded.
+If a real pattern is disclosed but nothing in the window connects it to a specific parent, do NOT guess which line it's from -- use "none". A pattern with no stated ancestral connection isn't this system's material, even if it's genuinely something real about the person (it may belong to a different part of this app instead -- not your concern here).
+
+The same applies when the window shows the conversation explicitly explored a family-origin angle and the person denied it or didn't confirm it ("my parents were pretty steady, actually") -- that's a real, informative answer, not a prompt to guess anyway. Use "none" here even when a different, unrelated pattern lands well elsewhere in the same conversation -- a lens that was tried and came up empty is never tagged just because another lens succeeded.
 
 The four themes:
 - money: their relationship to money -- scarcity, safety, proof, what it means to have or not have it.
@@ -382,8 +384,26 @@ async function tagSephirah(
   }
 }
 
-// Same shape as tagSephirah.
-async function tagFamilyPattern(userMessage: string): Promise<
+// Unlike tagSephirah (a single real condition, satisfiable from one
+// isolated message), this needs two things to line up -- a theme AND a
+// parent -- and in real conversations those routinely land in different
+// turns (see "Multiple lenses, held loosely" in system-prompt.md: the
+// angle is tried, the person confirms or denies it on a LATER turn). A
+// single isolated message almost never shows both at once, which is why
+// this took a window of recent turns and tagSephirah didn't.
+function recentFamilyContext(history: StoredMessage[]): Anthropic.MessageParam[] {
+  const window = history.slice(-6).map((m) => ({ role: m.role, content: m.content }));
+  // The API requires the first message to be role "user" -- a 6-message
+  // slice can land on an assistant turn at that boundary in a normal
+  // alternating history, so drop it rather than send an invalid request.
+  if (window[0]?.role === "assistant") window.shift();
+  return window;
+}
+
+async function tagFamilyPattern(
+  userMessage: string,
+  recentHistory: StoredMessage[]
+): Promise<
   | {
       theme: FamilyTheme;
       tracesTo: FamilyLine;
@@ -404,7 +424,13 @@ async function tagFamilyPattern(userMessage: string): Promise<
       system: [{ type: "text", text: FAMILY_TAG_SYSTEM, cache_control: { type: "ephemeral", ttl: "1h" } }],
       tools: [FAMILY_TAG_TOOL],
       tool_choice: { type: "tool", name: "tag_family_pattern" },
-      messages: [{ role: "user", content: `Judge this message:\n\n"${userMessage}"` }],
+      messages: [
+        ...recentFamilyContext(recentHistory),
+        {
+          role: "user",
+          content: `Judge the most recent message below -- the turns above it, if any, are context only:\n\n"${userMessage}"`,
+        },
+      ],
     });
     const call = response.content.find(
       (b): b is Anthropic.ToolUseBlock => b.type === "tool_use" && b.name === "tag_family_pattern"
@@ -667,7 +693,7 @@ export async function runChat(
   // loop below rather than adding its own sequential round-trip.
   const elementPromise = tagElement(userMessage);
   const sephirahPromise = resolveSephirahTag(userId, tagSephirah(userMessage));
-  const familyPromise = resolveFamilyPatternTag(userId, tagFamilyPattern(userMessage));
+  const familyPromise = resolveFamilyPatternTag(userId, tagFamilyPattern(userMessage, history));
 
   const [openCommitment, stageInfo, treeInfo, crossLinkInfo, avoidanceInfo] = await Promise.all([
     openCommitmentContext(userId),
