@@ -481,6 +481,18 @@ async function tagFamilyPattern(
           patternBrokenInstance: input?.pattern_broken_instance === true,
         };
       }
+      // theme was a real value but traces_to/weight/grounded_in didn't pass
+      // the inner guard (missing, or outside its enum) -- the schema only
+      // requires "theme", so this is a real, distinct failure mode from a
+      // genuine "none" judgment, and was previously indistinguishable from
+      // one: both fell through to the same silent `return undefined`
+      // below, with nothing logged either way.
+      console.error("tagFamilyPattern: theme set but malformed, dropping tag", {
+        theme,
+        tracesTo: input?.traces_to,
+        weight: input?.weight,
+        hasGroundedIn: typeof input?.grounded_in === "string" && !!input.grounded_in.trim(),
+      });
     }
     return undefined;
   } catch (err) {
@@ -676,6 +688,12 @@ async function resolveFamilyPatternTag(
       tag.tracesTo,
       tag.groundedIn,
       tag.patternBrokenInstance
+    );
+    // The only place a successful tag is ever logged -- previously only
+    // the error path logged anything, so a healthy run and a silently
+    // dropped one both left zero trace.
+    console.log(
+      `[family_tag] userId=${userId} theme=${tag.theme} tracesTo=${tag.tracesTo} weight=${tag.weight}`
     );
   } catch (err) {
     console.error("recordFamilyPatternTag error", err);
