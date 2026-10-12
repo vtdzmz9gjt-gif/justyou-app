@@ -406,6 +406,21 @@ const MAX_COST_MICRODOLLARS_PER_PERIOD = 2_000_000;
 // same person could let one extra day or a few cents over -- not worth
 // a transaction for how rarely that could even happen.
 export async function checkConversationGate(userId: string): Promise<{ allowed: boolean }> {
+  // The synthetic health-check user (see HEALTH_CHECK_USER_ID above) hits
+  // this same /api/chat path on a 15-minute cron, same as any real
+  // visitor -- nothing above exempted it from either limit. Left
+  // unexempted, it would eventually trip the day-count gate (3 distinct
+  // calendar days) or the cost gate just like a real free-tier user,
+  // and the health check treats a blocked/non-ok response as a failure
+  // -- so either one would start firing false "chat is down" alerts for
+  // a monitoring bot hitting its own simulated spending cap, not an
+  // actual outage. Exempted from the whole gate, not just the cost
+  // check that happened to surface this -- the day-count check has the
+  // identical risk, just on a slower clock.
+  if (userId === HEALTH_CHECK_USER_ID) {
+    return { allowed: true };
+  }
+
   await ensureUser(userId);
   const rows = await sql`
     SELECT subscribed_until, conversation_period, conversations_this_period,
