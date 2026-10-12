@@ -4054,8 +4054,9 @@ export default function Home() {
         </div>
       )}
 
-      {showAlivenessCompass && (
+      {showAlivenessCompass && userId && (
         <AlivenessCompass
+          userId={userId}
           lang={lang}
           onClose={(answer) => {
             setShowAlivenessCompass(false);

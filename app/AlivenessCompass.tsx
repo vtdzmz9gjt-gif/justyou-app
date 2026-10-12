@@ -39,9 +39,15 @@ function hasEnoughWords(value: string): boolean {
 }
 
 export default function AlivenessCompass({
+  userId,
   lang,
   onClose,
 }: {
+  // Sent to the API route solely so its one Claude call can be counted
+  // toward the per-user cost cap (lib/db.ts's checkConversationGate) --
+  // the route still reads/writes nothing else about this person; see its
+  // own comment for what "isolated by design" still means with this here.
+  userId: string;
   lang: string;
   // Hands back the first answer (if any real one was given) so the
   // conversation can treat it the same way an opening-sequence answer
@@ -65,7 +71,7 @@ export default function AlivenessCompass({
       const res = await fetch("/api/aliveness-exercise", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ alivenessAnswer, stuckAnswer, lang }),
+        body: JSON.stringify({ userId, alivenessAnswer, stuckAnswer, lang }),
       });
       const data = await res.json();
       if (!res.ok || !Array.isArray(data.signs) || typeof data.closing !== "string") {

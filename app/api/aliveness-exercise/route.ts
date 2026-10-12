@@ -11,10 +11,12 @@ function hasEnoughWords(value: string): boolean {
   return value.trim().split(/\s+/).filter(Boolean).length >= MIN_WORDS;
 }
 
-// Standalone and fully isolated from the main conversation by design: no
-// userId, no DB read or write, nothing persisted. Ephemeral in, ephemeral
-// out -- this must never feed the tree/family tagging systems, which only
-// ever see organic conversation content.
+// Isolated from the main conversation by design: no DB read or write of
+// conversation content, nothing persisted, and this must never feed the
+// tree/family tagging systems, which only ever see organic conversation
+// content. userId is accepted and used for exactly one thing -- counting
+// this call's real cost toward the per-user cap in generateAlivenessExercise
+// -- not for anything else; see that function's own trackCost call.
 export async function POST(req: NextRequest) {
   if (!process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json(
@@ -24,10 +26,14 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => null);
+  const userId = typeof body?.userId === "string" ? body.userId : "";
   const alivenessAnswer = typeof body?.alivenessAnswer === "string" ? body.alivenessAnswer : "";
   const stuckAnswer = typeof body?.stuckAnswer === "string" ? body.stuckAnswer : "";
   const lang = typeof body?.lang === "string" ? body.lang : null;
 
+  if (!userId) {
+    return NextResponse.json({ error: "Missing userId." }, { status: 400 });
+  }
   if (!hasEnoughWords(alivenessAnswer) || !hasEnoughWords(stuckAnswer)) {
     return NextResponse.json(
       { error: "A few more words would help this mean something." },
@@ -37,6 +43,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const result = await generateAlivenessExercise(
+      userId,
       alivenessAnswer.trim(),
       stuckAnswer.trim(),
       lang

@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
   const recent = messages.slice(-RECENT_MESSAGE_COUNT);
 
   try {
-    const review = await generatePatternReview(stage, recent, lang);
+    const review = await generatePatternReview(userId, stage, recent, lang);
 
     const tally = await getElementTally(userId, sinceMessageId);
     const total = ELEMENTS.reduce((sum, el) => sum + tally[el], 0);
@@ -55,6 +55,7 @@ export async function GET(req: NextRequest) {
       const dominantPct = Math.round((tally[dominant] / total) * 100);
       const weakestPct = Math.round((tally[weakest] / total) * 100);
       const reflection = await generateElementReflection(
+        userId,
         dominant,
         dominantPct,
         weakest,
