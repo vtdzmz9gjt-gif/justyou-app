@@ -262,7 +262,7 @@ function ensureSchema(): Promise<void> {
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_conversation_date TEXT`;
       // Real Anthropic API cost gate, alongside the day-count one above --
       // whichever limit is hit first blocks access. Stored in microdollars
-      // (millionths of a dollar, e.g. $2.00 = 2,000,000) rather than cents,
+      // (millionths of a dollar, e.g. $0.50 = 500,000) rather than cents,
       // since a single tagging call can cost a fraction of a cent and
       // repeated integer-cent rounding would systematically undercount.
       // Scoped to the same conversation_period column/window as the count
@@ -391,17 +391,34 @@ export async function consumeRestoreToken(token: string): Promise<{ userId: stri
   return row ? { userId: row.id } : null;
 }
 
-// $2.00, in microdollars -- see cost_microdollars_this_period's comment in
-// ensureSchema for why microdollars rather than cents.
-const MAX_COST_MICRODOLLARS_PER_PERIOD = 2_000_000;
+// $0.50, in microdollars -- see cost_microdollars_this_period's comment in
+// ensureSchema for why microdollars rather than cents. Lowered from the
+// original $2.00: real production traffic showed $2.00 wasn't tight
+// enough given the gate bug below, and this is the actual intended cap
+// going forward, not just a stopgap.
+const MAX_COST_MICRODOLLARS_PER_PERIOD = 500_000;
 
 // The free-tier frequency gate -- unlimited for an active subscriber,
 // otherwise blocked by whichever of two limits is hit first per UTC
 // calendar month: 3 separate UTC calendar days of conversation, or
-// $2.00 of real Anthropic API cost (see trackCost in lib/anthropic.ts,
+// $0.50 of real Anthropic API cost (see trackCost in lib/anthropic.ts,
 // called from every billed call across the app, not just this one).
-// Continuing the same day never counts twice (checked before either
-// limit), and both reset together the first time someone talks in a new
+//
+// These two limits are checked differently on purpose. The day-count
+// limit counts distinct CALENDAR DAYS, so a single day's conversation
+// (however many messages) must only ever count once -- that's what the
+// "already talked today" shortcut below is for. The cost limit is not
+// like that: cost accrues continuously, message by message, within a
+// single day's conversation, so it has to be checked on every message,
+// including every message after the first one today. A real bug shipped
+// here once already: the cost check used to sit on the SAME SIDE of the
+// "already talked today" shortcut as the day-count check, which meant
+// cost was only ever evaluated once per day -- every later message that
+// day silently skipped the cap entirely, regardless of how much it
+// actually spent. The cost check below now runs unconditionally, before
+// that shortcut, specifically to never repeat that.
+//
+// Both counters reset together the first time someone talks in a new
 // month. A tiny race between two near-simultaneous requests from the
 // same person could let one extra day or a few cents over -- not worth
 // a transaction for how rarely that could even happen.
@@ -439,20 +456,18 @@ export async function checkConversationGate(userId: string): Promise<{ allowed: 
     return { allowed: true };
   }
 
-  const today = new Date().toISOString().slice(0, 10); // UTC, "YYYY-MM-DD"
-  if (row.last_conversation_date === today) {
-    return { allowed: true };
-  }
-
   // A pending open commitment is a narrow, self-bounding exception: only
   // one is ever tracked at a time, and it clears the moment the
   // follow-up actually happens -- so this can't become an indefinite
   // way around the limit, only protection for the one visit that's
-  // actually closing something out.
+  // actually closing something out. Kept ahead of the cost check below,
+  // same as it was ahead of every other check before -- this exception
+  // is still meant to be absolute, not itself cost-gated.
   if (await getOpenCommitment(userId)) {
     return { allowed: true };
   }
 
+  const today = new Date().toISOString().slice(0, 10); // UTC, "YYYY-MM-DD"
   const month = today.slice(0, 7); // UTC, "YYYY-MM"
   // A stored period from an earlier month means both counters are stale --
   // treat them as 0 here, and the UPDATE below actually writes that reset
@@ -460,9 +475,21 @@ export async function checkConversationGate(userId: string): Promise<{ allowed: 
   // Otherwise a new month's trackCost() calls would add onto last month's
   // leftover total instead of starting clean.
   const isNewPeriod = row.conversation_period !== month;
-  const countThisMonth = isNewPeriod ? 0 : row.conversations_this_period;
   const costThisMonth = isNewPeriod ? 0 : row.cost_microdollars_this_period;
-  if (countThisMonth >= 3 || costThisMonth >= MAX_COST_MICRODOLLARS_PER_PERIOD) {
+
+  // Checked before the same-day shortcut, unconditionally -- see the
+  // function comment above for why cost can't share that shortcut with
+  // the day-count check.
+  if (costThisMonth >= MAX_COST_MICRODOLLARS_PER_PERIOD) {
+    return { allowed: false };
+  }
+
+  if (row.last_conversation_date === today) {
+    return { allowed: true };
+  }
+
+  const countThisMonth = isNewPeriod ? 0 : row.conversations_this_period;
+  if (countThisMonth >= 3) {
     return { allowed: false };
   }
 
