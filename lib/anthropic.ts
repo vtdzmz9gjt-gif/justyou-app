@@ -25,6 +25,7 @@ import {
   consumePendingCrossLinks,
   getAvoidancePattern,
   incrementUserCost,
+  claimCostNudge,
   type StoredMessage,
   type Stage,
   type Element,
@@ -653,6 +654,7 @@ export interface ChatResult {
   familyTheme?: FamilyTheme;
   committed?: boolean;
   win?: { action: string; reflection: string };
+  costNudge?: boolean;
 }
 
 // Awaits the classification and, if it named a real node, writes it --
@@ -829,6 +831,7 @@ export async function runChat(
         familyTheme,
         committed,
         win: await winPromise,
+        costNudge: await claimCostNudge(userId),
       };
     }
 
@@ -916,6 +919,7 @@ export async function runChat(
           familyTheme,
           committed,
           win: await winPromise,
+          costNudge: await claimCostNudge(userId),
         };
       }
     }
@@ -945,6 +949,7 @@ export async function runChat(
       familyTheme,
       committed,
       win: await winPromise,
+      costNudge: await claimCostNudge(userId),
     };
   }
 }

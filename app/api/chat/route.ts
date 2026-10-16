@@ -79,6 +79,7 @@ export async function POST(req: NextRequest) {
     sephirah?: string;
     committed?: boolean;
     win?: { action: string; reflection: string };
+    costNudge?: boolean;
   };
 
   let timeoutId!: ReturnType<typeof setTimeout>;
@@ -138,6 +139,7 @@ export async function POST(req: NextRequest) {
     branches: result.branches,
     elementTally,
     win: result.win,
+    costNudge: result.costNudge,
     userMessageId,
     assistantMessageId,
   });
