@@ -3327,10 +3327,30 @@ export default function Home() {
     }
   }
 
+  // The one real composer now doubles as the opening-question answer
+  // field (the dedicated one above it was removed -- same text, same
+  // placeholder, two visible boxes for one question). Before the mood
+  // picker has been reached, submitting here captures the typed text as
+  // the opening answer and reveals the mood picker, exactly what the
+  // dedicated field used to do, instead of sending straight to the API.
+  // Once hasStarted or awaitingDepth is true, it's a real message again
+  // and sends normally -- this only intercepts the one moment before
+  // either of those exists yet.
+  function submitComposer() {
+    if (!hasStarted && !awaitingDepth && !openingAnswerSubmitted) {
+      if (!draft.trim()) return;
+      setOpeningAnswer(draft);
+      setDraft("");
+      setOpeningAnswerSubmitted(true);
+      return;
+    }
+    send();
+  }
+
   function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      send();
+      submitComposer();
     }
   }
 
@@ -3850,36 +3870,13 @@ export default function Home() {
       {showFirstLight ? null : !hasStarted && !awaitingDepth ? (
         <div className="opening">
           <p className="opening-question">{openingQuestion}</p>
-          {!openingAnswerSubmitted ? (
-            <div className="opening-answer-field">
-              <input
-                id="opening-answer"
-                type="text"
-                value={openingAnswer}
-                onChange={(e) => setOpeningAnswer(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && openingAnswer.trim()) {
-                    e.preventDefault();
-                    setOpeningAnswerSubmitted(true);
-                  }
-                }}
-                placeholder={s.placeholderStart}
-                disabled={sending}
-                autoFocus
-              />
-              {openingAnswer.trim() && (
-                <button
-                  type="button"
-                  className="opening-answer-continue key-action"
-                  onClick={() => setOpeningAnswerSubmitted(true)}
-                  disabled={sending}
-                >
-                  <ArrowIcon />
-                  {s.continueLabel}
-                </button>
-              )}
-            </div>
-          ) : (
+          {/* The answer field used to live here too, duplicating the real
+              composer at the bottom of the screen -- both visible at once,
+              both saying "Answer, or say anything." Removed; typing the
+              opening answer into the one real composer below now submits
+              it the same way (see submitComposer), so there's only ever
+              one place to answer. */}
+          {openingAnswerSubmitted && (
             <>
               {showLastCommitment && lastCommitment && (
                 <button
@@ -4041,7 +4038,7 @@ export default function Home() {
             />
             <button
               className="send-btn"
-              onClick={() => send()}
+              onClick={submitComposer}
               disabled={sending || !draft.trim()}
               aria-label={s.sendAriaLabel}
             >
