@@ -25,6 +25,7 @@ import {
   consumePendingCrossLinks,
   getAvoidancePattern,
   incrementUserCost,
+  claimCostNudge,
   type StoredMessage,
   type Stage,
   type Element,
@@ -45,15 +46,16 @@ const anthropic = new Anthropic({
 });
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
 
-// Real Anthropic API cost, tracked per user to drive the $2/month cap in
-// checkConversationGate (lib/db.ts) -- these are claude-sonnet-5's actual
-// published per-token rates, not an estimate. If ANTHROPIC_MODEL is ever
-// changed to a different tier, these need to change with it -- there's no
-// live pricing lookup here. Cache-write pricing assumes the 1-hour TTL
-// specifically (2x base input): every cache_control in this file uses
-// ttl: "1h", none use the default 5-minute TTL, confirmed by grep before
-// writing this. $/MTok and microdollars/token are numerically identical
-// (both scale by 1e6), so no extra conversion factor is needed below.
+// Real Anthropic API cost, tracked per user to drive the $0.50
+// per-conversation nudge in claimCostNudge (lib/db.ts) -- these are
+// claude-sonnet-5's actual published per-token rates, not an estimate. If
+// ANTHROPIC_MODEL is ever changed to a different tier, these need to
+// change with it -- there's no live pricing lookup here. Cache-write
+// pricing assumes the 1-hour TTL specifically (2x base input): every
+// cache_control in this file uses ttl: "1h", none use the default
+// 5-minute TTL, confirmed by grep before writing this. $/MTok and
+// microdollars/token are numerically identical (both scale by 1e6), so
+// no extra conversion factor is needed below.
 const PRICE_INPUT_PER_MTOK = 2.0;
 const PRICE_OUTPUT_PER_MTOK = 10.0;
 const PRICE_CACHE_WRITE_1H_PER_MTOK = 4.0; // 2x input
@@ -653,6 +655,7 @@ export interface ChatResult {
   familyTheme?: FamilyTheme;
   committed?: boolean;
   win?: { action: string; reflection: string };
+  costNudge?: boolean;
 }
 
 // Awaits the classification and, if it named a real node, writes it --
@@ -763,13 +766,24 @@ export async function runChat(
   let committed = false;
 
   // Tool-use loop: the model may call record_commitment / resolve_open_commitment /
-  // signal_depth one or more times before producing its actual reply to the person.
-  for (let round = 0; round < 4; round++) {
+  // signal_depth / offer_branches one or more times before producing its
+  // actual reply to the person. ROUNDS was 4 -- confirmed in production
+  // traffic to not always be enough: on a turn where the model wants to
+  // fire multiple signal tools before composing its reply (a stage
+  // transition landing in the same reply as a real disclosure, say), the
+  // loop could exhaust every round on tool calls and never reach text,
+  // surfacing a generic "something got tangled" fallback over a real,
+  // substantive answer. Two independent fixes, not just a bigger number:
+  // more headroom, AND a structural guarantee -- the final round never
+  // offers `tools` at all, so the model is physically unable to spend it
+  // on another tool call instead of answering.
+  const ROUNDS = 6;
+  for (let round = 0; round < ROUNDS; round++) {
     const response = await anthropic.messages.create({
       model: MODEL,
       max_tokens: 1024,
       system,
-      tools,
+      tools: round < ROUNDS - 1 ? tools : undefined,
       messages,
       // Automatic caching for the growing message history -- the SDK
       // places the breakpoint on the last cacheable block and moves it
@@ -818,6 +832,7 @@ export async function runChat(
         familyTheme,
         committed,
         win: await winPromise,
+        costNudge: await claimCostNudge(userId),
       };
     }
 
@@ -905,15 +920,19 @@ export async function runChat(
           familyTheme,
           committed,
           win: await winPromise,
+          costNudge: await claimCostNudge(userId),
         };
       }
     }
   }
 
   {
-    // Exhausted all 4 rounds without ever producing a reply -- rare, but
-    // worth knowing about: this is the model genuinely never landing on a
-    // text answer, not a transient network issue.
+    // Should be unreachable now that the final round never offers `tools`
+    // (toolUses.length === 0 is then guaranteed, returning inside the loop
+    // above instead) -- kept only because the loop's own exhaustive-return
+    // shape isn't visible to TypeScript's control-flow analysis, and as a
+    // last-resort guard if ROUNDS or the final-round logic above ever
+    // changes. Reaching this would mean something broke that invariant.
     Sentry.captureMessage("runChat: exhausted all rounds without a reply", {
       level: "warning",
       tags: { route: "runChat" },
@@ -931,6 +950,7 @@ export async function runChat(
       familyTheme,
       committed,
       win: await winPromise,
+      costNudge: await claimCostNudge(userId),
     };
   }
 }

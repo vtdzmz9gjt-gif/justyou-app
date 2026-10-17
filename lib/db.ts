@@ -260,14 +260,25 @@ function ensureSchema(): Promise<void> {
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS conversation_period TEXT`;
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS conversations_this_period INTEGER NOT NULL DEFAULT 0`;
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS last_conversation_date TEXT`;
-      // Real Anthropic API cost gate, alongside the day-count one above --
-      // whichever limit is hit first blocks access. Stored in microdollars
-      // (millionths of a dollar, e.g. $2.00 = 2,000,000) rather than cents,
-      // since a single tagging call can cost a fraction of a cent and
-      // repeated integer-cent rounding would systematically undercount.
-      // Scoped to the same conversation_period column/window as the count
-      // above -- reset together, by checkConversationGate, not here.
+      // Unused as of the per-conversation cost nudge below -- kept rather
+      // than dropped, same non-destructive migration style as the rest of
+      // this schema (see e.g. email vs billing_email). Superseded by
+      // cost_microdollars_today.
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS cost_microdollars_this_period BIGINT NOT NULL DEFAULT 0`;
+      // Real Anthropic API cost for the CURRENT conversation only --
+      // "conversation" here means the same thing the day-count gate above
+      // already means by it (one calendar day's worth of messaging; this
+      // app has no other notion of a conversation boundary at the data
+      // layer). Reset to 0 every time checkConversationGate sees a new
+      // calendar day starting, independent of the monthly 3-conversation
+      // counter. Stored in microdollars (millionths of a dollar, e.g.
+      // $0.50 = 500,000) for the same undercounting reason as above.
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS cost_microdollars_today BIGINT NOT NULL DEFAULT 0`;
+      // Whether the soft cost-nudge (see claimCostNudge) has already
+      // fired for today's conversation -- a dismissible, non-blocking
+      // subscribe prompt that should only ever interrupt once per
+      // conversation, not on every message after the threshold.
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS cost_nudge_shown_today BOOLEAN NOT NULL DEFAULT false`;
       await sql`CREATE INDEX IF NOT EXISTS idx_users_restore_token ON users(restore_token)`;
     })();
     // If schema setup itself fails (not one of the non-fatal steps above,
@@ -391,40 +402,40 @@ export async function consumeRestoreToken(token: string): Promise<{ userId: stri
   return row ? { userId: row.id } : null;
 }
 
-// $2.00, in microdollars -- see cost_microdollars_this_period's comment in
-// ensureSchema for why microdollars rather than cents.
-const MAX_COST_MICRODOLLARS_PER_PERIOD = 2_000_000;
+// $0.50, in microdollars -- see cost_microdollars_today's comment in
+// ensureSchema for why microdollars rather than cents. This is a
+// PER-CONVERSATION soft cap (see claimCostNudge below), entirely separate
+// from the hard 3-conversations/month block that checkConversationGate
+// still enforces on its own, unchanged.
+const MAX_COST_MICRODOLLARS_PER_CONVERSATION = 500_000;
 
 // The free-tier frequency gate -- unlimited for an active subscriber,
-// otherwise blocked by whichever of two limits is hit first per UTC
-// calendar month: 3 separate UTC calendar days of conversation, or
-// $2.00 of real Anthropic API cost (see trackCost in lib/anthropic.ts,
-// called from every billed call across the app, not just this one).
-// Continuing the same day never counts twice (checked before either
-// limit), and both reset together the first time someone talks in a new
-// month. A tiny race between two near-simultaneous requests from the
-// same person could let one extra day or a few cents over -- not worth
-// a transaction for how rarely that could even happen.
+// otherwise a hard block the moment a 4th distinct UTC calendar day of
+// conversation would start this month. This governs ONLY the
+// conversation count; real API cost is tracked per conversation and
+// surfaced as a separate, non-blocking nudge -- see claimCostNudge below,
+// called from the chat route after a reply is produced, never from here.
+// (An earlier version of this function also hard-blocked on a MONTHLY
+// cost total, sharing this same day-boundary check -- that conflated two
+// different things: a per-conversation spend cap has to reset every
+// conversation, not accumulate for the whole month, and a soft nudge
+// isn't a reason to refuse the turn in the first place. Reverted.)
 export async function checkConversationGate(userId: string): Promise<{ allowed: boolean }> {
   // The synthetic health-check user (see HEALTH_CHECK_USER_ID above) hits
   // this same /api/chat path on a 15-minute cron, same as any real
-  // visitor -- nothing above exempted it from either limit. Left
-  // unexempted, it would eventually trip the day-count gate (3 distinct
-  // calendar days) or the cost gate just like a real free-tier user,
-  // and the health check treats a blocked/non-ok response as a failure
-  // -- so either one would start firing false "chat is down" alerts for
-  // a monitoring bot hitting its own simulated spending cap, not an
-  // actual outage. Exempted from the whole gate, not just the cost
-  // check that happened to surface this -- the day-count check has the
-  // identical risk, just on a slower clock.
+  // visitor -- nothing above exempted it from the day-count gate. Left
+  // unexempted, it would eventually trip it (3 distinct calendar days)
+  // just like a real free-tier user, and the health check treats a
+  // blocked response as a failure -- so it would start firing false
+  // "chat is down" alerts for a monitoring bot hitting its own simulated
+  // limit, not an actual outage.
   if (userId === HEALTH_CHECK_USER_ID) {
     return { allowed: true };
   }
 
   await ensureUser(userId);
   const rows = await sql`
-    SELECT subscribed_until, conversation_period, conversations_this_period,
-           last_conversation_date, cost_microdollars_this_period
+    SELECT subscribed_until, conversation_period, conversations_this_period, last_conversation_date
     FROM users WHERE id = ${userId}
   `;
   const row = rows[0] as {
@@ -432,7 +443,6 @@ export async function checkConversationGate(userId: string): Promise<{ allowed: 
     conversation_period: string | null;
     conversations_this_period: number;
     last_conversation_date: string | null;
-    cost_microdollars_this_period: number;
   };
 
   if (row.subscribed_until && new Date(row.subscribed_until) > new Date()) {
@@ -454,24 +464,25 @@ export async function checkConversationGate(userId: string): Promise<{ allowed: 
   }
 
   const month = today.slice(0, 7); // UTC, "YYYY-MM"
-  // A stored period from an earlier month means both counters are stale --
-  // treat them as 0 here, and the UPDATE below actually writes that reset
-  // back (cost_microdollars_this_period included), not just conversation_period.
-  // Otherwise a new month's trackCost() calls would add onto last month's
-  // leftover total instead of starting clean.
+  // A stored period from an earlier month means the count is stale --
+  // treat it as 0 here, and the UPDATE below actually writes that reset
+  // back, not just conversation_period.
   const isNewPeriod = row.conversation_period !== month;
   const countThisMonth = isNewPeriod ? 0 : row.conversations_this_period;
-  const costThisMonth = isNewPeriod ? 0 : row.cost_microdollars_this_period;
-  if (countThisMonth >= 3 || costThisMonth >= MAX_COST_MICRODOLLARS_PER_PERIOD) {
+  if (countThisMonth >= 3) {
     return { allowed: false };
   }
 
+  // A new conversation starting -- reset today's cost counter and nudge
+  // flag here too, in the same write, so the very first message of a
+  // fresh conversation always starts its $0.50 tracking from zero.
   await sql`
     UPDATE users
     SET conversation_period = ${month},
         conversations_this_period = ${countThisMonth + 1},
         last_conversation_date = ${today},
-        cost_microdollars_this_period = ${costThisMonth}
+        cost_microdollars_today = 0,
+        cost_nudge_shown_today = false
     WHERE id = ${userId}
   `;
   return { allowed: true };
@@ -480,14 +491,37 @@ export async function checkConversationGate(userId: string): Promise<{ allowed: 
 // Called after every billed Anthropic API call, anywhere in the app --
 // see trackCost in lib/anthropic.ts, which computes the microdollar
 // amount and calls this. A no-op write of 0 is skipped by the caller,
-// not here, so this stays a plain unconditional increment.
+// not here, so this stays a plain unconditional increment. Tracks the
+// CURRENT conversation's running cost (reset by checkConversationGate at
+// the start of each new one) -- not a monthly total.
 export async function incrementUserCost(userId: string, microdollars: number): Promise<void> {
   await ensureUser(userId);
   await sql`
     UPDATE users
-    SET cost_microdollars_this_period = cost_microdollars_this_period + ${microdollars}
+    SET cost_microdollars_today = cost_microdollars_today + ${microdollars}
     WHERE id = ${userId}
   `;
+}
+
+// A dismissible, non-blocking "you might want to subscribe" prompt --
+// never a reason to refuse a turn, just a nudge surfaced once per
+// conversation the first time its running cost crosses $0.50. Claimed
+// atomically in the UPDATE's WHERE clause (same one-time-claim shape as
+// claimDaatReveal/claimGuidedFamilyOffer elsewhere in this file): only
+// the call that actually flips cost_nudge_shown_today from false to true
+// gets a row back, so a concurrent call from the same turn's retries (if
+// any) can never show it twice.
+export async function claimCostNudge(userId: string): Promise<boolean> {
+  await ensureUser(userId);
+  const rows = await sql`
+    UPDATE users
+    SET cost_nudge_shown_today = true
+    WHERE id = ${userId}
+      AND cost_microdollars_today >= ${MAX_COST_MICRODOLLARS_PER_CONVERSATION}
+      AND cost_nudge_shown_today = false
+    RETURNING id
+  `;
+  return rows.length > 0;
 }
 
 export async function getUser(userId: string) {

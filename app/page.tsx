@@ -2927,6 +2927,12 @@ export default function Home() {
   const [winCelebration, setWinCelebration] = useState<{ action: string; reflection: string } | null>(
     null
   );
+  // Dismissible, non-blocking -- unlike subscriptionLimit (which replaces
+  // the whole composer), this sits alongside it. Cleared on dismiss, on
+  // subscribing, and whenever a fresh conversation starts (startFresh /
+  // the returning-user open), so it never carries over from a previous
+  // conversation's nudge.
+  const [costNudge, setCostNudge] = useState(false);
   const [weeklyRecap, setWeeklyRecap] = useState<{
     wins: { action: string }[];
     summary: string | null;
@@ -3298,6 +3304,7 @@ export default function Home() {
       if (Array.isArray(data.branches) && data.branches.length > 0) setBranches(data.branches);
       if (data.elementTally) setElementTally(data.elementTally);
       if (data.win) setWinCelebration(data.win);
+      if (data.costNudge) setCostNudge(true);
     } catch (err) {
       // Whatever actually went wrong (timeout, network drop, a 5xx from
       // the route) -- the person just said something real and should
@@ -3363,6 +3370,7 @@ export default function Home() {
     setAvatarReveal(null);
     setPendingAvatarReveal(null);
     setWinCelebration(null);
+    setCostNudge(false);
     setShowSettings(false);
     const questions = (STRINGS[lang] || STRINGS.en).questions;
     setOpeningQuestion(questions[Math.floor(Math.random() * questions.length)]);
@@ -3984,6 +3992,28 @@ export default function Home() {
         </div>
       ) : (
         <div className="composer">
+          {/* English-only for now, same call made for Aliveness Compass and
+              the Guided Family Session button -- new enough that translating
+              all 22 languages up front isn't worth blocking on. */}
+          {costNudge && (
+            <div className="cost-nudge-card">
+              <p>Enjoying this? Subscribe for unlimited conversations.</p>
+              <div className="cost-nudge-actions">
+                <button type="button" className="key-action" onClick={startCheckout} disabled={checkoutLoading}>
+                  <UnlockIcon />
+                  {SUBSCRIPTION_FALLBACK.subscribeLabel}
+                </button>
+                <button
+                  type="button"
+                  className="cost-nudge-dismiss"
+                  onClick={() => setCostNudge(false)}
+                  aria-label="Dismiss"
+                >
+                  ×
+                </button>
+              </div>
+            </div>
+          )}
           {hasSentRealMessage && (
             <div className="composer-affordances">
               <button
