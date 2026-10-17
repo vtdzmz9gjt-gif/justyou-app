@@ -777,47 +777,68 @@ export async function runChat(
   // more headroom, AND a structural guarantee -- the final round never
   // offers `tools` at all, so the model is physically unable to spend it
   // on another tool call instead of answering.
+  // A response with neither a tool call nor any text is rare but real --
+  // not the round-exhaustion case above (which this loop's own structure
+  // now prevents), but Claude occasionally landing a genuinely empty
+  // response on a single round, independent of round count. Confirmed in
+  // production: fired mid-conversation, after an ordinary short message,
+  // with five rounds of budget still unused -- a transient blip, not a
+  // deterministic failure, so it's worth one immediate retry on the same
+  // round before ever falling back to the generic reply. Capped at 2
+  // extra attempts (3 total) so a genuinely stuck case still terminates
+  // quickly rather than tripling the turn's latency on every failure.
+  const MAX_EMPTY_RETRIES = 2;
   const ROUNDS = 6;
   for (let round = 0; round < ROUNDS; round++) {
-    const response = await anthropic.messages.create({
-      model: MODEL,
-      max_tokens: 1024,
-      system,
-      tools: round < ROUNDS - 1 ? tools : undefined,
-      messages,
-      // Automatic caching for the growing message history -- the SDK
-      // places the breakpoint on the last cacheable block and moves it
-      // forward as the conversation grows, so prior turns become cache
-      // reads instead of full-price resends. Same 1h TTL as the system
-      // breakpoint above -- a longer-TTL entry must appear before any
-      // shorter one, and this app's per-user reply gaps can easily
-      // exceed 5 minutes.
-      cache_control: { type: "ephemeral", ttl: "1h" },
-    });
-    console.log(
-      `[cache] round=${round} input=${response.usage.input_tokens} cache_write=${response.usage.cache_creation_input_tokens ?? 0} cache_read=${response.usage.cache_read_input_tokens ?? 0}`
-    );
-    await trackCost(userId, response.usage);
+    let response!: Anthropic.Message;
+    let toolUses: Anthropic.ToolUseBlock[] = [];
+    let textBlocks: Anthropic.TextBlock[] = [];
+    for (let attempt = 0; attempt <= MAX_EMPTY_RETRIES; attempt++) {
+      response = await anthropic.messages.create({
+        model: MODEL,
+        max_tokens: 1024,
+        system,
+        tools: round < ROUNDS - 1 ? tools : undefined,
+        messages,
+        // Automatic caching for the growing message history -- the SDK
+        // places the breakpoint on the last cacheable block and moves it
+        // forward as the conversation grows, so prior turns become cache
+        // reads instead of full-price resends. Same 1h TTL as the system
+        // breakpoint above -- a longer-TTL entry must appear before any
+        // shorter one, and this app's per-user reply gaps can easily
+        // exceed 5 minutes.
+        cache_control: { type: "ephemeral", ttl: "1h" },
+      });
+      console.log(
+        `[cache] round=${round} attempt=${attempt} input=${response.usage.input_tokens} cache_write=${response.usage.cache_creation_input_tokens ?? 0} cache_read=${response.usage.cache_read_input_tokens ?? 0}`
+      );
+      await trackCost(userId, response.usage);
 
-    const toolUses = response.content.filter(
-      (b): b is Anthropic.ToolUseBlock => b.type === "tool_use"
-    );
-    const textBlocks = response.content.filter(
-      (b): b is Anthropic.TextBlock => b.type === "text"
-    );
+      toolUses = response.content.filter(
+        (b): b is Anthropic.ToolUseBlock => b.type === "tool_use"
+      );
+      textBlocks = response.content.filter(
+        (b): b is Anthropic.TextBlock => b.type === "text"
+      );
+
+      const hasRealContent = toolUses.length > 0 || textBlocks.some((b) => b.text.trim());
+      if (hasRealContent || attempt === MAX_EMPTY_RETRIES) break;
+      console.error(
+        `runChat: empty response, retrying -- userId=${userId} round=${round} attempt=${attempt} stopReason=${response.stop_reason}`
+      );
+    }
 
     if (toolUses.length === 0) {
-      // No tool calls and no text is a real, if rare, possibility (e.g. a
-      // response that lands with only non-text content) -- fall back here
-      // too, same as the trailing-text path below, rather than ever
-      // returning an empty reply. An empty string is indistinguishable
-      // from no answer at all once it reaches the transcript.
+      // Still nothing after every retry -- fall back here too, same as
+      // the trailing-text path below, rather than ever returning an
+      // empty reply. An empty string is indistinguishable from no
+      // answer at all once it reaches the transcript.
       const text = textBlocks.map((b) => b.text).join("\n").trim();
       if (!text) {
-        Sentry.captureMessage("runChat: response had no tool calls and no text", {
+        Sentry.captureMessage("runChat: response had no tool calls and no text after retries", {
           level: "warning",
           tags: { route: "runChat" },
-          extra: { userId, round, stopReason: response.stop_reason },
+          extra: { userId, round, retries: MAX_EMPTY_RETRIES, stopReason: response.stop_reason },
         });
       }
       const sephirah = await sephirahPromise;
