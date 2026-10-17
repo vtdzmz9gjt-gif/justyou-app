@@ -46,15 +46,16 @@ const anthropic = new Anthropic({
 });
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
 
-// Real Anthropic API cost, tracked per user to drive the $0.50/month cap in
-// checkConversationGate (lib/db.ts) -- these are claude-sonnet-5's actual
-// published per-token rates, not an estimate. If ANTHROPIC_MODEL is ever
-// changed to a different tier, these need to change with it -- there's no
-// live pricing lookup here. Cache-write pricing assumes the 1-hour TTL
-// specifically (2x base input): every cache_control in this file uses
-// ttl: "1h", none use the default 5-minute TTL, confirmed by grep before
-// writing this. $/MTok and microdollars/token are numerically identical
-// (both scale by 1e6), so no extra conversion factor is needed below.
+// Real Anthropic API cost, tracked per user to drive the $0.50
+// per-conversation nudge in claimCostNudge (lib/db.ts) -- these are
+// claude-sonnet-5's actual published per-token rates, not an estimate. If
+// ANTHROPIC_MODEL is ever changed to a different tier, these need to
+// change with it -- there's no live pricing lookup here. Cache-write
+// pricing assumes the 1-hour TTL specifically (2x base input): every
+// cache_control in this file uses ttl: "1h", none use the default
+// 5-minute TTL, confirmed by grep before writing this. $/MTok and
+// microdollars/token are numerically identical (both scale by 1e6), so
+// no extra conversion factor is needed below.
 const PRICE_INPUT_PER_MTOK = 2.0;
 const PRICE_OUTPUT_PER_MTOK = 10.0;
 const PRICE_CACHE_WRITE_1H_PER_MTOK = 4.0; // 2x input
