@@ -3023,6 +3023,39 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
+    // A tab someone opened days or weeks ago (installed-PWA icon tap,
+    // bookmark, a browser tab they never closed) keeps running whatever
+    // JS was loaded that day -- a new deploy doesn't reach it on its own.
+    // Checked only on regaining focus/visibility, never on an interval,
+    // so this can't interrupt someone mid-conversation; the reload lands
+    // at the one moment they weren't actively looking at the screen
+    // anyway. Touches no account data -- purely "pick up the latest code."
+    function checkForNewBuild() {
+      if (document.visibilityState !== "visible") return;
+      const current = document
+        .querySelector('meta[name="build-sha"]')
+        ?.getAttribute("content");
+      if (!current || current === "dev") return; // local dev -- nothing to compare against
+      fetch("/api/version", { cache: "no-store" })
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.sha && data.sha !== current) {
+            window.location.reload();
+          }
+        })
+        .catch(() => {
+          /* quiet failure -- next focus tries again */
+        });
+    }
+    document.addEventListener("visibilitychange", checkForNewBuild);
+    window.addEventListener("focus", checkForNewBuild);
+    return () => {
+      document.removeEventListener("visibilitychange", checkForNewBuild);
+      window.removeEventListener("focus", checkForNewBuild);
+    };
+  }, []);
+
+  useEffect(() => {
     // A ?lang= link (for sharing with someone specific, or testing) wins
     // over every other signal, including a previously saved preference.
     const urlLang = new URLSearchParams(window.location.search).get("lang");

@@ -60,6 +60,12 @@ export default function RootLayout({
             full-screen (no browser chrome) when launched from the home
             screen. */}
         <meta name="apple-mobile-web-app-capable" content="yes" />
+        {/* Vercel sets this automatically at build time, per deploy -- no
+            extra config needed. Compared client-side (see page.tsx) against
+            /api/version's live value to detect a stale, already-open tab
+            running an old build, and reload it. Never touches any account
+            data -- purely a "pick up the latest code" check. */}
+        <meta name="build-sha" content={process.env.VERCEL_GIT_COMMIT_SHA || "dev"} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link
