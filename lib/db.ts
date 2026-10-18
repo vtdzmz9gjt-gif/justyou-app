@@ -598,6 +598,14 @@ export async function incrementUserCost(userId: string, microdollars: number): P
 // the call that actually flips cost_nudge_shown_today from false to true
 // gets a row back, so a concurrent call from the same turn's retries (if
 // any) can never show it twice.
+//
+// Bug fixed here: this never checked subscription status, so an active
+// subscriber's own cost (still tracked -- incrementUserCost runs
+// unconditionally for every call, subscriber or not) would cross $0.50
+// in any real conversation and surface a prompt to subscribe to someone
+// who already has. checkConversationGate's own subscribed bypass never
+// covered this function -- they're separate checks on separate things,
+// and this one was simply missing its own copy of the same bypass.
 export async function claimCostNudge(userId: string): Promise<boolean> {
   await ensureUser(userId);
   const rows = await sql`
@@ -606,6 +614,7 @@ export async function claimCostNudge(userId: string): Promise<boolean> {
     WHERE id = ${userId}
       AND cost_microdollars_today >= ${MAX_COST_MICRODOLLARS_PER_CONVERSATION}
       AND cost_nudge_shown_today = false
+      AND (subscribed_until IS NULL OR subscribed_until <= now())
     RETURNING id
   `;
   return rows.length > 0;
