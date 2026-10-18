@@ -11,6 +11,7 @@ import {
   getUser,
   type Element,
   type ConversationGateReason,
+  FIRST_CONVERSATION_REPLY_CAP,
 } from "@/lib/db";
 import { runChat } from "@/lib/anthropic";
 
@@ -33,7 +34,7 @@ const TIMEOUT_SENTINEL = Symbol("chat-route-internal-timeout");
 // actually means and when it fires.
 function blockedMessage(reason: ConversationGateReason | undefined, hoursRemaining?: number): string {
   if (reason === "first_conversation_reply_cap") {
-    return "You've used your 3 free replies for your first conversation. Subscribe for unlimited, or come back in 24 hours to continue.";
+    return `You've used your ${FIRST_CONVERSATION_REPLY_CAP} free replies for your first conversation. Subscribe for unlimited, or come back in 24 hours to continue.`;
   }
   if (reason === "first_conversation_wait") {
     const hours = hoursRemaining ?? 24;

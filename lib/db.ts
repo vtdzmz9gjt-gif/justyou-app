@@ -282,7 +282,8 @@ function ensureSchema(): Promise<void> {
       // Set once, the moment a brand-new user's very first conversation
       // actually starts -- never touched again afterward (checkConversationGate
       // only ever sets it via COALESCE). Drives the stricter first-time
-      // onboarding throttle: 3 replies max on that first calendar day, and
+      // onboarding throttle: FIRST_CONVERSATION_REPLY_CAP replies max on
+      // that first calendar day, and
       // a real 24-hour wait (not just a new calendar day) before a second
       // conversation can start. Permanently inert for everyone once that
       // first 24-hour gap has passed -- normal rules take over for good.
@@ -434,6 +435,9 @@ export async function consumeRestoreToken(token: string): Promise<{ userId: stri
 // still enforces on its own, unchanged.
 const MAX_COST_MICRODOLLARS_PER_CONVERSATION = 500_000;
 
+// See checkConversationGate's first-conversation throttle below.
+export const FIRST_CONVERSATION_REPLY_CAP = 7;
+
 export type ConversationGateReason =
   | "monthly_limit"
   | "first_conversation_reply_cap"
@@ -453,8 +457,9 @@ export type ConversationGateReason =
 //
 // Layered on top, a stricter one-time throttle for a brand-new visitor
 // specifically: their first-ever conversation (first calendar day) is
-// capped at 3 real assistant replies rather than unlimited like every
-// later conversation, and their second-ever conversation can't start
+// capped at FIRST_CONVERSATION_REPLY_CAP real assistant replies rather than
+// unlimited like every later conversation, and their second-ever
+// conversation can't start
 // until a full 24 hours after the first one began -- not just a new
 // calendar day. Both exist to stop someone from burning through the
 // entire monthly allotment in one sitting, or again a few minutes after
@@ -522,7 +527,7 @@ export async function checkConversationGate(
         WHERE user_id = ${userId} AND role = 'assistant' AND created_at::date = CURRENT_DATE
       `;
       const repliesToday = (replyRows[0] as { count: number }).count;
-      if (repliesToday >= 3) {
+      if (repliesToday >= FIRST_CONVERSATION_REPLY_CAP) {
         return { allowed: false, reason: "first_conversation_reply_cap" };
       }
     } else {
