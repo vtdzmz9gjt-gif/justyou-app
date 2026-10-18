@@ -10,6 +10,7 @@ import {
   getElementTally,
   getUser,
   type Element,
+  type ConversationGateReason,
 } from "@/lib/db";
 import { runChat } from "@/lib/anthropic";
 
@@ -26,6 +27,20 @@ export const maxDuration = 60;
 // worst case). 45s leaves real margin before the 60s wall.
 const INTERNAL_TIMEOUT_MS = 45_000;
 const TIMEOUT_SENTINEL = Symbol("chat-route-internal-timeout");
+
+// English-only for now, same call made elsewhere in this app for new UI
+// text -- see checkConversationGate in lib/db.ts for what each reason
+// actually means and when it fires.
+function blockedMessage(reason: ConversationGateReason | undefined, hoursRemaining?: number): string {
+  if (reason === "first_conversation_reply_cap") {
+    return "You've used your 3 free replies for your first conversation. Subscribe for unlimited, or come back in 24 hours to continue.";
+  }
+  if (reason === "first_conversation_wait") {
+    const hours = hoursRemaining ?? 24;
+    return `Come back in about ${hours} hour${hours === 1 ? "" : "s"} for your next conversation — or subscribe now for unlimited access.`;
+  }
+  return "You've used your 3 free conversations this month. Subscribe for unlimited, or come back next month.";
+}
 
 export async function POST(req: NextRequest) {
   let body: {
@@ -64,8 +79,7 @@ export async function POST(req: NextRequest) {
   if (!gate.allowed) {
     return NextResponse.json({
       blocked: true,
-      message:
-        "You've used your 3 free conversations this month. Subscribe for unlimited, or come back next month.",
+      message: blockedMessage(gate.reason, gate.hoursRemaining),
     });
   }
 

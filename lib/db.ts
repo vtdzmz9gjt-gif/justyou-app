@@ -279,6 +279,31 @@ function ensureSchema(): Promise<void> {
       // subscribe prompt that should only ever interrupt once per
       // conversation, not on every message after the threshold.
       await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS cost_nudge_shown_today BOOLEAN NOT NULL DEFAULT false`;
+      // Set once, the moment a brand-new user's very first conversation
+      // actually starts -- never touched again afterward (checkConversationGate
+      // only ever sets it via COALESCE). Drives the stricter first-time
+      // onboarding throttle: 3 replies max on that first calendar day, and
+      // a real 24-hour wait (not just a new calendar day) before a second
+      // conversation can start. Permanently inert for everyone once that
+      // first 24-hour gap has passed -- normal rules take over for good.
+      await sql`ALTER TABLE users ADD COLUMN IF NOT EXISTS first_conversation_started_at TIMESTAMPTZ`;
+      // Backfill for everyone who already has at least one real
+      // conversation on record (conversation_period only ever gets set
+      // by checkConversationGate's own new-conversation branch) -- without
+      // this, every existing user's column starts NULL, which reads
+      // exactly like "this is their first conversation ever" and would
+      // retroactively re-apply the brand-new stricter throttle to
+      // longtime users the moment this ships. created_at is always safely
+      // more than 24h in the past for any real existing user, so this
+      // makes the new gate permanently inert for them, same as it already
+      // is for anyone who cleared their real first 24-hour wait. The
+      // `first_conversation_started_at IS NULL` guard makes this a
+      // one-time backfill, safe to run on every cold start.
+      await sql`
+        UPDATE users
+        SET first_conversation_started_at = created_at
+        WHERE first_conversation_started_at IS NULL AND conversation_period IS NOT NULL
+      `;
       await sql`CREATE INDEX IF NOT EXISTS idx_users_restore_token ON users(restore_token)`;
     })();
     // If schema setup itself fails (not one of the non-fatal steps above,
@@ -409,6 +434,11 @@ export async function consumeRestoreToken(token: string): Promise<{ userId: stri
 // still enforces on its own, unchanged.
 const MAX_COST_MICRODOLLARS_PER_CONVERSATION = 500_000;
 
+export type ConversationGateReason =
+  | "monthly_limit"
+  | "first_conversation_reply_cap"
+  | "first_conversation_wait";
+
 // The free-tier frequency gate -- unlimited for an active subscriber,
 // otherwise a hard block the moment a 4th distinct UTC calendar day of
 // conversation would start this month. This governs ONLY the
@@ -420,7 +450,24 @@ const MAX_COST_MICRODOLLARS_PER_CONVERSATION = 500_000;
 // different things: a per-conversation spend cap has to reset every
 // conversation, not accumulate for the whole month, and a soft nudge
 // isn't a reason to refuse the turn in the first place. Reverted.)
-export async function checkConversationGate(userId: string): Promise<{ allowed: boolean }> {
+//
+// Layered on top, a stricter one-time throttle for a brand-new visitor
+// specifically: their first-ever conversation (first calendar day) is
+// capped at 3 real assistant replies rather than unlimited like every
+// later conversation, and their second-ever conversation can't start
+// until a full 24 hours after the first one began -- not just a new
+// calendar day. Both exist to stop someone from burning through the
+// entire monthly allotment in one sitting, or again a few minutes after
+// midnight. Checked before the existing same-day shortcut below, for the
+// same reason the $0.50 cost check had to move earlier than it used to:
+// a once-per-day shortcut can't be the only thing standing between a
+// person and an unlimited first conversation. Permanently inert for
+// everyone once that first 24-hour gap has passed -- both branches below
+// become unreachable from then on, forever, and every later conversation
+// follows only the plain monthly rule above.
+export async function checkConversationGate(
+  userId: string
+): Promise<{ allowed: boolean; reason?: ConversationGateReason; hoursRemaining?: number }> {
   // The synthetic health-check user (see HEALTH_CHECK_USER_ID above) hits
   // this same /api/chat path on a 15-minute cron, same as any real
   // visitor -- nothing above exempted it from the day-count gate. Left
@@ -435,7 +482,8 @@ export async function checkConversationGate(userId: string): Promise<{ allowed: 
 
   await ensureUser(userId);
   const rows = await sql`
-    SELECT subscribed_until, conversation_period, conversations_this_period, last_conversation_date
+    SELECT subscribed_until, conversation_period, conversations_this_period,
+           last_conversation_date, first_conversation_started_at
     FROM users WHERE id = ${userId}
   `;
   const row = rows[0] as {
@@ -443,23 +491,53 @@ export async function checkConversationGate(userId: string): Promise<{ allowed: 
     conversation_period: string | null;
     conversations_this_period: number;
     last_conversation_date: string | null;
+    first_conversation_started_at: string | null;
   };
 
   if (row.subscribed_until && new Date(row.subscribed_until) > new Date()) {
     return { allowed: true };
   }
 
-  const today = new Date().toISOString().slice(0, 10); // UTC, "YYYY-MM-DD"
-  if (row.last_conversation_date === today) {
-    return { allowed: true };
-  }
-
   // A pending open commitment is a narrow, self-bounding exception: only
   // one is ever tracked at a time, and it clears the moment the
   // follow-up actually happens -- so this can't become an indefinite
-  // way around the limit, only protection for the one visit that's
-  // actually closing something out.
+  // way around any limit below, only protection for the one visit
+  // that's actually closing something out. A brand-new user can't
+  // actually have one yet (nothing's been committed to on a first
+  // conversation that hasn't happened), so this never interacts with
+  // the first-conversation throttle below in practice -- just the
+  // existing monthly one.
   if (await getOpenCommitment(userId)) {
+    return { allowed: true };
+  }
+
+  const today = new Date().toISOString().slice(0, 10); // UTC, "YYYY-MM-DD"
+
+  if (row.first_conversation_started_at) {
+    const firstStart = new Date(row.first_conversation_started_at);
+    const firstStartDay = firstStart.toISOString().slice(0, 10);
+    if (firstStartDay === today) {
+      const replyRows = await sql`
+        SELECT COUNT(*)::int AS count FROM messages
+        WHERE user_id = ${userId} AND role = 'assistant' AND created_at::date = CURRENT_DATE
+      `;
+      const repliesToday = (replyRows[0] as { count: number }).count;
+      if (repliesToday >= 3) {
+        return { allowed: false, reason: "first_conversation_reply_cap" };
+      }
+    } else {
+      const hoursSinceFirst = (Date.now() - firstStart.getTime()) / 36e5;
+      if (hoursSinceFirst < 24) {
+        return {
+          allowed: false,
+          reason: "first_conversation_wait",
+          hoursRemaining: Math.max(1, Math.ceil(24 - hoursSinceFirst)),
+        };
+      }
+    }
+  }
+
+  if (row.last_conversation_date === today) {
     return { allowed: true };
   }
 
@@ -470,19 +548,23 @@ export async function checkConversationGate(userId: string): Promise<{ allowed: 
   const isNewPeriod = row.conversation_period !== month;
   const countThisMonth = isNewPeriod ? 0 : row.conversations_this_period;
   if (countThisMonth >= 3) {
-    return { allowed: false };
+    return { allowed: false, reason: "monthly_limit" };
   }
 
   // A new conversation starting -- reset today's cost counter and nudge
   // flag here too, in the same write, so the very first message of a
   // fresh conversation always starts its $0.50 tracking from zero.
+  // first_conversation_started_at is set via COALESCE -- only the very
+  // first time this ever runs for a given user does it actually write
+  // anything there; every later conversation leaves it untouched.
   await sql`
     UPDATE users
     SET conversation_period = ${month},
         conversations_this_period = ${countThisMonth + 1},
         last_conversation_date = ${today},
         cost_microdollars_today = 0,
-        cost_nudge_shown_today = false
+        cost_nudge_shown_today = false,
+        first_conversation_started_at = COALESCE(first_conversation_started_at, now())
     WHERE id = ${userId}
   `;
   return { allowed: true };
