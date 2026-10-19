@@ -435,8 +435,12 @@ export async function consumeRestoreToken(token: string): Promise<{ userId: stri
 // still enforces on its own, unchanged.
 const MAX_COST_MICRODOLLARS_PER_CONVERSATION = 500_000;
 
-// See checkConversationGate's first-conversation throttle below.
-export const FIRST_CONVERSATION_REPLY_CAP = 7;
+// See checkConversationGate's first-conversation throttle below. Mood and
+// depth picking (the opening flow before the first real message) never
+// hit the API at all -- client-side only, zero cost -- so this counts
+// only real assistant replies: 4 real exchanges for a brand-new visitor's
+// first conversation before the reply cap kicks in.
+export const FIRST_CONVERSATION_REPLY_CAP = 4;
 
 export type ConversationGateReason =
   | "monthly_limit"
