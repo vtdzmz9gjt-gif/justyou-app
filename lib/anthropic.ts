@@ -46,6 +46,56 @@ const anthropic = new Anthropic({
 });
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
 
+// Whether an error is a transient one worth retrying rather than failing
+// the turn outright -- overloaded (529, surfaces as InternalServerError
+// since APIError.generate buckets any status >=500 there), rate-limited
+// (429), a connection drop, or a timeout (APIConnectionTimeoutError, a
+// subclass of APIConnectionError). Never retries a 4xx like bad auth or a
+// malformed request -- those won't succeed on a second try and retrying
+// them would just add latency to a doomed call.
+function isRetryableAnthropicError(err: unknown): boolean {
+  return (
+    err instanceof Anthropic.RateLimitError ||
+    err instanceof Anthropic.InternalServerError ||
+    err instanceof Anthropic.APIConnectionError
+  );
+}
+
+// Short, fixed backoff -- a transient overloaded/timeout error usually
+// clears within a second or two, and this has to stay small enough that
+// it can't by itself blow the chat route's internal timeout budget across
+// a multi-round turn (see runChat's ROUNDS loop). The SDK's own
+// maxRetries:1 above already retries once before this ever sees the
+// error; this adds up to 2 more explicit attempts with their own delay,
+// so a single hiccup during a real overloaded-API incident gets a real
+// chance to clear instead of ending the conversation on the first miss.
+const TRANSIENT_RETRY_DELAYS_MS = [500, 1500];
+
+async function createChatMessage(
+  params: Anthropic.MessageCreateParamsNonStreaming,
+  userId: string
+): Promise<Anthropic.Message> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await anthropic.messages.create(params);
+    } catch (err) {
+      if (attempt >= TRANSIENT_RETRY_DELAYS_MS.length || !isRetryableAnthropicError(err)) {
+        throw err;
+      }
+      const message = err instanceof Error ? err.message : String(err);
+      console.error(
+        `runChat: transient Anthropic API error, retrying -- userId=${userId} attempt=${attempt} err=${message}`
+      );
+      Sentry.captureMessage("runChat: retrying transient Anthropic API error", {
+        level: "warning",
+        tags: { route: "runChat" },
+        extra: { userId, attempt, error: message },
+      });
+      await new Promise((resolve) => setTimeout(resolve, TRANSIENT_RETRY_DELAYS_MS[attempt]));
+    }
+  }
+}
+
 // Real Anthropic API cost, tracked per user to drive the $0.50
 // per-conversation nudge in claimCostNudge (lib/db.ts) -- these are
 // claude-sonnet-5's actual published per-token rates, not an estimate. If
@@ -794,21 +844,24 @@ export async function runChat(
     let toolUses: Anthropic.ToolUseBlock[] = [];
     let textBlocks: Anthropic.TextBlock[] = [];
     for (let attempt = 0; attempt <= MAX_EMPTY_RETRIES; attempt++) {
-      response = await anthropic.messages.create({
-        model: MODEL,
-        max_tokens: 1024,
-        system,
-        tools: round < ROUNDS - 1 ? tools : undefined,
-        messages,
-        // Automatic caching for the growing message history -- the SDK
-        // places the breakpoint on the last cacheable block and moves it
-        // forward as the conversation grows, so prior turns become cache
-        // reads instead of full-price resends. Same 1h TTL as the system
-        // breakpoint above -- a longer-TTL entry must appear before any
-        // shorter one, and this app's per-user reply gaps can easily
-        // exceed 5 minutes.
-        cache_control: { type: "ephemeral", ttl: "1h" },
-      });
+      response = await createChatMessage(
+        {
+          model: MODEL,
+          max_tokens: 1024,
+          system,
+          tools: round < ROUNDS - 1 ? tools : undefined,
+          messages,
+          // Automatic caching for the growing message history -- the SDK
+          // places the breakpoint on the last cacheable block and moves it
+          // forward as the conversation grows, so prior turns become cache
+          // reads instead of full-price resends. Same 1h TTL as the system
+          // breakpoint above -- a longer-TTL entry must appear before any
+          // shorter one, and this app's per-user reply gaps can easily
+          // exceed 5 minutes.
+          cache_control: { type: "ephemeral", ttl: "1h" },
+        },
+        userId
+      );
       console.log(
         `[cache] round=${round} attempt=${attempt} input=${response.usage.input_tokens} cache_write=${response.usage.cache_creation_input_tokens ?? 0} cache_read=${response.usage.cache_read_input_tokens ?? 0}`
       );
