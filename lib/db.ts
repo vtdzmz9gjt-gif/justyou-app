@@ -12,7 +12,26 @@ import {
 } from "@/lib/tree";
 import { THEME_ORDER, type FamilyTheme, type FamilyLine, type FamilyState } from "@/lib/family";
 
-const sql = neon(process.env.DATABASE_URL!);
+// Runs at module load -- the moment any route imports this file, before
+// any request handler's own try/catch ever gets a chance to run -- so an
+// unset DATABASE_URL here crashes every DB-backed route in the app with
+// whatever error neon() itself throws. Checked explicitly so that error
+// is immediately legible (which env var, which environment) instead of
+// the driver's generic "no connection string provided" with a stack
+// trace pointing into node_modules. Prime suspect for a crash like this:
+// DATABASE_URL set for Production but not for Preview in Vercel's env
+// var config -- an easy miss with integrations that default to
+// Production-only unless Preview is checked explicitly.
+if (!process.env.DATABASE_URL) {
+  throw new Error(
+    "DATABASE_URL is not set for this environment (" +
+      `VERCEL_ENV=${process.env.VERCEL_ENV ?? "unknown"}` +
+      "). Check Vercel → Project Settings → Environment Variables — " +
+      "a var added via an integration can default to Production only, " +
+      "leaving Preview (and Development) without it."
+  );
+}
+const sql = neon(process.env.DATABASE_URL);
 
 // Fixed id for the automated health-check turn (see
 // app/api/cron/health-check/route.ts) -- a plain readable string, never a
