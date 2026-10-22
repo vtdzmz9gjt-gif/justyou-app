@@ -2873,12 +2873,22 @@ function getOnboardingScreens(lang: string): { html: JSX.Element }[] {
 }
 
 function getUserId(): string {
-  let id = localStorage.getItem(USER_ID_KEY);
-  if (!id) {
-    id = crypto.randomUUID();
-    localStorage.setItem(USER_ID_KEY, id);
+  try {
+    let id = localStorage.getItem(USER_ID_KEY);
+    if (!id) {
+      id = crypto.randomUUID();
+      localStorage.setItem(USER_ID_KEY, id);
+    }
+    return id;
+  } catch {
+    // Storage blocked or throwing (private browsing, cookies disabled, a
+    // locked-down in-app browser) -- without this, init() (page.tsx) throws
+    // here uncaught, userId state never gets set, and every send() call
+    // silently no-ops forever on its `if (!userId) return` guard: no
+    // message appears, no error, nothing. A session-only id keeps the app
+    // usable; it just won't persist across a reload.
+    return crypto.randomUUID();
   }
-  return id;
 }
 
 // The most recent Sunday 7pm in the visitor's own local time that has
