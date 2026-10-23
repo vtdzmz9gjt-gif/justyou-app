@@ -299,6 +299,14 @@ const CHECKIN_FALLBACK = {
     "When's usually a good time for you? I'll check in warmly around then — never a hard rule, just less random than a stranger's guess.",
 };
 
+// English-only for now, same staged-translation approach as
+// REPLY_FAILED_FALLBACK below -- shared by saveEmail and saveCheckIn,
+// the two Settings forms that previously failed with zero feedback: the
+// button just sat there, no error, no success, nothing.
+const SAVE_ERROR_FALLBACK = {
+  saveErrorLabel: "The connection slipped. Try once more.",
+};
+
 // English-only for now, unlike the rest of this file's fully translated
 // strings -- subscriptions are new enough that translating all 22
 // languages up front isn't worth blocking this on.
@@ -2140,7 +2148,17 @@ function getVisitorCountry(): string | null {
 }
 
 function detectLang(): string {
-  const stored = localStorage.getItem(LANG_KEY);
+  // Unguarded, this throws straight out of the mount effect below (before
+  // init() -- and the already-hardened getUserId() inside it -- ever
+  // runs) whenever storage is blocked or throwing, leaving userId null
+  // forever and every send() a silent no-op. Same failure class as
+  // getUserId(), same fix.
+  let stored: string | null = null;
+  try {
+    stored = localStorage.getItem(LANG_KEY);
+  } catch {
+    /* storage blocked -- fall through to browser-language detection */
+  }
   if (stored && SUPPORTED_LANGS.includes(stored)) return stored;
   const candidates = navigator.languages?.length ? navigator.languages : [navigator.language || "en"];
   for (const c of candidates) {
@@ -2918,8 +2936,10 @@ export default function Home() {
   const [showSettings, setShowSettings] = useState(false);
   const [email, setEmail] = useState("");
   const [emailSaved, setEmailSaved] = useState(false);
+  const [emailSaveError, setEmailSaveError] = useState(false);
   const [checkInTime, setCheckInTime] = useState("");
   const [checkInSaved, setCheckInSaved] = useState(false);
+  const [checkInSaveError, setCheckInSaveError] = useState(false);
   const [subscribed, setSubscribed] = useState(false);
   const [subscriptionLimit, setSubscriptionLimit] = useState<string | null>(null);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
@@ -3072,12 +3092,23 @@ export default function Home() {
     const detected =
       urlLang && SUPPORTED_LANGS.includes(urlLang) ? urlLang : detectLang();
     setLang(detected);
-    localStorage.setItem(LANG_KEY, detected);
+    try {
+      localStorage.setItem(LANG_KEY, detected);
+    } catch {
+      /* storage blocked -- the choice just won't persist across a reload */
+    }
 
     const questions = (STRINGS[detected] || STRINGS.en).questions;
     setOpeningQuestion(questions[Math.floor(Math.random() * questions.length)]);
 
-    if (!localStorage.getItem(ONBOARDED_KEY)) {
+    let onboarded = false;
+    try {
+      onboarded = !!localStorage.getItem(ONBOARDED_KEY);
+    } catch {
+      /* storage blocked -- default to not onboarded rather than let this
+         throw and stop init() below from ever running */
+    }
+    if (!onboarded) {
       setShowOnboarding(true);
     }
 
@@ -3247,13 +3278,24 @@ export default function Home() {
 
   function changeLang(newLang: string) {
     setLang(newLang);
-    localStorage.setItem(LANG_KEY, newLang);
+    try {
+      localStorage.setItem(LANG_KEY, newLang);
+    } catch {
+      /* storage blocked -- the choice just won't persist across a reload */
+    }
     const questions = (STRINGS[newLang] || STRINGS.en).questions;
     setOpeningQuestion(questions[Math.floor(Math.random() * questions.length)]);
   }
 
   function finishOnboarding() {
-    localStorage.setItem(ONBOARDED_KEY, "1");
+    // setShowOnboarding(false) must always run, even if storage throws --
+    // otherwise the one close affordance on this screen does nothing and
+    // the modal is stuck up for good.
+    try {
+      localStorage.setItem(ONBOARDED_KEY, "1");
+    } catch {
+      /* storage blocked -- onboarding just reappears next visit */
+    }
     setShowOnboarding(false);
   }
 
@@ -3450,21 +3492,29 @@ export default function Home() {
   async function saveEmail(e: FormEvent) {
     e.preventDefault();
     if (!userId || !email.trim()) return;
+    setEmailSaveError(false);
     try {
       const res = await fetch("/api/user", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, email: email.trim() }),
       });
-      if (res.ok) setEmailSaved(true);
+      if (res.ok) {
+        setEmailSaved(true);
+      } else {
+        // Previously silent -- the button just sat there with no success
+        // and no error, which reads as broken. Always say something.
+        setEmailSaveError(true);
+      }
     } catch {
-      /* silent — this is a nice-to-have */
+      setEmailSaveError(true);
     }
   }
 
   async function saveCheckIn(e: FormEvent) {
     e.preventDefault();
     if (!userId || !checkInTime) return;
+    setCheckInSaveError(false);
     let timezone = "UTC";
     try {
       timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
@@ -3477,9 +3527,13 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, preferredTime: checkInTime, timezone }),
       });
-      if (res.ok) setCheckInSaved(true);
+      if (res.ok) {
+        setCheckInSaved(true);
+      } else {
+        setCheckInSaveError(true);
+      }
     } catch {
-      /* silent — this is a nice-to-have */
+      setCheckInSaveError(true);
     }
   }
 
@@ -3849,6 +3903,7 @@ export default function Home() {
               <button type="submit">{s.saveLabel}</button>
             </form>
           )}
+          {emailSaveError && <p className="error-line">{SAVE_ERROR_FALLBACK.saveErrorLabel}</p>}
           <p>{s.checkInPromptText || CHECKIN_FALLBACK.checkInPromptText}</p>
           {checkInSaved ? (
             <span className="settings-status">{s.savedLabel}</span>
@@ -3871,6 +3926,7 @@ export default function Home() {
               <button type="submit">{s.saveLabel}</button>
             </form>
           )}
+          {checkInSaveError && <p className="error-line">{SAVE_ERROR_FALLBACK.saveErrorLabel}</p>}
           <div className="settings-subscription">
             {subscribed ? (
               <button type="button" onClick={openPortal} disabled={checkoutLoading}>
