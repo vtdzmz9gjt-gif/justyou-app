@@ -3663,6 +3663,13 @@ export default function Home() {
 
   const hasStarted = visibleMessages.length > 0;
   const awaitingDepth = selectedMood !== null && !hasStarted;
+  // A blocked send() (checkConversationGate's monthly/first-conversation/
+  // 24h-wait limits) sets subscriptionLimit but never adds to messages --
+  // so hasStarted stays false and awaitingDepth stays true forever once
+  // someone picks a depth into a block. Every render site below that
+  // branches on awaitingDepth explicitly excludes this case too, so the
+  // depth question steps aside for the limit card instead of reappearing
+  // with no way forward.
 
   const activeColors = stage
     ? STAGE_COLORS[stage]
@@ -3966,7 +3973,7 @@ export default function Home() {
         </div>
       )}
 
-      {showFirstLight ? null : !hasStarted && !awaitingDepth ? (
+      {showFirstLight ? null : !hasStarted && !awaitingDepth && !subscriptionLimit ? (
         <div className="opening">
           <p className="opening-question">{openingQuestion}</p>
           {/* The answer field used to live here too, duplicating the real
@@ -4005,7 +4012,7 @@ export default function Home() {
             </>
           )}
         </div>
-      ) : awaitingDepth ? (
+      ) : awaitingDepth && !subscriptionLimit ? (
         <div className="opening">
           <p className="mood-caption">{s.depthQuestion}</p>
           <div className="mood-row depth-row">
@@ -4076,7 +4083,7 @@ export default function Home() {
         </div>
       )}
 
-      {!awaitingDepth && (subscriptionLimit ? (
+      {(!awaitingDepth || subscriptionLimit) && (subscriptionLimit ? (
         <div className="composer">
           <div className="limit-card">
             <p>{subscriptionLimit}</p>
