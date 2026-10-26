@@ -47,18 +47,37 @@ const anthropic = new Anthropic({
 const MODEL = process.env.ANTHROPIC_MODEL || "claude-sonnet-5";
 
 // Whether an error is a transient one worth retrying rather than failing
-// the turn outright -- overloaded (529, surfaces as InternalServerError
-// since APIError.generate buckets any status >=500 there), rate-limited
-// (429), a connection drop, or a timeout (APIConnectionTimeoutError, a
-// subclass of APIConnectionError). Never retries a 4xx like bad auth or a
-// malformed request -- those won't succeed on a second try and retrying
-// them would just add latency to a doomed call.
+// the turn outright. Status-based, not subclass-based -- a prior version
+// of this checked `instanceof RateLimitError | InternalServerError |
+// APIConnectionError`, which silently missed a real gap: reading the
+// SDK's own APIError.generate() (node_modules/@anthropic-ai/sdk/src/core/
+// error.ts), only status 400/401/403/404/409/422/429/>=500 get bucketed
+// into one of those named subclasses -- a 408 (request timeout, squarely
+// transient) and anything else unenumerated fall through to the bare
+// APIError base class, which none of those three `instanceof` checks
+// matched. That meant a 408 failed fast with zero retries instead of the
+// 2 extra attempts every other transient status got.
 function isRetryableAnthropicError(err: unknown): boolean {
-  return (
-    err instanceof Anthropic.RateLimitError ||
-    err instanceof Anthropic.InternalServerError ||
-    err instanceof Anthropic.APIConnectionError
-  );
+  if (!(err instanceof Anthropic.APIError)) return false;
+  const status = err.status;
+  // No status = a connection-level failure (APIConnectionError, including
+  // its APIConnectionTimeoutError subclass) -- always worth a retry. With
+  // a status, retry only request-timeout, rate-limited, or any server-side
+  // failure (>=500, covers 529 overloaded). Never a definite client error
+  // (bad auth, malformed request, not found, conflict, unprocessable) --
+  // none of those succeed on a second try.
+  return status === undefined || status === 408 || status === 429 || status >= 500;
+}
+
+// Pulled out so route.ts's top-level catch can enrich its own Sentry
+// capture without importing the SDK itself just for one instanceof check
+// -- a thrown Anthropic error previously reached Sentry as a bare
+// exception with no status/type visible without opening the stack trace,
+// which is exactly what made the last "couldn't respond" report need a
+// second, separately-found event to actually diagnose.
+export function anthropicErrorDetails(err: unknown): Record<string, unknown> | undefined {
+  if (!(err instanceof Anthropic.APIError)) return undefined;
+  return { anthropicStatus: err.status, anthropicType: err.type, anthropicErrorName: err.constructor.name };
 }
 
 // Short, fixed backoff -- a transient overloaded/timeout error usually

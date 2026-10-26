@@ -13,7 +13,7 @@ import {
   type ConversationGateReason,
   FIRST_CONVERSATION_REPLY_CAP,
 } from "@/lib/db";
-import { runChat } from "@/lib/anthropic";
+import { runChat, anthropicErrorDetails } from "@/lib/anthropic";
 
 // runChat's tool-use loop can make up to 4 sequential calls to Claude in a
 // single turn (recording a commitment, signaling a stage, offering
@@ -110,8 +110,13 @@ export async function POST(req: NextRequest) {
     ]);
   } catch (err) {
     clearTimeout(timeoutId);
-    console.error("chat error", err);
-    Sentry.captureException(err, { tags: { route: "api/chat" }, extra: { userId } });
+    // anthropicErrorDetails surfaces status/type/name directly on this one
+    // event when it's a thrown Anthropic API error -- e.g. status: 408,
+    // type: "timeout_error" -- instead of needing a second, separately
+    // dug-up event just to see what actually failed.
+    const details = anthropicErrorDetails(err);
+    console.error("chat error", err, details ?? "");
+    Sentry.captureException(err, { tags: { route: "api/chat" }, extra: { userId, ...details } });
     return NextResponse.json(
       { error: "Just You couldn't respond just now. Try again in a moment." },
       { status: 502 }
