@@ -1,4 +1,4 @@
-import { neon } from "@neondatabase/serverless";
+import { neon, type NeonQueryFunction } from "@neondatabase/serverless";
 import {
   EDGES,
   NODE_ORDER,
@@ -12,26 +12,52 @@ import {
 } from "@/lib/tree";
 import { THEME_ORDER, type FamilyTheme, type FamilyLine, type FamilyState } from "@/lib/family";
 
-// Runs at module load -- the moment any route imports this file, before
-// any request handler's own try/catch ever gets a chance to run -- so an
-// unset DATABASE_URL here crashes every DB-backed route in the app with
-// whatever error neon() itself throws. Checked explicitly so that error
-// is immediately legible (which env var, which environment) instead of
-// the driver's generic "no connection string provided" with a stack
-// trace pointing into node_modules. Prime suspect for a crash like this:
-// DATABASE_URL set for Production but not for Preview in Vercel's env
-// var config -- an easy miss with integrations that default to
-// Production-only unless Preview is checked explicitly.
-if (!process.env.DATABASE_URL) {
-  throw new Error(
-    "DATABASE_URL is not set for this environment (" +
-      `VERCEL_ENV=${process.env.VERCEL_ENV ?? "unknown"}` +
-      "). Check Vercel → Project Settings → Environment Variables — " +
-      "a var added via an integration can default to Production only, " +
-      "leaving Preview (and Development) without it."
-  );
+// Lazy on purpose -- confirmed the hard way: `next build`'s "Collecting
+// page data" step imports every route module (including ones that only
+// touch the DB inside a request handler, like the cron routes) just to
+// read their static exports, with no DATABASE_URL in that build-time
+// environment. An eager `neon(process.env.DATABASE_URL!)` here (what this
+// used to be, and briefly an explicit eager check before that) throws
+// during that import and fails the WHOLE build, so Vercel keeps serving
+// whatever the last successful build was -- every fix since silently
+// never actually shipped. Deferring the check (and the neon() call
+// itself) to first real use means the build only imports this module,
+// never calls into it, so it can't fail here -- the same legible error
+// now throws on the first actual query instead, same message, real
+// runtime failure only, never a build-time one.
+// Explicit <false, false> -- ReturnType<typeof neon> does NOT resolve
+// neon()'s generic defaults the way a direct `neon(url)` call does (it
+// leaves ArrayMode/FullResults at their `boolean` constraint instead of
+// their `= false` default), which silently widens every `` sql`...` ``
+// call site's result to a FullQueryResults/any[][] union. Confirmed via
+// tsc -- spelled out explicitly instead.
+let _sql: NeonQueryFunction<false, false> | undefined;
+function getSql(): NeonQueryFunction<false, false> {
+  if (_sql) return _sql;
+  if (!process.env.DATABASE_URL) {
+    throw new Error(
+      "DATABASE_URL is not set for this environment (" +
+        `VERCEL_ENV=${process.env.VERCEL_ENV ?? "unknown"}` +
+        "). Check Vercel → Project Settings → Environment Variables — " +
+        "a var added via an integration can default to Production only, " +
+        "leaving Preview (and Development) without it."
+    );
+  }
+  _sql = neon(process.env.DATABASE_URL);
+  return _sql;
 }
-const sql = neon(process.env.DATABASE_URL);
+// A Proxy so every existing `` sql`...` `` call site below (there are
+// many) keeps working unchanged -- callable (tagged-template calls go
+// through `apply`) and forwards any property access (e.g. sql.transaction)
+// to the real client once it exists, lazily created on first touch.
+const sql: NeonQueryFunction<false, false> = new Proxy(function sql() {} as unknown as NeonQueryFunction<false, false>, {
+  apply(_target, thisArg, args) {
+    return Reflect.apply(getSql() as unknown as (...a: unknown[]) => unknown, thisArg, args);
+  },
+  get(_target, prop, receiver) {
+    return Reflect.get(getSql() as object, prop, receiver);
+  },
+});
 
 // Fixed id for the automated health-check turn (see
 // app/api/cron/health-check/route.ts) -- a plain readable string, never a
