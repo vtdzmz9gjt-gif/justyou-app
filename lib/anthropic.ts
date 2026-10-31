@@ -856,6 +856,16 @@ export async function runChat(
   // round before ever falling back to the generic reply. Capped at 2
   // extra attempts (3 total) so a genuinely stuck case still terminates
   // quickly rather than tripling the turn's latency on every failure.
+  //
+  // That said, NOT every empty-looking response is this transient case --
+  // confirmed via Sentry on a real, deep conversation (round 0, 3/3
+  // retries exhausted, stopReason "max_tokens" on every single attempt):
+  // a reply needing real room (composing a thoughtful answer alongside a
+  // tool call like signal_depth, on substantive, late-stage material) got
+  // cut off mid-generation by the old max_tokens:1024 ceiling every time,
+  // deterministically -- retrying the identical request against the same
+  // too-small budget just burns 3 paid calls to fail the same way 3
+  // times before falling back anyway. See max_tokens below.
   const MAX_EMPTY_RETRIES = 2;
   const ROUNDS = 6;
   for (let round = 0; round < ROUNDS; round++) {
@@ -866,7 +876,15 @@ export async function runChat(
       response = await createChatMessage(
         {
           model: MODEL,
-          max_tokens: 1024,
+          // Raised from 1024 -- confirmed too tight for a substantive
+          // turn (a full reply plus a tool call like signal_depth) on
+          // deep, late-stage conversation material; see the comment on
+          // MAX_EMPTY_RETRIES above for the real incident this traces
+          // to. This is a ceiling, not a spend -- billed only for tokens
+          // actually generated, so a short reply still costs the same as
+          // before; this only changes what a turn that genuinely needs
+          // more room is allowed to use instead of getting cut off.
+          max_tokens: 4096,
           system,
           tools: round < ROUNDS - 1 ? tools : undefined,
           messages,
