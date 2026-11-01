@@ -694,6 +694,19 @@ export async function getMessages(userId: string): Promise<StoredMessage[]> {
   return rows as unknown as StoredMessage[];
 }
 
+// Wipes one user's entire message history -- not a general-purpose
+// function, only ever meant for the health-check synthetic user (see
+// HEALTH_CHECK_USER_ID). That user's "conversation" has no real content
+// worth keeping, but tagFamilyPattern now sends the FULL history on every
+// call (see its own comment), so left to run every 15 minutes forever
+// with nothing ever trimming it, its own classification cost would climb
+// without bound. Called right after each health-check turn so the next
+// one always starts from empty.
+export async function deleteAllMessages(userId: string): Promise<void> {
+  await ensureSchema();
+  await sql`DELETE FROM messages WHERE user_id = ${userId}`;
+}
+
 export async function addMessage(
   userId: string,
   role: Role,
