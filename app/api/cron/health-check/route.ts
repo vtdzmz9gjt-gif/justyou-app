@@ -1,14 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
 import * as Sentry from "@sentry/nextjs";
-import { HEALTH_CHECK_USER_ID } from "@/lib/db";
+import { HEALTH_CHECK_USER_ID, deleteHealthCheckMessages } from "@/lib/db";
 
-// Periodic synthetic turn against the real public /api/chat endpoint --
-// not an internal shortcut -- so this tests the exact path a real user
-// hits (DNS, Vercel routing, the whole thing), not a bypassed version of
-// it. Same CRON_SECRET auth pattern as the existing check-ins cron. A
-// fixed, permanent test user (HEALTH_CHECK_USER_ID) is excluded from
-// getAdminSignals()/getSignals() everywhere they touch users/messages/
-// commitments/tags, so this never pollutes real-traffic counts.
+// Daily (see vercel.json) synthetic turn against the real public
+// /api/chat endpoint -- not an internal shortcut -- so this tests the
+// exact path a real user hits (DNS, Vercel routing, the whole thing), not
+// a bypassed version of it. Same CRON_SECRET auth pattern as the existing
+// check-ins cron. A fixed, permanent test user (HEALTH_CHECK_USER_ID) is
+// excluded from getAdminSignals()/getSignals() everywhere they touch
+// users/messages/commitments/tags, so this never pollutes real-traffic
+// counts. Was every 15 minutes -- real cost, every single run, since this
+// hits the real API same as any user turn, with zero real users behind
+// any of it; daily keeps the same coverage (one real check that the
+// deployed site can still reach the model end to end) at roughly 1/96th
+// the spend. Its own message history is wiped before every run (below) so
+// tagFamilyPattern's now-full-history classification call can't let this
+// cost climb on its own, independent of the frequency cut.
 const SITE_URL = "https://www.justyou.fyi";
 const SLOW_THRESHOLD_MS = 20_000;
 const TEST_MESSAGE = "This is an automated health check. A brief reply is fine.";
@@ -27,6 +34,21 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Wiped before this run, not after -- so every run, including the very
+  // first one after a deploy and any run following one whose own cleanup
+  // never got to run (killed, crashed, etc.), starts from a guaranteed-
+  // empty history rather than "usually empty except when the previous
+  // run's own cleanup failed." Its own try/catch, outside the timer
+  // below: a delete failure is a reason to look at the DB, never a
+  // reason to skip or fail this run's actual check.
+  try {
+    await deleteHealthCheckMessages();
+  } catch (err) {
+    console.error("[health-check] failed to reset synthetic user history", err);
+  }
+
+  // Started only now -- the delete's own DB round trip isn't part of
+  // what this measures or what SLOW_THRESHOLD_MS judges.
   const started = Date.now();
   let ok = false;
   let status: number | undefined;
